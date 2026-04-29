@@ -6,25 +6,24 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  if (!process.env.ANTHROPIC_API_KEY) {
-    return res.status(500).json({ error: 'ANTHROPIC_API_KEY not set in Vercel environment variables' });
+  if (!process.env.GEMINI_API_KEY) {
+    return res.status(500).json({ error: 'GEMINI_API_KEY not set in Vercel environment variables' });
   }
 
   try {
-    // 클라이언트가 보낸 body를 그대로 사용하지 않고, 안전하게 재구성
     const userPrompt = req.body?.messages?.[0]?.content || '주식 분석을 해주세요.';
 
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${process.env.GEMINI_API_KEY}`;
+
+    const response = await fetch(url, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': process.env.ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01',
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 1500,
-        messages: [{ role: 'user', content: userPrompt }],
+        contents: [{ parts: [{ text: userPrompt }] }],
+        generationConfig: {
+          temperature: 0.7,
+          maxOutputTokens: 2048,
+        },
       }),
     });
 
@@ -34,13 +33,17 @@ export default async function handler(req, res) {
 
     if (!response.ok) {
       return res.status(response.status).json({
-        error: 'Anthropic API error',
+        error: 'Gemini API error',
         status: response.status,
         details: data,
       });
     }
 
-    return res.status(200).json(data);
+    // Gemini 응답을 Anthropic 형식으로 변환 (프론트엔드는 그대로 사용)
+    const aiText = data?.candidates?.[0]?.content?.parts?.[0]?.text || '응답이 비어있습니다.';
+    return res.status(200).json({
+      content: [{ type: 'text', text: aiText }],
+    });
   } catch (e) {
     return res.status(500).json({ error: 'Server error: ' + e.message });
   }
