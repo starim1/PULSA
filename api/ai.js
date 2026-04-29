@@ -13,7 +13,7 @@ export default async function handler(req, res) {
   try {
     const userPrompt = req.body?.messages?.[0]?.content || '주식 분석을 해주세요.';
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${process.env.GEMINI_API_KEY}`;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${process.env.GEMINI_API_KEY}`;
 
     const response = await fetch(url, {
       method: 'POST',
