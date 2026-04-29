@@ -388,11 +388,16 @@ async function doAI(){
   $('aio').style.display='none';$('ail').style.display='block';$('aib').disabled=true;
   const prompt=`당신은 전문 주식 애널리스트입니다. ${d.tk} 주식을 분석해주세요.\n\n현재가: $${d.cp} | 전일대비: ${d.dc>=0?'+':''}$${Math.abs(d.dc).toFixed(2)} (${fp(d.dcp)})\n52주 최고: $${f2(d.meta.fiftyTwoWeekHigh)} | 52주 최저: $${f2(d.meta.fiftyTwoWeekLow)}\n\n기술적 지표:\n- RSI(14): ${d.lr?.toFixed(1)} → ${d.lr>70?'과매수':d.lr<30?'과매도':'중립'}\n- MACD: ${d.lm>d.ls?'상승 추세':'하락 추세'}\n- SMA20: $${f2(d.s20[d.s20.length-1])}, SMA50: $${f2(d.s50[d.s50.length-1])}\n- 볼린저밴드 상단: $${f2(d.bnd.U[d.bnd.U.length-1])}, 하단: $${f2(d.bnd.L[d.bnd.L.length-1])}\n\n최신 뉴스를 검색하고 한국어로 작성해주세요:\n1. 📊 종합 투자 의견 (매수/매도/관망 + 신뢰도)\n2. 📈 기술적 분석 요약\n3. 📰 최신 뉴스 및 주요 이슈\n4. 🎯 단기 전망 및 매수/매도 타점\n5. ⚠️ 주요 리스크`;
   try{
-    const res=await fetch('/api/ai',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1000,tools:[{type:'web_search_20250305',name:'web_search'}],messages:[{role:'user',content:prompt}]})});
+    const res=await fetch('/api/ai',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({messages:[{role:'user',content:prompt}]})});
     const data=await res.json();
-    const txt=data.content.filter(b=>b.type==='text').map(b=>b.text).join('\n');
-    $('aio').textContent=txt||'결과를 받아오지 못했습니다.';$('aio').style.display='block';
-  }catch(e){$('aio').textContent='AI 분석 실패. 잠시 후 다시 시도해주세요.';$('aio').style.display='block';}
+    if(!res.ok||data.error){
+      $('aio').textContent='⚠️ 디버그 정보:\n\nHTTP 상태: '+res.status+'\n\n응답:\n'+JSON.stringify(data,null,2);
+      $('aio').style.display='block';
+    }else{
+      const txt=data.content.filter(b=>b.type==='text').map(b=>b.text).join('\n');
+      $('aio').textContent=txt||'결과를 받아오지 못했습니다.';$('aio').style.display='block';
+    }
+  }catch(e){$('aio').textContent='⚠️ 네트워크 오류: '+e.message;$('aio').style.display='block';}
   $('ail').style.display='none';$('aib').disabled=false;
 }
 function drawBT(){
