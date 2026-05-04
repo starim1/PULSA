@@ -1,21 +1,21 @@
 {
-  "name": "Pulsa - 주식 분석 대시보드",
+  "name": "Pulsa - Personal Ultimate Live Stock Assistant",
   "short_name": "Pulsa",
-  "description": "Market Pulse, Real Time. 실시간 주식 분석 + AI 인사이트",
+  "description": "당신이 잠든 사이에도 시장의 심장은 뜁니다. PULSA가 그 맥박을 놓치지 않고 보고합니다.",
   "start_url": "/",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#0a0e1a",
-  "theme_color": "#0a0e1a",
+  "background_color": "#0a1628",
+  "theme_color": "#0a1628",
   "icons": [
     {
-      "src": "/icon.svg",
+      "src": "/icon.svg?v=2",
       "sizes": "192x192",
       "type": "image/svg+xml",
       "purpose": "any"
     },
     {
-      "src": "/icon.svg",
+      "src": "/icon.svg?v=2",
       "sizes": "512x512",
       "type": "image/svg+xml",
       "purpose": "any maskable"
