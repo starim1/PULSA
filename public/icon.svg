@@ -1,19 +1,106 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192">
   <defs>
     <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#0a0e1a"/>
-      <stop offset="100%" stop-color="#1a2235"/>
+      <stop offset="0%" stop-color="#0d2340"/>
+      <stop offset="100%" stop-color="#1a3a5c"/>
     </linearGradient>
-    <linearGradient id="gold" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#f5d97b"/>
-      <stop offset="50%" stop-color="#d4af37"/>
-      <stop offset="100%" stop-color="#b8941e"/>
+    <linearGradient id="heartGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#ff6b7a"/>
+      <stop offset="100%" stop-color="#dc2949"/>
     </linearGradient>
+    <linearGradient id="pulseRed" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#ff8896" stop-opacity="0"/>
+      <stop offset="20%" stop-color="#ff6b7a"/>
+      <stop offset="100%" stop-color="#ff4d6d"/>
+    </linearGradient>
+    <linearGradient id="arrowGrad" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#0ea860"/>
+      <stop offset="50%" stop-color="#22e8a8"/>
+      <stop offset="100%" stop-color="#26d782"/>
+    </linearGradient>
+    <filter id="redGlow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="2" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="greenGlow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="1.5" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
   </defs>
+
+  <!-- Background -->
   <rect width="192" height="192" rx="42" fill="url(#bg)"/>
-  <!-- Pulse waveform -->
-  <path d="M 30 96 L 56 96 L 68 70 L 84 122 L 96 60 L 108 130 L 124 80 L 136 96 L 162 96"
-        fill="none" stroke="url(#gold)" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
-  <!-- Pulse dot -->
-  <circle cx="96" cy="96" r="5" fill="url(#gold)"/>
+
+  <!-- Subtle radial highlight at top -->
+  <ellipse cx="96" cy="40" rx="80" ry="40" fill="#ffffff" opacity="0.03"/>
+
+  <!-- Chart grid (bottom right, subtle green) -->
+  <g opacity="0.55" stroke="#26d782" stroke-width="1.5" fill="none">
+    <line x1="118" y1="100" x2="118" y2="158"/>
+    <line x1="138" y1="100" x2="138" y2="158"/>
+    <line x1="158" y1="100" x2="158" y2="158"/>
+    <line x1="178" y1="100" x2="178" y2="158"/>
+    <line x1="118" y1="118" x2="178" y2="118"/>
+    <line x1="118" y1="138" x2="178" y2="138"/>
+    <line x1="118" y1="158" x2="178" y2="158"/>
+  </g>
+
+  <!-- Red pulse waveform (incoming from left) -->
+  <g filter="url(#redGlow)">
+    <path d="M 8 110
+             L 32 110
+             L 38 102
+             L 44 118
+             L 50 88
+             L 56 124
+             L 62 110
+             L 78 110"
+          fill="none"
+          stroke="url(#pulseRed)"
+          stroke-width="5"
+          stroke-linecap="round"
+          stroke-linejoin="round"/>
+  </g>
+
+  <!-- Heart outline (red) -->
+  <g filter="url(#redGlow)">
+    <path d="M 96 138
+             C 96 138 56 110 56 78
+             A 20 20 0 0 1 96 70
+             A 20 20 0 0 1 136 78
+             C 136 110 96 138 96 138 Z"
+          fill="none"
+          stroke="url(#heartGrad)"
+          stroke-width="6"
+          stroke-linejoin="round"/>
+  </g>
+
+  <!-- Green arrow rising up-right through the heart -->
+  <g filter="url(#greenGlow)">
+    <!-- Arrow shaft -->
+    <path d="M 64 124
+             L 80 110
+             L 92 122
+             L 108 100
+             L 124 112
+             L 152 78"
+          fill="none"
+          stroke="url(#arrowGrad)"
+          stroke-width="7"
+          stroke-linecap="round"
+          stroke-linejoin="round"/>
+    <!-- Arrow head -->
+    <path d="M 134 76 L 156 74 L 154 96"
+          fill="none"
+          stroke="url(#arrowGrad)"
+          stroke-width="7"
+          stroke-linecap="round"
+          stroke-linejoin="round"/>
+  </g>
 </svg>
