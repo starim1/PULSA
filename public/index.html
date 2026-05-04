@@ -1017,12 +1017,23 @@ async function go(){
     let recommend=null,quoteSummary=null;
     try{
       [recommend,quoteSummary]=await Promise.all([
-        tryFetch(`/api/finnhub?symbol=${tk}&type=recommend`).catch(()=>null),
-        tryFetch(`/api/quote?symbol=${tk}`).catch(()=>null),
+        tryFetch(`/api/finnhub?symbol=${tk}&type=recommend`).catch(e=>{console.warn('[Pulsa] recommend 실패:',e);return null;}),
+        tryFetch(`/api/quote?symbol=${tk}`).catch(e=>{console.warn('[Pulsa] quote 실패:',e);return null;}),
       ]);
-    }catch(e){}
+    }catch(e){console.warn('[Pulsa] Promise.all 실패:',e);}
     D.recommend=recommend;
     D.qs=quoteSummary?.quoteSummary?.result?.[0]||null;
+
+    // 디버그: 데이터 소스 상태 확인
+    if(!D.qs){
+      console.warn('[Pulsa] quoteSummary 데이터 없음. 응답:',quoteSummary);
+      // 화면 우측 상단에 안내
+      if(quoteSummary?.error){
+        toast('Yahoo 일부 데이터 차단됨: '+(quoteSummary.error||''),5000);
+      }
+    }else{
+      console.log('[Pulsa] quoteSummary OK. 모듈들:',Object.keys(D.qs));
+    }
 
     let analystScore=null;
     if(recommend?.[0]){
@@ -1140,12 +1151,15 @@ function drawPrice(){
   }));
 
   if(CURRENT_CHART_MODE==='candle'){
-    // chartjs-chart-financial 플러그인 확인
-    if(typeof Chart.controllers?.candlestick==='undefined'&&!Chart.registry.controllers.get('candlestick')){
-      // 플러그인이 로드 안됐으면 선형으로 폴백
+    // chartjs-chart-financial 플러그인 확인 (안전한 체크)
+    let candlestickAvailable=false;
+    try{
+      candlestickAvailable=!!(Chart.registry&&Chart.registry.controllers&&Chart.registry.controllers.get('candlestick'));
+    }catch(e){candlestickAvailable=false;}
+    if(!candlestickAvailable){
       CURRENT_CHART_MODE='line';
       document.querySelectorAll('.cm-btn').forEach(b=>b.classList.toggle('on',b.dataset.mode==='line'));
-      toast('캔들 차트 플러그인 로딩 실패, 선형으로 표시합니다');
+      toast('캔들 차트를 사용할 수 없어 선형으로 표시합니다');
     }
   }
 
