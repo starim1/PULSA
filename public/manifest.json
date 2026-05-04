@@ -1,22 +1,24 @@
 {
-  "name": "주식 분석 대시보드",
-  "short_name": "주식분석",
-  "description": "실시간 주식 분석 + AI 인사이트",
+  "name": "Pulsa - 주식 분석 대시보드",
+  "short_name": "Pulsa",
+  "description": "Market Pulse, Real Time. 실시간 주식 분석 + AI 인사이트",
   "start_url": "/",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#111111",
-  "theme_color": "#378ADD",
+  "background_color": "#0a0e1a",
+  "theme_color": "#0a0e1a",
   "icons": [
     {
-      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect width='192' height='192' rx='40' fill='%23378ADD'/><text x='96' y='130' text-anchor='middle' font-size='100' fill='white'>📈</text></svg>",
+      "src": "/icon.svg",
       "sizes": "192x192",
-      "type": "image/svg+xml"
+      "type": "image/svg+xml",
+      "purpose": "any"
     },
     {
-      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect width='512' height='512' rx='100' fill='%23378ADD'/><text x='256' y='350' text-anchor='middle' font-size='280' fill='white'>📈</text></svg>",
+      "src": "/icon.svg",
       "sizes": "512x512",
-      "type": "image/svg+xml"
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
     }
   ]
 }
