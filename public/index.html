@@ -2153,6 +2153,7 @@ async function runAIPicks(){
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({prompt}),
+      timeout:60000,
     });
     let txt=r?.content?.[0]?.text||r?.text||'';
     // JSON 추출
@@ -2570,6 +2571,7 @@ ${p.label} 동안의 주요 뉴스 / 정책 / 실적 등 2~3개
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({prompt}),
+      timeout:60000,
     });
     let txt=r?.content?.[0]?.text||r?.text||'';
     if(!txt){
@@ -2583,7 +2585,15 @@ ${p.label} 동안의 주요 뉴스 / 정책 / 실적 등 2~3개
       .replace(/\n/g,'<br>');
     out.innerHTML=`<p>${html}</p>`;
   }catch(e){
-    out.innerHTML='<div class="ltxt" style="text-align:left">분석 실패: '+e.message+'</div>';
+    const isOverload=e.message&&(e.message.includes('503')||e.message.includes('429')||e.message.includes('500'));
+    if(isOverload){
+      out.innerHTML=`<div class="ltxt" style="text-align:left;line-height:1.7">⚠️ AI 서비스가 일시적으로 과부하 상태입니다.<br><br>
+        잠시 후 다시 시도해주세요.<br>
+        <button class="btn btn-p" onclick="loadMarketAnalysis('${period}')" style="margin-top:10px">🔄 다시 시도</button></div>`;
+    }else{
+      out.innerHTML=`<div class="ltxt" style="text-align:left">분석 실패: ${e.message}<br>
+        <button class="btn btn-p" onclick="loadMarketAnalysis('${period}')" style="margin-top:10px">🔄 다시 시도</button></div>`;
+    }
   }
 }
 async function fetchIdx(tk){
