@@ -51,12 +51,13 @@ export default async function handler(req, res) {
 
     const errors = [];
     
-    // 각 모델 시도, 503/429이면 백오프 후 재시도
+    // 각 모델당 3회 시도 (지수 백오프: 2초 → 5초 → 다음 모델)
+    const RETRY_DELAYS = [2000, 5000];  // 1차 실패 후 2초, 2차 실패 후 5초
+    
     for (const model of models) {
       const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${process.env.GEMINI_API_KEY}`;
       
-      // 한 모델당 최대 2회 시도 (재시도 포함)
-      for (let attempt = 0; attempt < 2; attempt++) {
+      for (let attempt = 0; attempt < 3; attempt++) {
         try {
           const response = await fetch(url, {
             method: 'POST',
@@ -90,15 +91,15 @@ export default async function handler(req, res) {
             });
           }
 
-          // 503, 429: 재시도 가치 있음
+          // 503, 429, 500: 재시도 가치 있음
           if (response.status === 503 || response.status === 429 || response.status === 500) {
-            errors.push({ model, attempt, status: response.status });
-            // 첫 번째 시도 실패: 1.5초 대기 후 재시도
-            if (attempt === 0) {
-              await new Promise(r => setTimeout(r, 1500));
+            errors.push({ model, attempt: attempt+1, status: response.status });
+            // 마지막 시도가 아니면 백오프 후 재시도
+            if (attempt < 2) {
+              await new Promise(r => setTimeout(r, RETRY_DELAYS[attempt]));
               continue;
             }
-            // 두 번째 시도도 실패: 다음 모델로
+            // 3번 다 실패: 다음 모델로
             break;
           }
 
@@ -111,9 +112,9 @@ export default async function handler(req, res) {
           });
 
         } catch (e) {
-          errors.push({ model, attempt, error: e.message });
-          if (attempt === 0) {
-            await new Promise(r => setTimeout(r, 1000));
+          errors.push({ model, attempt: attempt+1, error: e.message });
+          if (attempt < 2) {
+            await new Promise(r => setTimeout(r, RETRY_DELAYS[attempt]));
             continue;
           }
           break;
