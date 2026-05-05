@@ -11,13 +11,11 @@ export default async function handler(req, res) {
   }
 
   try {
-    // 두 형식 모두 지원
     const userPrompt = req.body?.prompt || req.body?.messages?.[0]?.content || '주식 분석';
     const isShort = !!req.body?.short;
-    const useSearch = req.body?.search !== false;  // 기본은 검색 사용
-    const mode = req.body?.mode || (isShort ? 'short' : 'full');  // 'short' | 'translate' | 'full'
+    const useSearch = req.body?.search !== false;
+    const mode = req.body?.mode || (isShort ? 'short' : 'full');
 
-    // 현재 날짜 (한국 시간)
     const now = new Date();
     const krDate = new Intl.DateTimeFormat('ko-KR', {
       timeZone: 'Asia/Seoul',
@@ -25,66 +23,110 @@ export default async function handler(req, res) {
     }).format(now);
 
     let systemContext;
-    if (isShort) {
-      systemContext = `당신은 주식 분석 전문가입니다. 답변은 반드시 한 문장(40자 이내)으로 핵심만. 다른 설명 없이 결과만.`;
+    if (isShort || mode === 'translate') {
+      systemContext = mode === 'translate'
+        ? `당신은 전문 번역가입니다. 자연스러운 한국어로만 번역하세요.`
+        : `당신은 주식 분석 전문가입니다. 답변은 반드시 한 문장(40자 이내)으로 핵심만.`;
     } else {
       systemContext = `당신은 전문 주식 애널리스트입니다.
 **중요: 현재 시점은 ${krDate}입니다. 절대 다른 날짜를 사용하지 마세요.**
-답변에서 "현재 시점"을 언급할 때는 반드시 위의 날짜를 사용하세요.
-최신 뉴스와 실적 정보는 Google 검색을 활용해 확인하고, 검색 결과 기반으로 답변하세요.
-검색하지 않은 추측성 정보는 제공하지 마세요.`;
+최신 뉴스는 Google 검색을 활용하세요.`;
     }
 
     const fullPrompt = systemContext + '\n\n' + userPrompt;
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${process.env.GEMINI_API_KEY}`;
+    // 모델 폴백 순서: lite (빠름/저렴) → flash (안정) → flash-002 (백업)
+    const models = ['gemini-2.5-flash-lite', 'gemini-2.0-flash', 'gemini-2.0-flash-001'];
 
     const body = {
       contents: [{ parts: [{ text: fullPrompt }] }],
       generationConfig: {
         temperature: isShort ? 0.5 : 0.7,
-        maxOutputTokens: mode==='short' ? 200 : (mode==='translate' ? 1024 : 2048),
+        maxOutputTokens: mode === 'short' ? 200 : (mode === 'translate' ? 1024 : 2048),
       },
     };
-    if (useSearch && !isShort) {
+    if (useSearch && !isShort && mode !== 'translate') {
       body.tools = [{ google_search: {} }];
     }
 
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
+    const errors = [];
+    
+    // 각 모델 시도, 503/429이면 백오프 후 재시도
+    for (const model of models) {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${process.env.GEMINI_API_KEY}`;
+      
+      // 한 모델당 최대 2회 시도 (재시도 포함)
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+          });
 
-    const text = await response.text();
-    let data;
-    try { data = JSON.parse(text); } catch { data = { raw: text }; }
+          const text = await response.text();
+          let data;
+          try { data = JSON.parse(text); } catch { data = { raw: text }; }
 
-    if (!response.ok) {
-      return res.status(response.status).json({
-        error: 'Gemini API error',
-        status: response.status,
-        details: data,
-      });
+          if (response.ok) {
+            const aiText = data?.candidates?.[0]?.content?.parts
+              ?.map(p => p.text)
+              .filter(Boolean)
+              .join('\n') || '응답이 비어있습니다.';
+
+            if (isShort || mode === 'translate') {
+              return res.status(200).json({ text: aiText.trim(), model });
+            }
+
+            const sources = data?.candidates?.[0]?.groundingMetadata?.groundingChunks
+              ?.map(c => c.web?.title)
+              .filter(Boolean)
+              .slice(0, 3);
+            const sourceText = sources?.length ? '\n\n📚 참고 출처: ' + sources.join(', ') : '';
+
+            return res.status(200).json({
+              content: [{ type: 'text', text: aiText + sourceText }],
+              model,
+            });
+          }
+
+          // 503, 429: 재시도 가치 있음
+          if (response.status === 503 || response.status === 429 || response.status === 500) {
+            errors.push({ model, attempt, status: response.status });
+            // 첫 번째 시도 실패: 1.5초 대기 후 재시도
+            if (attempt === 0) {
+              await new Promise(r => setTimeout(r, 1500));
+              continue;
+            }
+            // 두 번째 시도도 실패: 다음 모델로
+            break;
+          }
+
+          // 400, 401 등 다른 에러는 재시도/폴백 의미 없음
+          return res.status(response.status).json({
+            error: 'Gemini API error',
+            status: response.status,
+            model,
+            details: data,
+          });
+
+        } catch (e) {
+          errors.push({ model, attempt, error: e.message });
+          if (attempt === 0) {
+            await new Promise(r => setTimeout(r, 1000));
+            continue;
+          }
+          break;
+        }
+      }
     }
 
-    const aiText = data?.candidates?.[0]?.content?.parts?.map(p => p.text).filter(Boolean).join('\n') || '응답이 비어있습니다.';
-
-    // short 모드에서는 출처 안 붙임
-    if (isShort) {
-      return res.status(200).json({ text: aiText.trim() });
-    }
-
-    // 검색 출처
-    const sources = data?.candidates?.[0]?.groundingMetadata?.groundingChunks
-      ?.map(c => c.web?.title)
-      .filter(Boolean)
-      .slice(0, 3);
-    const sourceText = sources?.length ? '\n\n📚 참고 출처: ' + sources.join(', ') : '';
-
-    return res.status(200).json({
-      content: [{ type: 'text', text: aiText + sourceText }],
+    // 모든 시도 실패
+    return res.status(503).json({
+      error: 'AI 서비스 일시 과부하. 잠시 후 다시 시도해주세요.',
+      attempts: errors,
     });
+
   } catch (e) {
     return res.status(500).json({ error: 'Server error: ' + e.message });
   }
