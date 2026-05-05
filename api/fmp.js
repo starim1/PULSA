@@ -8,10 +8,13 @@ export default async function handler(req, res) {
   }
 
   // 종목 필요 없는 엔드포인트들
-  const symbolFreeTypes = new Set(['gainers', 'losers', 'actives']);
+  const symbolFreeTypes = new Set(['gainers', 'losers', 'actives', 'earnings_cal']);
   if (!symbol && !symbolFreeTypes.has(type)) {
     return res.status(400).json({ error: 'symbol required' });
   }
+
+  // 추가 쿼리 파라미터
+  const { from, to } = req.query;
 
   // stable 엔드포인트 매핑
   const endpoints = {
@@ -26,6 +29,7 @@ export default async function handler(req, res) {
     actives: `/stable/most-actives`,
     news: `/stable/news/stock?symbols=${symbol}&limit=5`,
     grades: `/stable/grades-consensus?symbol=${symbol}`,
+    earnings_cal: `/stable/earnings-calendar${from?`?from=${from}&to=${to}`:''}`,
   };
 
   const path = endpoints[type] || endpoints.target;
