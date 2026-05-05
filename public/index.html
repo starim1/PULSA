@@ -2536,7 +2536,7 @@ function closeSectorModal(){$('sector-modal').classList.remove('on');}
 async function loadMarketAnalysis(period){
   document.querySelectorAll('[data-period]').forEach(b=>b.classList.toggle('on',b.dataset.period===period));
   const out=$('market-analysis-content');
-  out.innerHTML='<div class="ltxt" style="text-align:left">🤖 AI가 시황 분석 중... (15~30초)</div>';
+  out.innerHTML='<div class="ltxt" style="text-align:left">🤖 AI가 시황 분석 중... (최대 60초 소요)<br><span style="font-size:11px;color:var(--text2)">서버 과부하 시 자동으로 재시도하니 잠시만 기다려주세요</span></div>';
   const periodMap={
     '1d':{label:'전날',desc:'어제 미국 증시'},
     '1w':{label:'1주',desc:'최근 1주일 미국 증시'},
