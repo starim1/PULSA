@@ -896,9 +896,14 @@ function setRange(r){
   if(D)go();
 }
 function setChartMode(m){
+  console.log('[Pulsa] setChartMode called:', m);
   CURRENT_CHART_MODE=m;
   document.querySelectorAll('.cm-btn').forEach(b=>b.classList.toggle('on',b.dataset.mode===m));
-  if(D)drawPrice();
+  if(D){
+    drawPrice();
+  }else{
+    toast('먼저 종목을 검색해주세요');
+  }
 }
 
 // ── Indicators ────────────────────────────────────────
@@ -1014,26 +1019,32 @@ async function go(){
     D={...d,lr,lm,ls};
     loadSupportLines(d.tk);
 
-    let recommend=null,quoteSummary=null;
+    // 데이터 소스: Finnhub (메트릭/프로필) + Twelve Data (목표가) + Yahoo는 폴백
+    let recommend=null, finProfile=null, finMetric=null, twelveTarget=null, twelveStats=null;
     try{
-      [recommend,quoteSummary]=await Promise.all([
+      [recommend, finProfile, finMetric, twelveTarget, twelveStats] = await Promise.all([
         tryFetch(`/api/finnhub?symbol=${tk}&type=recommend`).catch(e=>{console.warn('[Pulsa] recommend 실패:',e);return null;}),
-        tryFetch(`/api/quote?symbol=${tk}`).catch(e=>{console.warn('[Pulsa] quote 실패:',e);return null;}),
+        tryFetch(`/api/finnhub?symbol=${tk}&type=profile`).catch(e=>{console.warn('[Pulsa] profile 실패:',e);return null;}),
+        tryFetch(`/api/finnhub?symbol=${tk}&type=metric`).catch(e=>{console.warn('[Pulsa] metric 실패:',e);return null;}),
+        tryFetch(`/api/twelve?symbol=${tk}&type=price_target`).catch(e=>{console.warn('[Pulsa] target 실패:',e);return null;}),
+        tryFetch(`/api/twelve?symbol=${tk}&type=statistics`).catch(e=>{console.warn('[Pulsa] stats 실패:',e);return null;}),
       ]);
     }catch(e){console.warn('[Pulsa] Promise.all 실패:',e);}
-    D.recommend=recommend;
-    D.qs=quoteSummary?.quoteSummary?.result?.[0]||null;
 
-    // 디버그: 데이터 소스 상태 확인
-    if(!D.qs){
-      console.warn('[Pulsa] quoteSummary 데이터 없음. 응답:',quoteSummary);
-      // 화면 우측 상단에 안내
-      if(quoteSummary?.error){
-        toast('Yahoo 일부 데이터 차단됨: '+(quoteSummary.error||''),5000);
-      }
-    }else{
-      console.log('[Pulsa] quoteSummary OK. 모듈들:',Object.keys(D.qs));
-    }
+    D.recommend = recommend;
+    D.finProfile = finProfile;
+    D.finMetric = finMetric;
+    D.twelveTarget = twelveTarget;
+    D.twelveStats = twelveStats;
+
+    // 디버그 로그
+    console.log('[Pulsa] 데이터 상태:', {
+      recommend: !!recommend?.[0],
+      finProfile: !!finProfile?.name,
+      finMetric: !!finMetric?.metric,
+      twelveTarget: !!twelveTarget?.price_target_average,
+      twelveStats: !!twelveStats?.statistics,
+    });
 
     let analystScore=null;
     if(recommend?.[0]){
@@ -1043,26 +1054,26 @@ async function go(){
     }
     const v=calcVerdict(D,analystScore);D.verdict=v;
 
-    // UI
+    // === UI 업데이트 ===
     $('ht').textContent=tk;
-    const profile=D.qs?.assetProfile||D.qs?.summaryProfile;
-    const price=D.qs?.price;
-    if(price?.longName||price?.shortName){$('hname').textContent=price.longName||price.shortName;}else{$('hname').textContent='';}
-    
+
+    // 회사명 (Finnhub profile)
+    const longName = D.finProfile?.name || '';
+    if(longName){$('hname').textContent=longName;}else{$('hname').textContent='';}
+
     // 섹터 / 자산 유형
     let sectorHTML='';
-    if(D.qs?.fundProfile){
-      sectorHTML=`<span class="sec-tag">ETF</span> <span class="sec-tag">${D.qs.fundProfile.categoryName||'펀드'}</span>`;
-    }else if(profile?.sector){
-      sectorHTML=`<span class="sec-tag">${profile.sector}</span>`;
-      if(profile.industry)sectorHTML+=` <span class="sec-tag">${profile.industry}</span>`;
+    if(D.finProfile?.finnhubIndustry){
+      sectorHTML=`<span class="sec-tag">${D.finProfile.finnhubIndustry}</span>`;
     }
-    if(price?.exchangeName)sectorHTML+=` <span class="sec-tag">${price.exchangeName}</span>`;
+    if(D.finProfile?.country)sectorHTML+=` <span class="sec-tag">${D.finProfile.country}</span>`;
+    if(D.finProfile?.exchange)sectorHTML+=` <span class="sec-tag">${D.finProfile.exchange}</span>`;
     $('hsector').innerHTML=sectorHTML;
 
-    // 회사 설명
-    if(profile?.longBusinessSummary){
-      const desc=profile.longBusinessSummary;
+    // 회사 설명 (Twelve Data statistics에 description 있을 수 있음)
+    const description = D.twelveStats?.statistics?.financials?.description || D.finProfile?.weburl ? '공식 웹사이트: '+D.finProfile.weburl : '';
+    if(description){
+      const desc = description;
       $('hdesc').textContent=desc.length>200?desc.substring(0,200)+'...':desc;
       $('hdesc').style.display='block';
     }else{$('hdesc').style.display='none';}
@@ -1071,45 +1082,50 @@ async function go(){
     $('krw').textContent=fkrw(d.cp);
     const ce=$('hc');ce.textContent=`${d.dc>=0?'+':''}$${Math.abs(d.dc).toFixed(2)} (${fp(d.dcp)})`;ce.className='h-chg '+(d.dc>=0?'up':'down');
 
-    // Verdict (오른쪽 상단 일관)
+    // Verdict
     const vd=$('verdict');vd.style.display='inline-flex';vd.className='verdict '+v.cls;
     $('verdict-text').textContent=v.em+' '+v.text;
     $('verdict-detail').textContent='Score: '+v.score+'/10';
 
-    // Metrics - 여러 경로에서 값 시도 (fallback 강화)
-    const fd=D.qs?.financialData;
-    const ks=D.qs?.defaultKeyStatistics;
-    const sd=D.qs?.summaryDetail;
-    const target=fd?.targetMeanPrice?.raw;
+    // === Metrics ===
+    // Finnhub metric에서 값 추출
+    const fm = D.finMetric?.metric || {};
+    // Twelve Data statistics에서 추가 값
+    const tsv = D.twelveStats?.statistics?.valuations_metrics || {};
+    const tsf = D.twelveStats?.statistics?.financials || {};
+    const tsd = D.twelveStats?.statistics?.dividends_and_splits || {};
+    const tss = D.twelveStats?.statistics?.stock_statistics || {};
 
-    // P/E 비율 (여러 출처 시도)
-    let pe=sd?.trailingPE?.raw||ks?.trailingPE?.raw;
-    if(!pe&&ks?.trailingEps?.raw&&d.cp)pe=d.cp/ks.trailingEps.raw;
+    // 목표가 (Twelve Data 우선)
+    const target = D.twelveTarget?.price_target_average ? parseFloat(D.twelveTarget.price_target_average) : null;
+
+    // P/E 비율
+    let pe = fm.peNormalizedAnnual || fm.peTTM || tsv.trailing_pe || tsv.forward_pe;
+    if(!pe && fm.epsNormalizedAnnual && d.cp) pe = d.cp / fm.epsNormalizedAnnual;
 
     // EPS
-    const eps=ks?.trailingEps?.raw;
+    const eps = fm.epsNormalizedAnnual || fm.epsTTM || tsf.most_recent_quarter || null;
 
-    // 배당수익률 (소수/퍼센트 자동 판단)
-    let divRaw=sd?.dividendYield?.raw||sd?.trailingAnnualDividendYield?.raw;
-    let divDisplay='—';
-    if(divRaw!=null){
-      const divPct=divRaw>1?divRaw:divRaw*100; // 이미 퍼센트면 그대로
-      divDisplay=divPct.toFixed(2)+'%';
-    }
+    // 배당수익률
+    let divPct = null;
+    if(fm.dividendYieldIndicatedAnnual != null) divPct = fm.dividendYieldIndicatedAnnual;
+    else if(fm.currentDividendYieldTTM != null) divPct = fm.currentDividendYieldTTM;
+    else if(tsd.forward_annual_dividend_yield) divPct = parseFloat(tsd.forward_annual_dividend_yield)*100;
+    const divDisplay = divPct != null ? divPct.toFixed(2)+'%' : '—';
 
     // 베타
-    const beta=ks?.beta?.raw||sd?.beta?.raw;
+    const beta = fm.beta || (tss.beta ? parseFloat(tss.beta) : null);
 
-    // 시가총액 (여러 출처)
-    const mcap=d.meta.marketCap||D.qs?.price?.marketCap?.raw||sd?.marketCap?.raw||ks?.marketCap?.raw;
+    // 시가총액
+    const mcap = d.meta.marketCap || (D.finProfile?.marketCapitalization ? D.finProfile.marketCapitalization*1e6 : null) || (tsv.market_capitalization ? parseFloat(tsv.market_capitalization) : null);
 
     $('mr').textContent=lr?lr.toFixed(1):'—';$('mr').style.color=lr>70?'var(--down)':lr<30?'var(--up)':'var(--text)';
     $('mm').textContent=lm>ls?'상승':'하락';$('mm').style.color=lm>ls?'var(--up)':'var(--down)';
     $('mtarget').textContent=target?fu(target):'—';
-    $('mpe').textContent=pe?pe.toFixed(1):'—';
-    $('meps').textContent=eps!=null?'$'+eps.toFixed(2):'—';
+    $('mpe').textContent=pe?(typeof pe==='number'?pe.toFixed(1):pe):'—';
+    $('meps').textContent=eps!=null?'$'+(typeof eps==='number'?eps.toFixed(2):eps):'—';
     $('mdiv').textContent=divDisplay;
-    $('mbeta').textContent=beta?beta.toFixed(2):'—';
+    $('mbeta').textContent=beta?(typeof beta==='number'?beta.toFixed(2):beta):'—';
     $('mh').textContent=fu(d.meta.fiftyTwoWeekHigh);
     $('ml').textContent=fu(d.meta.fiftyTwoWeekLow);
     $('mcap').textContent=fk(mcap);
@@ -1286,10 +1302,13 @@ function loadAnalyst(){
       scales:{x:{stacked:true,ticks:{font:{size:9}}},y:{stacked:true,ticks:{font:{size:9}}}}}});
   }
   
-  // Target price (Yahoo quoteSummary)
-  const fd=D.qs?.financialData;
-  if(fd?.targetMeanPrice?.raw){
-    const tm=fd.targetMeanPrice.raw,tl=fd.targetLowPrice?.raw,th=fd.targetHighPrice?.raw,nA=fd.numberOfAnalystOpinions?.raw;
+  // Target price (Twelve Data)
+  const tt = D.twelveTarget;
+  const tm = tt?.price_target_average ? parseFloat(tt.price_target_average) : null;
+  const tl = tt?.price_target_low ? parseFloat(tt.price_target_low) : null;
+  const th = tt?.price_target_high ? parseFloat(tt.price_target_high) : null;
+  const nA = tt?.number_of_analysts ? parseInt(tt.number_of_analysts) : null;
+  if(tm){
     $('an-target-mean').textContent=fu(tm);
     const upside=((tm-D.cp)/D.cp)*100;
     $('an-target-detail').innerHTML=`현재가 대비 <span class="${upside>=0?'up':'down'}">${fp(upside)}</span>${nA?` · ${nA}명`:''}`;
@@ -1304,12 +1323,15 @@ function loadAnalyst(){
     $('an-target-mean').textContent='—';$('an-target-detail').textContent='데이터 없음';
   }
 
-  // ETF holdings
+  // ETF holdings (해당 데이터 소스 없음 - 추후 추가)
+  $('an-hold-wrap').style.display='none';
+  /* ETF holdings - 비활성화 (Yahoo quoteSummary 의존)
   const top=D.qs?.topHoldings;
   if(top?.holdings?.length){
     $('an-hold-wrap').style.display='block';
     $('an-holdings').innerHTML=top.holdings.slice(0,10).map(h=>`<div class="trow"><span><strong style="font-family:Inter">${h.symbol}</strong> ${h.holdingName||''}</span><span>${(h.holdingPercent.raw*100).toFixed(2)}%</span></div>`).join('');
   }else{$('an-hold-wrap').style.display='none';}
+  */
 }
 
 // ── Backtest, Compare, AI (기존 유지) ────────────────
@@ -1384,11 +1406,11 @@ async function doAI(){
   const d=D;if(!d)return;
   $('aio').style.display='none';$('ail').style.display='block';$('aib').disabled=true;
   const recText=d.recommend?.[0]?`애널리스트(${d.recommend[0].period}): 강매수 ${d.recommend[0].strongBuy}, 매수 ${d.recommend[0].buy}, 중립 ${d.recommend[0].hold}, 매도 ${d.recommend[0].sell}, 강매도 ${d.recommend[0].strongSell}`:'';
-  const fd=d.qs?.financialData;
-  const targetText=fd?.targetMeanPrice?.raw?`목표가 평균: $${fd.targetMeanPrice.raw} (최저 $${fd.targetLowPrice?.raw}, 최고 $${fd.targetHighPrice?.raw})`:'';
-  const profile=d.qs?.assetProfile||d.qs?.summaryProfile;
-  const sectorText=profile?.sector?`섹터: ${profile.sector} / 산업: ${profile.industry||''}`:'';
-  const prompt=`당신은 전문 주식 애널리스트입니다. ${d.tk}${d.qs?.price?.longName?` (${d.qs.price.longName})`:''}를 분석해주세요.
+  const tt=d.twelveTarget;
+  const targetText=tt?.price_target_average?`목표가 평균: $${tt.price_target_average} (최저 $${tt.price_target_low}, 최고 $${tt.price_target_high})`:'';
+  const sectorText=d.finProfile?.finnhubIndustry?`섹터/산업: ${d.finProfile.finnhubIndustry}`:'';
+  const longName=d.finProfile?.name||'';
+  const prompt=`당신은 전문 주식 애널리스트입니다. ${d.tk}${longName?` (${longName})`:''}를 분석해주세요.
 
 ${sectorText}
 현재가: $${d.cp} | 전일대비: ${fp(d.dcp)} | 시가총액: ${fk(d.meta.marketCap)}
