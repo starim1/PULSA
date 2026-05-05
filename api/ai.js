@@ -15,6 +15,7 @@ export default async function handler(req, res) {
     const userPrompt = req.body?.prompt || req.body?.messages?.[0]?.content || '주식 분석';
     const isShort = !!req.body?.short;
     const useSearch = req.body?.search !== false;  // 기본은 검색 사용
+    const mode = req.body?.mode || (isShort ? 'short' : 'full');  // 'short' | 'translate' | 'full'
 
     // 현재 날짜 (한국 시간)
     const now = new Date();
@@ -42,7 +43,7 @@ export default async function handler(req, res) {
       contents: [{ parts: [{ text: fullPrompt }] }],
       generationConfig: {
         temperature: isShort ? 0.5 : 0.7,
-        maxOutputTokens: isShort ? 200 : 2048,
+        maxOutputTokens: mode==='short' ? 200 : (mode==='translate' ? 1024 : 2048),
       },
     };
     if (useSearch && !isShort) {
