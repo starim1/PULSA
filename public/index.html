@@ -649,7 +649,6 @@ body::before{
           <button class="tab" onclick="stab('bt')">🔁 백테스트</button>
           <button class="tab" onclick="stab('cmp')">⚖️ 비교</button>
           <button class="tab" onclick="stab('watch')">⭐ 관심종목</button>
-          <button class="tab" onclick="stab('pf')">💼 포트폴리오</button>
           <button class="tab" onclick="stab('alert')">🔔 알림</button>
         </div>
         <div class="tb">
@@ -778,22 +777,6 @@ body::before{
             <p class="sl" style="margin-top:10px">신호 변경 시 자동 알림 · 클릭하면 상세 분석</p>
           </div>
 
-          <div id="tc-pf" class="tc">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><span style="font-size:13px;font-weight:600">내 포트폴리오</span><button class="btn btn-sm" onclick="refreshPF()">새로고침</button></div>
-            <div id="pf-sum" style="display:none"><div class="bt-grid" id="pf-grid" style="margin-bottom:12px"></div></div>
-            <div style="overflow-x:auto"><table class="pf-tbl">
-              <thead><tr><th>종목</th><th>수량</th><th>평단가</th><th>현재가</th><th>평가금액</th><th>수익률</th><th></th></tr></thead>
-              <tbody id="pf-body"><tr><td colspan="7" class="empty">아래에서 종목을 추가해주세요.</td></tr></tbody>
-            </table></div>
-            <div class="add-row">
-              <div class="ig"><label>티커</label><input type="text" id="pf-tk" placeholder="NVDA" style="width:90px;text-transform:uppercase"></div>
-              <div class="ig"><label>수량</label><input type="number" id="pf-sh" placeholder="10" min="0" style="width:90px"></div>
-              <div class="ig"><label>평단가($)</label><input type="number" id="pf-avg" placeholder="120" step="0.01" min="0" style="width:110px"></div>
-              <button class="btn btn-p" onclick="addPF()">+ 추가</button>
-            </div>
-            <div id="pf-loading" class="ltxt" style="display:none">가격 업데이트 중...</div>
-          </div>
-
           <div id="tc-alert" class="tc">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><span style="font-size:13px;font-weight:600">가격 알림</span><button class="btn btn-sm" onclick="reqPerm()">🔔 알림 허용</button></div>
             <div id="al-list"></div>
@@ -809,6 +792,76 @@ body::before{
 
         </div>
       </div>
+    </div>
+  </div>
+
+  <!-- PICKS SCREEN (오늘의 추천) -->
+  <div class="screen" id="screen-picks">
+    <div class="main">
+      <div class="sec-title">⭐ 오늘의 추천 종목</div>
+      <div class="card" style="text-align:center;padding:32px 20px">
+        <div style="font-size:32px;margin-bottom:12px">🚧</div>
+        <div style="font-size:14px;font-weight:600;margin-bottom:6px">2단계에서 추가 예정</div>
+        <div style="font-size:12px;color:var(--text2);line-height:1.6">
+          • 알고리즘 스크리닝 + AI 분석 종합 추천<br>
+          • 가장 많이 오른/하락한 종목<br>
+          • 섹터별 시가총액 상위 종목<br>
+          • 시황 자동 분석 (전날/1주/1달/3개월/1년)
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ASSETS SCREEN (자산 관리) -->
+  <div class="screen" id="screen-assets">
+    <div class="main">
+      <div class="sec-title">💼 내 자산 <button class="btn btn-sm" onclick="refreshAssets()" style="margin-left:auto">새로고침</button></div>
+
+      <!-- 자산 요약 카드 -->
+      <div id="assets-summary" style="display:none">
+        <div class="bt-grid" id="assets-grid" style="margin-bottom:14px"></div>
+      </div>
+
+      <!-- 분석 카드 -->
+      <div id="assets-analysis" style="display:none;margin-bottom:14px">
+        <div class="card">
+          <div style="font-size:12px;color:var(--text2);font-weight:600;text-transform:uppercase;letter-spacing:0.04em;margin-bottom:10px">📊 포트폴리오 분석</div>
+          <div id="assets-analysis-content" style="font-size:13px;line-height:1.7"></div>
+        </div>
+      </div>
+
+      <!-- 종목별 비중 + 섹터별 비중 차트 -->
+      <div id="assets-charts" style="display:none">
+        <div class="analyst-row">
+          <div class="analyst-card">
+            <div class="analyst-title">📈 종목별 비중</div>
+            <div class="cw" style="height:200px"><canvas id="assets-pie"></canvas></div>
+          </div>
+          <div class="analyst-card">
+            <div class="analyst-title">🏭 섹터별 비중</div>
+            <div class="cw" style="height:200px"><canvas id="assets-sector"></canvas></div>
+            <div id="assets-sector-empty" style="display:none;text-align:center;padding:40px 0;color:var(--text2);font-size:11px">종목을 추가하면 자동 분류됩니다</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 보유 종목 리스트 -->
+      <div class="sec-title">보유 종목</div>
+      <div style="overflow-x:auto">
+        <table class="pf-tbl">
+          <thead><tr><th>종목</th><th>섹터</th><th>수량</th><th>평단가</th><th>현재가</th><th>평가금액</th><th>수익률</th><th></th></tr></thead>
+          <tbody id="assets-body"><tr><td colspan="8" class="empty">아래에서 종목을 추가해주세요.</td></tr></tbody>
+        </table>
+      </div>
+
+      <!-- 추가 폼 -->
+      <div class="add-row">
+        <div class="ig"><label>티커</label><input type="text" id="assets-tk" placeholder="NVDA" style="width:90px;text-transform:uppercase"></div>
+        <div class="ig"><label>수량</label><input type="number" id="assets-sh" placeholder="10" min="0" style="width:90px"></div>
+        <div class="ig"><label>평단가($)</label><input type="number" id="assets-avg" placeholder="120" step="0.01" min="0" style="width:110px"></div>
+        <button class="btn btn-p" onclick="addAsset()">+ 추가</button>
+      </div>
+      <div id="assets-loading" class="ltxt" style="display:none">가격 업데이트 중...</div>
     </div>
   </div>
 
@@ -830,6 +883,8 @@ body::before{
   <div class="bottomnav">
     <button class="nav-btn on" data-nav="home" onclick="navTo('home')"><span class="ico">🏠</span><span>홈</span></button>
     <button class="nav-btn" data-nav="analysis" onclick="navTo('analysis')"><span class="ico">📊</span><span>분석</span></button>
+    <button class="nav-btn" data-nav="picks" onclick="navTo('picks')"><span class="ico">⭐</span><span>추천</span></button>
+    <button class="nav-btn" data-nav="assets" onclick="navTo('assets')"><span class="ico">💼</span><span>자산</span></button>
     <button class="nav-btn" data-nav="calendar" onclick="navTo('calendar')"><span class="ico">📅</span><span>캘린더</span></button>
   </div>
 </div>
@@ -874,19 +929,19 @@ function navTo(name){
   $('screen-'+name).classList.add('on');
   if(name==='home')loadHome();
   if(name==='calendar')loadCalendar();
+  if(name==='assets')loadAssets();
   window.scrollTo(0,0);
 }
 
 function stab(n){
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('on'));
   document.querySelectorAll('.tc').forEach(c=>c.classList.remove('on'));
-  const ts=['chart','analyst','ai','bt','cmp','watch','pf','alert'];
+  const ts=['chart','analyst','ai','bt','cmp','watch','alert'];
   document.querySelectorAll('#screen-analysis .tab')[ts.indexOf(n)].classList.add('on');
   $('tc-'+n).classList.add('on');
   if(n==='analyst'&&D)loadAnalyst();
   if(n==='bt'&&D)drawBT();
   if(n==='watch')renderWatchlist();
-  if(n==='pf')renderPF();
   if(n==='alert')renderAlerts();
 }
 
@@ -1563,28 +1618,265 @@ function removeSupportLine(idx){SUPPORT_LINES.splice(idx,1);saveSupportLines();d
 function clearSupportLines(){SUPPORT_LINES=[];saveSupportLines();drawPrice();renderSupportList();}
 
 // ── Portfolio ─────────────────────────────────────────
-async function addPF(){
-  const tk=$('pf-tk').value.trim().toUpperCase(),sh=parseFloat($('pf-sh').value),avg=parseFloat($('pf-avg').value);
+// ── Assets (자산 관리) ────────────────────────────────
+async function addAsset(){
+  const tk=$('assets-tk').value.trim().toUpperCase();
+  const sh=parseFloat($('assets-sh').value);
+  const avg=parseFloat($('assets-avg').value);
   if(!tk||!sh||!avg){toast('모든 항목 입력');return;}
-  portfolio.push({tk,sh,avg,price:null});savePF();renderPF();
-  const price=await fetchQuote(tk);if(price)portfolio[portfolio.length-1].price=price;
-  savePF();renderPF();$('pf-tk').value='';$('pf-sh').value='';$('pf-avg').value='';
+  // 기존 종목인지 확인 (수량 합치기)
+  const existing=portfolio.findIndex(s=>s.tk===tk);
+  if(existing>=0){
+    if(confirm(`${tk}가 이미 있습니다. 평단가를 새로 계산해서 합칠까요?`)){
+      const old=portfolio[existing];
+      const totalSh=old.sh+sh;
+      const newAvg=(old.sh*old.avg+sh*avg)/totalSh;
+      portfolio[existing]={tk,sh:totalSh,avg:newAvg,price:old.price,sector:old.sector};
+    }else return;
+  }else{
+    portfolio.push({tk,sh,avg,price:null,sector:null});
+  }
+  savePF();renderAssets();
+  // 가격 + 섹터 가져오기
+  await fetchAssetExtras(tk);
+  savePF();renderAssets();
+  $('assets-tk').value='';$('assets-sh').value='';$('assets-avg').value='';
 }
-function removePF(i){portfolio.splice(i,1);savePF();renderPF();}
-async function refreshPF(){
-  if(!portfolio.length)return;$('pf-loading').style.display='block';
-  await Promise.all(portfolio.map(async(s,i)=>{const p=await fetchQuote(s.tk);if(p)portfolio[i].price=p;}));
-  savePF();renderPF();$('pf-loading').style.display='none';
+
+async function fetchAssetExtras(tk){
+  const idx=portfolio.findIndex(s=>s.tk===tk);if(idx<0)return;
+  // 가격
+  try{
+    const price=await fetchQuote(tk);
+    if(price)portfolio[idx].price=price;
+  }catch(e){}
+  // 섹터 (Finnhub profile)
+  try{
+    const profile=await tryFetch(`/api/finnhub?symbol=${tk}&type=profile`);
+    if(profile?.finnhubIndustry)portfolio[idx].sector=profile.finnhubIndustry;
+  }catch(e){}
 }
-function renderPF(){
-  const tbody=$('pf-body');
-  if(!portfolio.length){tbody.innerHTML='<tr><td colspan="7" class="empty">아래에서 종목을 추가해주세요.</td></tr>';$('pf-sum').style.display='none';return;}
+
+function removeAsset(i){
+  if(!confirm(`${portfolio[i].tk}를 삭제하시겠습니까?`))return;
+  portfolio.splice(i,1);savePF();renderAssets();
+}
+
+async function refreshAssets(){
+  if(!portfolio.length)return;
+  $('assets-loading').style.display='block';
+  await Promise.all(portfolio.map(async(s,i)=>{
+    if(!s.price)await fetchAssetExtras(s.tk);
+    else{
+      const p=await fetchQuote(s.tk);
+      if(p)portfolio[i].price=p;
+    }
+  }));
+  savePF();renderAssets();
+  $('assets-loading').style.display='none';
+}
+
+function loadAssets(){
+  renderAssets();
+  // 첫 진입 시 가격 자동 갱신
+  if(portfolio.length>0){
+    const needRefresh=portfolio.some(s=>!s.price);
+    if(needRefresh)refreshAssets();
+  }
+}
+
+function renderAssets(){
+  const tbody=$('assets-body');
+  if(!portfolio.length){
+    tbody.innerHTML='<tr><td colspan="8" class="empty">아래에서 종목을 추가해주세요.</td></tr>';
+    $('assets-summary').style.display='none';
+    $('assets-charts').style.display='none';
+    $('assets-analysis').style.display='none';
+    if(CH.assetsPie){try{CH.assetsPie.destroy();}catch(e){}CH.assetsPie=null;}
+    if(CH.assetsSector){try{CH.assetsSector.destroy();}catch(e){}CH.assetsSector=null;}
+    return;
+  }
+
   let totMkt=0,totCost=0;
-  tbody.innerHTML=portfolio.map((s,i)=>{const mkt=s.price?s.price*s.sh:null,cost=s.avg*s.sh,pnl=mkt?mkt-cost:null,pct=pnl?(pnl/cost)*100:null;if(mkt)totMkt+=mkt;totCost+=cost;return`<tr><td><strong style="font-family:Inter">${s.tk}</strong></td><td>${s.sh}</td><td>${fu(s.avg)}</td><td>${s.price?fu(s.price):'—'}</td><td>${mkt?fu(mkt):'—'}</td><td class="${pct>=0?'up':'down'}">${pct!=null?fp(pct):'—'}</td><td><button class="del-btn" onclick="removePF(${i})">✕</button></td></tr>`;}).join('');
-  const totPnl=totMkt-totCost,totPct=totCost?(totPnl/totCost)*100:0;
-  $('pf-grid').innerHTML=`<div class="btc"><div class="btc-l">평가금액</div><div class="btc-v">${totMkt?'$'+Math.round(totMkt).toLocaleString():'—'}</div></div><div class="btc"><div class="btc-l">원화</div><div class="btc-v" style="font-size:16px">${totMkt?'₩'+Math.round(totMkt*USD_KRW).toLocaleString():'—'}</div></div><div class="btc"><div class="btc-l">수익금</div><div class="btc-v ${totPnl>=0?'up':'down'}">${totMkt?(totPnl>=0?'+':'')+'$'+Math.abs(Math.round(totPnl)).toLocaleString():'—'}</div></div><div class="btc"><div class="btc-l">수익률</div><div class="btc-v ${totPct>=0?'up':'down'}">${totMkt?fp(totPct):'—'}</div></div>`;
-  $('pf-sum').style.display='block';
+  tbody.innerHTML=portfolio.map((s,i)=>{
+    const mkt=s.price?s.price*s.sh:null;
+    const cost=s.avg*s.sh;
+    const pnl=mkt?mkt-cost:null;
+    const pct=pnl!=null?(pnl/cost)*100:null;
+    if(mkt)totMkt+=mkt;
+    totCost+=cost;
+    return `<tr>
+      <td><strong style="font-family:Inter,sans-serif;cursor:pointer;color:var(--accent)" onclick="$('ti').value='${s.tk}';navTo('analysis');stab('chart');go();">${s.tk}</strong></td>
+      <td style="font-size:11px;color:var(--text2);font-family:Inter,sans-serif">${s.sector||'—'}</td>
+      <td>${s.sh}</td>
+      <td>${fu(s.avg)}</td>
+      <td>${s.price?fu(s.price):'—'}</td>
+      <td>${mkt?fu(mkt):'—'}</td>
+      <td class="${pct>=0?'up':'down'}">${pct!=null?fp(pct):'—'}</td>
+      <td><button class="del-btn" onclick="removeAsset(${i})">✕</button></td>
+    </tr>`;
+  }).join('');
+
+  // 요약
+  const totPnl=totMkt-totCost;
+  const totPct=totCost?(totPnl/totCost)*100:0;
+  $('assets-grid').innerHTML=`
+    <div class="btc"><div class="btc-l">평가금액</div><div class="btc-v">${totMkt?'$'+Math.round(totMkt).toLocaleString():'—'}</div></div>
+    <div class="btc"><div class="btc-l">평가금액 (원화)</div><div class="btc-v" style="font-size:15px">${totMkt?'₩'+Math.round(totMkt*USD_KRW).toLocaleString():'—'}</div></div>
+    <div class="btc"><div class="btc-l">총 투자금</div><div class="btc-v" style="font-size:15px">$${Math.round(totCost).toLocaleString()}</div></div>
+    <div class="btc"><div class="btc-l">수익금</div><div class="btc-v ${totPnl>=0?'up':'down'}">${totMkt?(totPnl>=0?'+':'')+'$'+Math.abs(Math.round(totPnl)).toLocaleString():'—'}</div></div>
+    <div class="btc"><div class="btc-l">수익률</div><div class="btc-v ${totPct>=0?'up':'down'}">${totMkt?fp(totPct):'—'}</div></div>
+    <div class="btc"><div class="btc-l">보유 종목 수</div><div class="btc-v">${portfolio.length}</div></div>`;
+  $('assets-summary').style.display='block';
+
+  // 차트들
+  if(totMkt>0){
+    $('assets-charts').style.display='block';
+    drawAssetsPieChart(totMkt);
+    drawSectorChart(totMkt);
+  }else{
+    $('assets-charts').style.display='none';
+  }
+
+  // 분석 (수익/손실 종목)
+  renderAssetsAnalysis(totMkt,totCost);
 }
+
+function drawAssetsPieChart(totMkt){
+  if(CH.assetsPie){try{CH.assetsPie.destroy();}catch(e){}CH.assetsPie=null;}
+  const oldC=$('assets-pie'),parent=oldC.parentNode;
+  const newC=document.createElement('canvas');newC.id='assets-pie';
+  parent.replaceChild(newC,oldC);
+
+  const data=portfolio.filter(s=>s.price).map(s=>({
+    label:s.tk,
+    value:s.price*s.sh,
+  })).sort((a,b)=>b.value-a.value);
+
+  const colors=['#10d090','#4a9eff','#22e8a8','#ffb432','#ff6b7a','#bf72ff','#26d782','#ff4d6d','#7a8499','#0ea860'];
+  const txt2=getComputedStyle(document.documentElement).getPropertyValue('--text2');
+
+  CH.assetsPie=new Chart(newC,{type:'doughnut',data:{
+    labels:data.map(d=>d.label),
+    datasets:[{
+      data:data.map(d=>d.value),
+      backgroundColor:data.map((_,i)=>colors[i%colors.length]),
+      borderWidth:0,
+    }]
+  },options:{
+    responsive:true,maintainAspectRatio:false,
+    plugins:{
+      legend:{position:'right',labels:{font:{size:10,family:'Inter'},color:txt2,boxWidth:8,padding:6}},
+      tooltip:{callbacks:{label:c=>{const v=c.parsed;const pct=(v/totMkt*100).toFixed(1);return `${c.label}: $${Math.round(v).toLocaleString()} (${pct}%)`;}}}
+    }
+  }});
+}
+
+function drawSectorChart(totMkt){
+  if(CH.assetsSector){try{CH.assetsSector.destroy();}catch(e){}CH.assetsSector=null;}
+  // 섹터별 집계
+  const sectorMap={};
+  portfolio.filter(s=>s.price).forEach(s=>{
+    const sec=s.sector||'분류 안됨';
+    if(!sectorMap[sec])sectorMap[sec]=0;
+    sectorMap[sec]+=s.price*s.sh;
+  });
+  const sectors=Object.entries(sectorMap).sort((a,b)=>b[1]-a[1]);
+  if(sectors.length===0||sectors.every(([s])=>s==='분류 안됨')){
+    $('assets-sector-empty').style.display='block';
+    return;
+  }
+  $('assets-sector-empty').style.display='none';
+
+  const oldC=$('assets-sector'),parent=oldC.parentNode;
+  const newC=document.createElement('canvas');newC.id='assets-sector';
+  parent.replaceChild(newC,oldC);
+
+  const colors=['#10d090','#4a9eff','#22e8a8','#ffb432','#ff6b7a','#bf72ff','#26d782','#ff4d6d','#7a8499','#0ea860'];
+  const txt2=getComputedStyle(document.documentElement).getPropertyValue('--text2');
+
+  CH.assetsSector=new Chart(newC,{type:'doughnut',data:{
+    labels:sectors.map(s=>s[0]),
+    datasets:[{
+      data:sectors.map(s=>s[1]),
+      backgroundColor:sectors.map((_,i)=>colors[i%colors.length]),
+      borderWidth:0,
+    }]
+  },options:{
+    responsive:true,maintainAspectRatio:false,
+    plugins:{
+      legend:{position:'right',labels:{font:{size:10,family:'Inter'},color:txt2,boxWidth:8,padding:6}},
+      tooltip:{callbacks:{label:c=>{const v=c.parsed;const pct=(v/totMkt*100).toFixed(1);return `${c.label}: $${Math.round(v).toLocaleString()} (${pct}%)`;}}}
+    }
+  }});
+}
+
+function renderAssetsAnalysis(totMkt,totCost){
+  $('assets-analysis').style.display='block';
+  const valued=portfolio.filter(s=>s.price);
+  if(!valued.length){
+    $('assets-analysis-content').innerHTML='<div style="color:var(--text2)">가격 데이터를 기다리는 중...</div>';
+    return;
+  }
+
+  // 종목별 수익률 계산
+  const withPnl=valued.map(s=>{
+    const pct=((s.price-s.avg)/s.avg)*100;
+    const pnl=(s.price-s.avg)*s.sh;
+    return {...s,pct,pnl};
+  });
+  const winners=withPnl.filter(s=>s.pnl>0).sort((a,b)=>b.pct-a.pct);
+  const losers=withPnl.filter(s=>s.pnl<0).sort((a,b)=>a.pct-b.pct);
+
+  // 최고/최악
+  const best=winners[0];
+  const worst=losers[0];
+
+  // 섹터 다양성
+  const sectors=[...new Set(valued.map(s=>s.sector||'분류 안됨').filter(s=>s!=='분류 안됨'))];
+  const concentratedTop=valued.sort((a,b)=>(b.price*b.sh)-(a.price*a.sh))[0];
+  const topPct=(concentratedTop.price*concentratedTop.sh/totMkt*100).toFixed(1);
+
+  let html='';
+
+  // 한줄 평가
+  const totPct=((totMkt-totCost)/totCost*100);
+  let summary='';
+  if(totPct>10)summary='🚀 <strong style="color:var(--up)">우수한 성과</strong>를 보이고 있습니다.';
+  else if(totPct>0)summary='📈 <strong style="color:var(--up)">소폭 수익</strong> 중입니다.';
+  else if(totPct>-5)summary='⏸ <strong>보합권</strong>에서 등락 중입니다.';
+  else if(totPct>-15)summary='📉 <strong style="color:var(--down)">손실 구간</strong>입니다.';
+  else summary='⚠️ <strong style="color:var(--down)">큰 손실</strong>이 발생했습니다.';
+  html+=`<div style="margin-bottom:10px">${summary}</div>`;
+
+  // 핵심 지표
+  html+=`<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;margin-bottom:10px">`;
+  if(best){
+    html+=`<div style="background:var(--up-bg);border-radius:8px;padding:10px"><div style="font-size:10px;color:var(--text2);font-weight:600;text-transform:uppercase;letter-spacing:0.04em">최고 수익</div><div style="font-size:14px;font-weight:600;margin-top:4px"><strong>${best.tk}</strong> <span class="up">${fp(best.pct)}</span></div></div>`;
+  }
+  if(worst){
+    html+=`<div style="background:var(--down-bg);border-radius:8px;padding:10px"><div style="font-size:10px;color:var(--text2);font-weight:600;text-transform:uppercase;letter-spacing:0.04em">최대 손실</div><div style="font-size:14px;font-weight:600;margin-top:4px"><strong>${worst.tk}</strong> <span class="down">${fp(worst.pct)}</span></div></div>`;
+  }
+  html+=`<div style="background:var(--bg3);border-radius:8px;padding:10px"><div style="font-size:10px;color:var(--text2);font-weight:600;text-transform:uppercase;letter-spacing:0.04em">집중도</div><div style="font-size:14px;font-weight:600;margin-top:4px"><strong>${concentratedTop.tk}</strong>가 ${topPct}%</div></div>`;
+  html+=`<div style="background:var(--bg3);border-radius:8px;padding:10px"><div style="font-size:10px;color:var(--text2);font-weight:600;text-transform:uppercase;letter-spacing:0.04em">섹터 분산</div><div style="font-size:14px;font-weight:600;margin-top:4px">${sectors.length}개 섹터</div></div>`;
+  html+=`</div>`;
+
+  // 추천 메시지
+  let advice=[];
+  if(parseFloat(topPct)>40)advice.push('⚠️ 한 종목에 집중도가 너무 높습니다. 분산 투자를 고려해보세요.');
+  if(sectors.length<=2&&valued.length>=4)advice.push('💡 섹터를 다양화하면 변동성을 낮출 수 있습니다.');
+  if(losers.length>winners.length*2&&valued.length>=3)advice.push('📉 손실 종목이 많습니다. 손절선 설정이나 리밸런싱을 검토해보세요.');
+  if(advice.length===0&&totPct>5)advice.push('✅ 균형 잡힌 포트폴리오입니다.');
+  if(advice.length===0)advice.push('📊 시장 변동에 유의하며 장기적 관점을 유지하세요.');
+
+  html+=`<div style="margin-top:8px;padding-top:10px;border-top:1px solid var(--border);font-size:12px;color:var(--text2);line-height:1.7">${advice.map(a=>`<div style="margin-bottom:4px">${a}</div>`).join('')}</div>`;
+
+  $('assets-analysis-content').innerHTML=html;
+}
+
+// 호환성 — 기존 코드가 호출하는 PF 함수들 별칭
+const renderPF=renderAssets;
+const refreshPF=refreshAssets;
 
 // ── Alerts ────────────────────────────────────────────
 function reqPerm(){if('Notification'in window)Notification.requestPermission().then(p=>toast(p==='granted'?'✅ 알림 허용됨':'❌ 거부됨'));}
@@ -1905,6 +2197,20 @@ async function autoRefreshHome(){
   refreshWatch();
 }
 
+// 3. 자산 화면 자동 갱신
+async function autoRefreshAssets(){
+  if(!$('screen-assets').classList.contains('on'))return;
+  if(!portfolio.length)return;
+  // 가격만 가볍게 업데이트
+  await Promise.all(portfolio.map(async(s,i)=>{
+    try{
+      const p=await fetchQuote(s.tk);
+      if(p)portfolio[i].price=p;
+    }catch(e){}
+  }));
+  savePF();renderAssets();
+}
+
 setInterval(checkAlerts,60000);
 setInterval(refreshWatch,300000);
 setInterval(fetchKRW,3600000);
@@ -1912,6 +2218,7 @@ setInterval(updateClock,30000);
 setInterval(updateMarketStatus,30000);
 setInterval(autoRefreshCurrent,30000);  // 30초마다 현재 종목 갱신
 setInterval(autoRefreshHome,30000);     // 30초마다 홈 갱신
+setInterval(autoRefreshAssets,30000);   // 30초마다 자산 가격 갱신
 
 updateClock();
 updateMarketStatus();
