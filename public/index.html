@@ -1564,7 +1564,12 @@ function loadAnalyst(){
   if(D.fmpEtf && D.fmpEtf.length>0){
     $('an-hold-wrap').style.display='block';
     const top10 = D.fmpEtf.slice(0,10);
-    $('an-holdings').innerHTML=top10.map(h=>`<div class="trow"><span><strong style="font-family:Inter,sans-serif;cursor:pointer;color:var(--accent)" onclick="$('ti').value='${h.asset}';go();">${h.asset||''}</strong> <span style="color:var(--text2);font-size:11px">${h.name||''}</span></span><span>${h.weightPercentage?h.weightPercentage.toFixed(2)+'%':'—'}</span></div>`).join('');
+    $('an-holdings').innerHTML=top10.map(h=>{
+      const sym=h.asset||h.symbol||'';
+      const name=h.name||h.companyName||'';
+      const wt=typeof h.weightPercentage==='number'?h.weightPercentage:(typeof h.weight==='number'?h.weight:null);
+      return `<div class="trow"><span><strong style="font-family:Inter,sans-serif;cursor:pointer;color:var(--accent)" onclick="$('ti').value='${sym}';go();">${sym}</strong> <span style="color:var(--text2);font-size:11px">${name}</span></span><span>${wt!=null?wt.toFixed(2)+'%':'—'}</span></div>`;
+    }).join('');
   }else{
     $('an-hold-wrap').style.display='none';
   }
