@@ -4,5 +4,10 @@
     { "source": "/manifest.json", "destination": "/public/manifest.json" },
     { "source": "/icon.svg", "destination": "/public/icon.svg" },
     { "source": "/(.*)", "destination": "/public/index.html" }
-  ]
+  ],
+  "functions": {
+    "api/ai.js": {
+      "maxDuration": 60
+    }
+  }
 }
