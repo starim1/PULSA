@@ -188,20 +188,30 @@ body::before{
   background:var(--bg-glass);backdrop-filter:blur(20px) saturate(180%);
   -webkit-backdrop-filter:blur(20px) saturate(180%);
   border-top:1px solid var(--border);
-  padding:10px 0 calc(10px + var(--safe-bottom)) 0;
+  padding:8px 0 calc(8px + var(--safe-bottom)) 0;
   display:flex;justify-content:space-around;
 }
 .nav-btn{
-  background:none;border:none;cursor:pointer;
+  background:none;border:none;cursor:pointer;position:relative;
   display:flex;flex-direction:column;align-items:center;gap:3px;
-  padding:6px 16px;color:var(--text3);
+  padding:6px 14px;color:var(--text3);
   font-size:10px;font-weight:600;letter-spacing:0.03em;
-  transition:color .15s;
+  transition:color .15s, transform .15s;
 }
-.nav-btn .ico{font-size:20px;line-height:1;}
+.nav-btn .ico{
+  display:inline-flex;align-items:center;justify-content:center;
+  width:24px;height:24px;
+}
+.nav-btn .ico svg{stroke-width:1.8;}
 .nav-btn.on{color:var(--accent);}
+.nav-btn.on .ico svg{stroke-width:2.2;}
+.nav-btn.on::before{
+  content:'';position:absolute;top:0;left:50%;transform:translateX(-50%);
+  width:24px;height:2.5px;background:var(--accent);border-radius:0 0 3px 3px;
+}
 .nav-btn:hover{color:var(--text2);}
 .nav-btn.on:hover{color:var(--accent);}
+.nav-btn:active{transform:scale(0.94);}
 
 /* Screens */
 .screen{display:none;animation:fade .25s;}
@@ -213,15 +223,21 @@ body::before{
 /* Section title */
 .sec-title{
   font-size:11px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;
-  color:var(--text2);margin:24px 0 12px;display:flex;align-items:center;gap:8px;
+  color:var(--text2);margin:28px 0 14px;display:flex;align-items:center;gap:9px;
 }
-.sec-title:first-child{margin-top:0;}
+.sec-title:first-child{margin-top:4px;}
+.sec-title .sec-icon{
+  display:inline-flex;align-items:center;justify-content:center;
+  width:22px;height:22px;color:var(--accent);
+}
+.sec-title .sec-icon svg{stroke-width:2;}
 
 /* Cards */
 .card{
   background:var(--bg-card);border:1px solid var(--border);
   border-radius:var(--rl);padding:16px;
   backdrop-filter:blur(20px);
+  box-shadow:0 1px 3px rgba(0,0,0,0.05);
 }
 
 /* HOME SCREEN */
@@ -254,15 +270,22 @@ body::before{
 
 /* ANALYSIS SCREEN */
 .search-bar{
-  display:flex;gap:8px;margin-bottom:16px;
+  display:flex;gap:8px;margin-bottom:16px;position:relative;
+}
+.search-bar-icon{
+  position:absolute;left:14px;top:50%;transform:translateY(-50%);
+  color:var(--text3);pointer-events:none;z-index:1;
+  display:inline-flex;align-items:center;justify-content:center;
 }
 .search-bar input{
-  flex:1;padding:12px 16px;font-size:14px;
+  flex:1;padding:12px 16px 12px 40px;font-size:14px;
   border:1px solid var(--border2);border-radius:12px;
   background:var(--bg2);color:var(--text);outline:none;font-weight:500;
-  font-family:'Inter','Pretendard',sans-serif;
+  font-family:'Inter','Pretendard',sans-serif;transition:all .15s;
 }
 .search-bar input:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(74,158,255,0.15);}
+.search-bar input:focus + .search-bar-icon,
+.search-bar:focus-within .search-bar-icon{color:var(--blue);}
 
 .btn{
   padding:10px 18px;font-size:13px;cursor:pointer;border-radius:10px;
@@ -283,14 +306,15 @@ body::before{
   color:#ffffff;border-color:transparent;font-weight:600;
   box-shadow:0 4px 12px rgba(16,208,144,0.25);
 }
-}
 .btn-sm{padding:6px 12px;font-size:11px;border-radius:8px;}
+.btn-icon{display:inline-flex;align-items:center;justify-content:center;gap:7px;}
+.btn-icon .ic-wrap svg{stroke-width:2;}
 
 /* Hero (price card) */
 .hero{
   background:linear-gradient(135deg,var(--bg-card) 0%,rgba(26,34,53,0.3) 100%);
   border:1px solid var(--border);border-radius:var(--rxl);
-  padding:20px 24px;margin-bottom:14px;
+  padding:22px 24px;margin-bottom:14px;
   backdrop-filter:blur(20px);box-shadow:var(--shadow);
   position:relative;overflow:hidden;
 }
@@ -300,20 +324,30 @@ body::before{
   background:radial-gradient(circle,var(--accent-soft) 0%,transparent 70%);
   pointer-events:none;
 }
+.hero::after{
+  content:'';position:absolute;top:0;left:0;right:0;height:1px;
+  background:linear-gradient(90deg,transparent,rgba(16,208,144,0.4),transparent);
+  pointer-events:none;
+}
 .hero-row{display:flex;align-items:flex-start;gap:14px;flex-wrap:wrap;position:relative;}
 .hero-left{flex:1;min-width:180px;}
 .hero-right{display:flex;flex-direction:column;align-items:flex-end;gap:6px;}
 .h-tk{font-size:12px;color:var(--text2);font-weight:700;letter-spacing:0.05em;margin-bottom:2px;text-transform:uppercase;}
 .watch-star{
-  background:none;border:none;cursor:pointer;
-  font-size:18px;line-height:1;padding:2px 6px;border-radius:6px;
+  background:none;border:none;cursor:pointer;padding:4px;border-radius:6px;
   color:var(--text3);transition:all .15s;
+  display:inline-flex;align-items:center;justify-content:center;
 }
 .watch-star:hover{background:var(--bg3);color:var(--accent);}
-.watch-star.on{color:var(--accent);text-shadow:0 0 12px rgba(16,208,144,0.6);}
+.watch-star.on{color:var(--accent);filter:drop-shadow(0 0 6px rgba(16,208,144,0.5));}
 .h-name{font-size:14px;font-weight:600;color:var(--text);margin-bottom:8px;line-height:1.3;}
-.h-sector{font-size:11px;color:var(--text2);margin-bottom:10px;}
-.sec-tag{display:inline-block;padding:2px 8px;background:var(--bg3);border-radius:6px;font-size:10px;color:var(--text2);font-weight:500;}
+.h-sector{font-size:11px;color:var(--text2);margin-bottom:12px;display:flex;flex-wrap:wrap;gap:5px;}
+.sec-tag{
+  display:inline-flex;align-items:center;
+  padding:3px 9px;background:var(--bg3);border:1px solid var(--border);
+  border-radius:7px;font-size:10.5px;color:var(--text2);font-weight:600;
+  letter-spacing:0.02em;
+}
 .h-price{font-size:34px;font-weight:700;line-height:1;font-family:'JetBrains Mono',monospace;letter-spacing:-0.02em;}
 .h-chg{font-size:13px;font-weight:600;margin-top:4px;font-family:'JetBrains Mono',monospace;}
 .h-krw{font-size:12px;color:var(--text2);margin-top:4px;font-family:'JetBrains Mono',monospace;}
@@ -344,13 +378,20 @@ body::before{
 .ai-quick-text.loading{color:var(--text2);font-style:italic;}
 
 .h-desc{
-  font-size:12px;color:var(--text2);line-height:1.6;
-  margin-top:12px;padding-top:12px;border-top:1px solid var(--border);position:relative;
+  font-size:12.5px;color:var(--text2);line-height:1.7;
+  margin-top:14px;padding:14px 14px 12px;
+  background:rgba(0,0,0,0.15);
+  border-radius:10px;border-left:2px solid var(--accent-soft);
+  position:relative;
 }
 
 /* Metrics */
 .mets{display:grid;grid-template-columns:repeat(auto-fit,minmax(115px,1fr));gap:8px;margin-top:14px;position:relative;}
-.mc{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:10px 12px;}
+.mc{
+  background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:10px 12px;
+  transition:all .15s;
+}
+.mc:hover{background:var(--bg3);border-color:var(--border2);}
 .mc-l{font-size:10px;color:var(--text2);margin-bottom:5px;font-weight:600;letter-spacing:0.03em;text-transform:uppercase;}
 .mc-v{font-size:14px;font-weight:600;font-family:'JetBrains Mono',monospace;}
 
@@ -359,12 +400,16 @@ body::before{
 .tabs{display:flex;border-bottom:1px solid var(--border);overflow-x:auto;scrollbar-width:none;background:rgba(10,14,26,0.4);}
 .tabs::-webkit-scrollbar{display:none;}
 .tab{
-  padding:13px 18px;font-size:12px;cursor:pointer;border:none;background:transparent;
+  padding:13px 16px;font-size:12px;cursor:pointer;border:none;background:transparent;
   color:var(--text2);border-bottom:2px solid transparent;white-space:nowrap;margin-bottom:-1px;
   font-weight:500;transition:all .15s;font-family:'Inter','Pretendard',sans-serif;
+  display:inline-flex;align-items:center;gap:7px;
 }
+.tab .ico{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;}
+.tab .ico svg{stroke-width:1.8;}
 .tab:hover{color:var(--text);}
 .tab.on{color:var(--accent);border-bottom-color:var(--accent);font-weight:700;}
+.tab.on .ico svg{stroke-width:2.2;}
 .tb{padding:18px;}
 .tc{display:none;animation:fade .2s;}
 .tc.on{display:block;}
@@ -386,9 +431,13 @@ body::before{
   display:flex;gap:4px;background:var(--bg2);border-radius:8px;padding:3px;border:1px solid var(--border);
 }
 .cm-btn{
-  padding:5px 12px;font-size:11px;cursor:pointer;border-radius:6px;border:none;
+  padding:6px 12px;font-size:11px;cursor:pointer;border-radius:6px;border:none;
   background:transparent;color:var(--text2);font-weight:600;font-family:'Inter',sans-serif;
+  display:inline-flex;align-items:center;gap:5px;transition:all .15s;
 }
+.cm-btn .ico{display:inline-flex;align-items:center;justify-content:center;width:13px;height:13px;}
+.cm-btn .ico svg{stroke-width:2;}
+.cm-btn:hover:not(.on){color:var(--text);}
 .cm-btn.on{background:var(--accent);color:#ffffff;}
 
 .cw{position:relative;width:100%;}
@@ -446,7 +495,11 @@ body::before{
 .al-form{background:var(--bg3);border:1px solid var(--border);border-radius:var(--rl);padding:14px;display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;}
 .al-form .ig input,.al-form .ig select{width:100%;}
 
-.del-btn{background:none;border:none;cursor:pointer;color:var(--text3);font-size:13px;padding:3px 7px;border-radius:5px;transition:all .15s;}
+.del-btn{
+  background:none;border:none;cursor:pointer;color:var(--text3);
+  padding:5px;border-radius:5px;transition:all .15s;
+  display:inline-flex;align-items:center;justify-content:center;
+}
 .del-btn:hover{color:var(--down);background:var(--down-bg);}
 
 .empty{text-align:center;padding:24px;color:var(--text2);font-size:12px;}
@@ -460,7 +513,11 @@ body::before{
 .wt-tk{font-size:13px;font-weight:700;margin-bottom:5px;letter-spacing:0.02em;}
 .wt-pr{font-size:16px;font-weight:600;font-family:'JetBrains Mono',monospace;}
 .wt-ch{font-size:10px;margin-top:3px;font-weight:600;font-family:'JetBrains Mono',monospace;}
-.wt-x{position:absolute;top:6px;right:6px;background:none;border:none;color:var(--text3);font-size:12px;cursor:pointer;padding:2px 5px;border-radius:4px;}
+.wt-x{
+  position:absolute;top:6px;right:6px;background:none;border:none;color:var(--text3);
+  cursor:pointer;padding:4px;border-radius:5px;
+  display:inline-flex;align-items:center;justify-content:center;transition:all .15s;
+}
 .wt-x:hover{color:var(--down);background:var(--down-bg);}
 .wt-verdict{font-size:8px;padding:2px 5px;border-radius:4px;margin-top:4px;display:inline-block;font-weight:700;letter-spacing:0.05em;}
 
@@ -472,9 +529,12 @@ body::before{
 /* Picks page */
 .picks-tab{
   background:var(--bg3);border:1px solid var(--border);color:var(--text2);
-  font-size:12px;padding:7px 12px;border-radius:8px;cursor:pointer;
+  font-size:12px;padding:8px 14px;border-radius:9px;cursor:pointer;
   transition:all 0.15s;font-weight:500;
+  display:inline-flex;align-items:center;gap:6px;
 }
+.picks-tab .ico{display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;}
+.picks-tab .ico svg{stroke-width:2;}
 .picks-tab.on{background:var(--accent);color:#fff;border-color:var(--accent);}
 .picks-tab:hover:not(.on){background:var(--bg2);color:var(--text);}
 .picks-content{display:none;}
@@ -506,27 +566,35 @@ body::before{
 
 /* Modal */
 .modal-overlay{
-  display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);
+  display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);
   z-index:1000;align-items:center;justify-content:center;padding:20px;
-  backdrop-filter:blur(4px);
+  backdrop-filter:blur(8px);
+  animation:fadeIn .2s;
 }
+@keyframes fadeIn{from{opacity:0;}to{opacity:1;}}
 .modal-overlay.on{display:flex;}
 .modal-content{
-  background:var(--bg2);border:1px solid var(--border);border-radius:14px;
-  width:100%;max-width:480px;max-height:80vh;overflow:hidden;
+  background:var(--bg2);border:1px solid var(--border);border-radius:16px;
+  width:100%;max-width:480px;max-height:85vh;overflow:hidden;
   display:flex;flex-direction:column;
+  box-shadow:0 20px 60px rgba(0,0,0,0.5);
+  animation:slideUp .25s ease-out;
 }
+@keyframes slideUp{from{transform:translateY(20px);opacity:0;}to{transform:translateY(0);opacity:1;}}
 .modal-head{
   display:flex;align-items:center;justify-content:space-between;gap:10px;
-  padding:16px 18px;border-bottom:1px solid var(--border);
+  padding:18px 20px;border-bottom:1px solid var(--border);
+  background:linear-gradient(180deg,var(--bg3) 0%,var(--bg2) 100%);
 }
-.modal-title{font-size:15px;font-weight:600;color:var(--text);}
-.modal-sub{font-size:11px;color:var(--text2);margin-top:2px;}
+.modal-title{font-size:15px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:8px;}
+.modal-sub{font-size:11px;color:var(--text2);margin-top:3px;}
 .modal-close{
-  background:transparent;border:none;color:var(--text2);font-size:18px;
-  cursor:pointer;width:30px;height:30px;border-radius:6px;
+  background:var(--bg3);border:1px solid var(--border);color:var(--text2);
+  cursor:pointer;width:32px;height:32px;border-radius:8px;
+  display:inline-flex;align-items:center;justify-content:center;
+  transition:all .15s;
 }
-.modal-close:hover{background:var(--bg3);color:var(--text);}
+.modal-close:hover{background:var(--down-bg);color:var(--down);border-color:var(--down);}
 #sector-modal-list{padding:14px 18px;overflow-y:auto;}
 #sector-modal-list .mover-item{padding:8px 10px;}
 .analyst-title{font-size:10px;color:var(--text2);font-weight:700;text-transform:uppercase;letter-spacing:0.04em;margin-bottom:8px;}
@@ -559,8 +627,13 @@ body::before{
 .event-content{flex:1;}
 .event-title{font-size:13px;font-weight:600;margin-bottom:2px;}
 .event-meta{font-size:11px;color:var(--text2);}
-.event-bell{background:none;border:none;cursor:pointer;color:var(--text3);padding:4px 8px;border-radius:6px;font-size:14px;}
-.event-bell.on{color:var(--accent);}
+.event-bell{
+  background:none;border:none;cursor:pointer;color:var(--text3);
+  padding:6px;border-radius:6px;display:inline-flex;align-items:center;justify-content:center;
+  transition:all .15s;
+}
+.event-bell:hover{background:var(--bg3);color:var(--text);}
+.event-bell.on{color:var(--accent);background:var(--accent-soft);}
 
 .notif{position:fixed;top:20px;right:20px;background:var(--bg2);border:1px solid var(--border2);border-radius:12px;padding:14px 18px;font-size:13px;z-index:1000;box-shadow:var(--shadow-lg);max-width:340px;display:none;backdrop-filter:blur(20px);}
 
@@ -648,7 +721,7 @@ body::before{
                 fill="none" stroke="#22e8a8" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
       </div>
-      <span>PULSA</span>
+      <span class="brand-text">PULSA</span>
       <span class="mkt-status" id="mkt-status">—</span>
     </div>
     <div class="tb-time" id="tb-time"></div>
@@ -657,19 +730,19 @@ body::before{
   <!-- HOME SCREEN -->
   <div class="screen on" id="screen-home">
     <div class="main">
-      <div class="sec-title">📊 주요 지수</div>
+      <div class="sec-title"><span class="sec-icon" data-icon="chart"></span>주요 지수</div>
       <div class="indices-grid" id="indices-grid"><div class="ltxt" style="grid-column:1/-1">로딩 중...</div></div>
 
-      <div class="sec-title">🌍 환율 · 원자재 · 코인</div>
+      <div class="sec-title"><span class="sec-icon" data-icon="globe"></span>환율 · 원자재 · 코인</div>
       <div class="indices-grid" id="commod-grid"></div>
 
-      <div class="sec-title">🏭 섹터별 변동 (S&P 500 ETF 기준)</div>
+      <div class="sec-title"><span class="sec-icon" data-icon="factory"></span>섹터별 변동 <span style="text-transform:none;font-weight:500;color:var(--text3);font-size:10px;letter-spacing:0">(S&P 500 ETF)</span></div>
       <div class="sector-grid" id="sector-grid"></div>
 
-      <div class="sec-title">⭐ 내 관심종목 <button class="btn btn-sm" onclick="navTo('analysis');stab('watch')" style="margin-left:auto">관리</button></div>
+      <div class="sec-title"><span class="sec-icon" data-icon="star"></span>내 관심종목 <button class="btn btn-sm" onclick="navTo('analysis');stab('watch')" style="margin-left:auto">관리</button></div>
       <div class="watch-home-grid" id="watch-home"></div>
 
-      <div class="sec-title" style="margin-top:24px">📰 AI 시황 분석</div>
+      <div class="sec-title"><span class="sec-icon" data-icon="newspaper"></span>AI 시황 분석</div>
       <div class="card">
         <div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">
           <button class="picks-tab on" data-period="1d" onclick="loadMarketAnalysis('1d')">전날</button>
@@ -689,8 +762,9 @@ body::before{
   <div class="screen" id="screen-analysis">
     <div class="main">
       <div class="search-bar">
+        <span class="search-bar-icon" data-icon="search" data-icon-size="16"><span class="ico"></span></span>
         <input type="text" id="ti" value="NVDA" placeholder="종목 검색 (NVDA, AAPL, TSLA...)" onkeydown="if(event.key==='Enter')go()">
-        <button class="btn btn-p" onclick="go()">분석</button>
+        <button class="btn btn-p btn-icon" onclick="go()"><span data-icon="zap" data-icon-size="14" class="ico"></span>분석</button>
       </div>
 
       <div id="ph" class="hero" style="display:none">
@@ -717,7 +791,7 @@ body::before{
           </div>
         </div>
         <div class="ai-quick" id="ai-quick" style="display:none">
-          <div class="ai-quick-label">⚡ AI 한 줄 요약</div>
+          <div class="ai-quick-label" style="display:flex;align-items:center;gap:5px"><span data-icon="zap" data-icon-size="12" style="display:inline-flex;color:var(--accent)"></span>AI 한 줄 요약</div>
           <div class="ai-quick-text" id="ai-quick-text">분석 중...</div>
         </div>
         <div class="h-desc" id="hdesc" style="display:none"></div>
@@ -740,13 +814,13 @@ body::before{
 
       <div class="tw">
         <div class="tabs">
-          <button class="tab on" onclick="stab('chart')">📈 차트 & 지표</button>
-          <button class="tab" onclick="stab('analyst')">🎯 애널리스트</button>
-          <button class="tab" onclick="stab('ai')">🤖 AI 분석</button>
-          <button class="tab" onclick="stab('bt')">🔁 백테스트</button>
-          <button class="tab" onclick="stab('cmp')">⚖️ 비교</button>
-          <button class="tab" onclick="stab('watch')">⭐ 관심종목</button>
-          <button class="tab" onclick="stab('alert')">🔔 알림</button>
+          <button class="tab on" data-icon="chart" onclick="stab('chart')"><span class="ico"></span>차트 &amp; 지표</button>
+          <button class="tab" data-icon="analyst" onclick="stab('analyst')"><span class="ico"></span>애널리스트</button>
+          <button class="tab" data-icon="ai" onclick="stab('ai')"><span class="ico"></span>AI 분석</button>
+          <button class="tab" data-icon="refresh" onclick="stab('bt')"><span class="ico"></span>백테스트</button>
+          <button class="tab" data-icon="scale" onclick="stab('cmp')"><span class="ico"></span>비교</button>
+          <button class="tab" data-icon="star" onclick="stab('watch')"><span class="ico"></span>관심종목</button>
+          <button class="tab" data-icon="bell" onclick="stab('alert')"><span class="ico"></span>알림</button>
         </div>
         <div class="tb">
 
@@ -755,8 +829,8 @@ body::before{
             <div id="ch-b" style="display:none">
               <div style="display:flex;gap:8px;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap">
                 <div class="chart-mode">
-                  <button class="cm-btn on" data-mode="line" onclick="setChartMode('line')">📈 선형</button>
-                  <button class="cm-btn" data-mode="candle" onclick="setChartMode('candle')">🕯️ 캔들</button>
+                  <button class="cm-btn on" data-mode="line" data-icon="trending_up" data-icon-size="13" onclick="setChartMode('line')"><span class="ico"></span>선형</button>
+                  <button class="cm-btn" data-mode="candle" data-icon="activity" data-icon-size="13" onclick="setChartMode('candle')"><span class="ico"></span>캔들</button>
                 </div>
                 <div style="font-size:10px;color:var(--text2);font-family:'JetBrains Mono',monospace" id="last-update"></div>
               </div>
@@ -798,12 +872,12 @@ body::before{
             <div id="an-b" style="display:none">
               <div class="analyst-row">
                 <div class="analyst-card">
-                  <div class="analyst-title">📊 애널리스트 의견</div>
+                  <div class="analyst-title" style="display:flex;align-items:center;gap:6px"><span data-icon="analyst" data-icon-size="14" style="display:inline-flex;color:var(--accent)"></span>애널리스트 의견</div>
                   <div class="cw" style="height:180px"><canvas id="anpie"></canvas></div>
                   <div id="an-summary" style="text-align:center;font-size:11px;color:var(--text2);margin-top:8px;font-family:'JetBrains Mono',monospace"></div>
                 </div>
                 <div class="analyst-card">
-                  <div class="analyst-title">🎯 12개월 목표가</div>
+                  <div class="analyst-title" style="display:flex;align-items:center;gap:6px"><span data-icon="pin" data-icon-size="14" style="display:inline-flex;color:var(--accent)"></span>12개월 목표가</div>
                   <div class="analyst-big mono" id="an-target-mean">—</div>
                   <div class="analyst-sub" id="an-target-detail">—</div>
                   <div class="target-bar"><div class="target-bar-fill"></div><div class="target-bar-marker" id="target-marker"></div></div>
@@ -811,11 +885,11 @@ body::before{
                 </div>
               </div>
               <div class="analyst-card" id="an-bar-wrap">
-                <div class="analyst-title">📅 분기별 추천 변화</div>
+                <div class="analyst-title" style="display:flex;align-items:center;gap:6px"><span data-icon="calendar" data-icon-size="14" style="display:inline-flex;color:var(--accent)"></span>분기별 추천 변화</div>
                 <div class="cw" style="height:180px"><canvas id="anbar"></canvas></div>
               </div>
               <div class="analyst-card" id="an-hold-wrap" style="margin-top:12px;display:none">
-                <div class="analyst-title">📦 ETF 주요 보유 종목 (Top 10)</div>
+                <div class="analyst-title" style="display:flex;align-items:center;gap:6px"><span data-icon="briefcase" data-icon-size="14" style="display:inline-flex;color:var(--accent)"></span>ETF 주요 보유 종목 <span style="color:var(--text3);font-weight:400;font-size:10.5px">Top 10</span></div>
                 <div id="an-holdings"></div>
               </div>
             </div>
@@ -825,7 +899,7 @@ body::before{
             <div id="ai-e" class="empty">종목을 먼저 검색해주세요.</div>
             <div id="ai-b" style="display:none">
               <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
-                <button class="btn btn-gold" onclick="doAI()" id="aib">✨ AI 분석 실행</button>
+                <button class="btn btn-gold btn-icon" data-icon="zap" data-icon-size="14" onclick="doAI()" id="aib"><span class="ico"></span>AI 분석 실행</button>
                 <span style="font-size:11px;color:var(--text2)">최신 뉴스 + 기술 지표 + 애널리스트 의견 종합</span>
               </div>
               <div id="ail" class="ltxt" style="display:none">AI가 분석 중입니다...</div>
@@ -864,18 +938,18 @@ body::before{
           <div id="tc-watch" class="tc">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
               <span style="font-size:13px;font-weight:600">관심 종목</span>
-              <div style="display:flex;gap:6px"><button class="btn btn-sm" onclick="refreshWatch()">새로고침</button><button class="btn btn-sm" onclick="reqPerm()">🔔 알림</button></div>
+              <div style="display:flex;gap:6px"><button class="btn btn-sm btn-icon" data-icon="refresh" data-icon-size="13" onclick="refreshWatch()"><span class="ico"></span>새로고침</button><button class="btn btn-sm btn-icon" data-icon="bell" data-icon-size="13" onclick="reqPerm()"><span class="ico"></span>알림</button></div>
             </div>
             <div id="watch-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin-bottom:14px"></div>
             <div class="add-row" style="margin-top:0;border-top:none;padding-top:0">
               <div class="ig"><label>티커 추가</label><input type="text" id="watch-tk" placeholder="NVDA..." style="width:140px;text-transform:uppercase" onkeydown="if(event.key==='Enter')addWatch()"></div>
-              <button class="btn btn-p" onclick="addWatch()">+ 추가</button>
+              <button class="btn btn-p btn-icon" data-icon="plus" data-icon-size="14" onclick="addWatch()"><span class="ico"></span>추가</button>
             </div>
             <p class="sl" style="margin-top:10px">신호 변경 시 자동 알림 · 클릭하면 상세 분석</p>
           </div>
 
           <div id="tc-alert" class="tc">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><span style="font-size:13px;font-weight:600">가격 알림</span><button class="btn btn-sm" onclick="reqPerm()">🔔 알림 허용</button></div>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><span style="font-size:13px;font-weight:600">가격 알림</span><button class="btn btn-sm btn-icon" data-icon="bell" data-icon-size="13" onclick="reqPerm()"><span class="ico"></span>알림 허용</button></div>
             <div id="al-list"></div>
             <div class="sl">새 알림 추가</div>
             <div class="al-form">
@@ -895,29 +969,29 @@ body::before{
   <!-- PICKS SCREEN (오늘의 추천) -->
   <div class="screen" id="screen-picks">
     <div class="main">
-      <div class="sec-title">⭐ 오늘의 추천 <button class="btn btn-sm" onclick="loadPicks(true)" style="margin-left:auto">새로고침</button></div>
+      <div class="sec-title"><span class="sec-icon" data-icon="star"></span>오늘의 추천 <button class="btn btn-sm" onclick="loadPicks(true)" style="margin-left:auto">새로고침</button></div>
 
       <!-- Top Movers -->
       <div class="picks-tabs" style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap">
-        <button class="picks-tab on" data-tab="movers" onclick="switchPicksTab('movers')">📊 Top Movers</button>
-        <button class="picks-tab" data-tab="algo" onclick="switchPicksTab('algo')">🔢 알고리즘 추천</button>
-        <button class="picks-tab" data-tab="ai" onclick="switchPicksTab('ai')">🤖 AI 추천</button>
+        <button class="picks-tab on" data-tab="movers" data-icon="trending_up" onclick="switchPicksTab('movers')"><span class="ico"></span>Top Movers</button>
+        <button class="picks-tab" data-tab="algo" data-icon="algo" onclick="switchPicksTab('algo')"><span class="ico"></span>알고리즘 추천</button>
+        <button class="picks-tab" data-tab="ai" data-icon="ai" onclick="switchPicksTab('ai')"><span class="ico"></span>AI 추천</button>
       </div>
 
       <!-- Movers content -->
       <div id="picks-movers" class="picks-content on">
         <div class="analyst-row" style="margin-bottom:14px">
           <div class="analyst-card" style="flex:1;min-width:0">
-            <div class="analyst-title" style="color:var(--up)">🚀 Top Gainers (상승 Top 5)</div>
+            <div class="analyst-title" style="color:var(--up);display:flex;align-items:center;gap:6px"><span data-icon="trending_up" data-icon-size="16" style="display:inline-flex"></span>Top Gainers <span style="color:var(--text3);font-weight:400;font-size:11px">상승 5</span></div>
             <div id="movers-gainers" class="movers-list"><div class="ltxt">로딩 중...</div></div>
           </div>
           <div class="analyst-card" style="flex:1;min-width:0">
-            <div class="analyst-title" style="color:var(--down)">📉 Top Losers (하락 Top 5)</div>
+            <div class="analyst-title" style="color:var(--down);display:flex;align-items:center;gap:6px"><span data-icon="trending_down" data-icon-size="16" style="display:inline-flex"></span>Top Losers <span style="color:var(--text3);font-weight:400;font-size:11px">하락 5</span></div>
             <div id="movers-losers" class="movers-list"><div class="ltxt">로딩 중...</div></div>
           </div>
         </div>
         <div class="card">
-          <div class="analyst-title" style="margin-bottom:10px">🔥 가장 활발한 거래 (Most Actives)</div>
+          <div class="analyst-title" style="margin-bottom:10px;display:flex;align-items:center;gap:6px"><span data-icon="fire" data-icon-size="16" style="display:inline-flex;color:#ff8845"></span>가장 활발한 거래 <span style="color:var(--text3);font-weight:400;font-size:11px">Most Actives</span></div>
           <div id="movers-actives" class="movers-list"><div class="ltxt">로딩 중...</div></div>
         </div>
       </div>
@@ -926,26 +1000,27 @@ body::before{
       <div id="picks-algo" class="picks-content">
         <div class="card">
           <div style="font-size:12px;color:var(--text2);margin-bottom:10px;line-height:1.6">
-            <strong>📐 알고리즘 스크리닝 기준:</strong><br>
+            <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;color:var(--accent);font-weight:600;font-size:13px"><span data-icon="algo" data-icon-size="16" style="display:inline-flex"></span>알고리즘 스크리닝 기준</div>
             • RSI 30 이하 (과매도) <strong>또는</strong> RSI 70 이상 (과열)<br>
             • 골든/데드 크로스 (20일 SMA × 50일 SMA)<br>
             • 거래량 평균 대비 변화<br>
-            <span style="font-style:italic">※ 매수/매도 추천이 아닌 기술적 신호 기반 정보 제공입니다.</span>
+            <span style="font-style:italic;color:var(--text3)">※ 매수/매도 추천이 아닌 기술적 신호 기반 정보 제공입니다.</span>
           </div>
         </div>
         <div id="picks-algo-list" style="margin-top:12px"></div>
-        <button class="btn btn-p" onclick="runAlgoScreening()" style="width:100%;margin-top:12px">🔄 알고리즘 분석 실행</button>
+        <button class="btn btn-p btn-icon" onclick="runAlgoScreening()" style="width:100%;margin-top:12px"><span data-icon="refresh" data-icon-size="16" style="display:inline-flex"></span>알고리즘 분석 실행</button>
       </div>
 
       <!-- AI picks content -->
       <div id="picks-ai" class="picks-content">
         <div class="card">
           <div style="font-size:12px;color:var(--text2);line-height:1.6">
-            <strong>🧠 AI 추천:</strong> Gemini가 최신 시장 뉴스와 트렌드를 검색해서 오늘 주목할 만한 미국 주식 5개를 추천합니다.
+            <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;color:var(--accent);font-weight:600;font-size:13px"><span data-icon="ai" data-icon-size="16" style="display:inline-flex"></span>AI 추천</div>
+            Gemini가 최신 시장 뉴스와 트렌드를 검색해서 오늘 주목할 만한 미국 주식 5개를 추천합니다.
           </div>
         </div>
         <div id="picks-ai-list" style="margin-top:12px"><div class="ltxt">"AI 추천 받기" 버튼을 눌러주세요</div></div>
-        <button class="btn btn-p" onclick="runAIPicks()" id="picks-ai-btn" style="width:100%;margin-top:12px">🤖 AI 추천 받기</button>
+        <button class="btn btn-p btn-icon" onclick="runAIPicks()" id="picks-ai-btn" style="width:100%;margin-top:12px"><span data-icon="ai" data-icon-size="16" style="display:inline-flex"></span>AI 추천 받기</button>
       </div>
     </div>
   </div>
@@ -953,7 +1028,7 @@ body::before{
   <!-- ASSETS SCREEN (자산 관리) -->
   <div class="screen" id="screen-assets">
     <div class="main">
-      <div class="sec-title">💼 내 자산 <button class="btn btn-sm" onclick="refreshAssets()" style="margin-left:auto">새로고침</button></div>
+      <div class="sec-title"><span class="sec-icon" data-icon="briefcase"></span>내 자산 <button class="btn btn-sm" onclick="refreshAssets()" style="margin-left:auto">새로고침</button></div>
 
       <!-- 자산 요약 카드 -->
       <div id="assets-summary" style="display:none">
@@ -963,7 +1038,7 @@ body::before{
       <!-- 분석 카드 -->
       <div id="assets-analysis" style="display:none;margin-bottom:14px">
         <div class="card">
-          <div style="font-size:12px;color:var(--text2);font-weight:600;text-transform:uppercase;letter-spacing:0.04em;margin-bottom:10px">📊 포트폴리오 분석</div>
+          <div style="font-size:12px;color:var(--text2);font-weight:600;text-transform:uppercase;letter-spacing:0.04em;margin-bottom:10px;display:flex;align-items:center;gap:6px"><span data-icon="chart" data-icon-size="14" style="display:inline-flex;color:var(--accent)"></span>포트폴리오 분석</div>
           <div id="assets-analysis-content" style="font-size:13px;line-height:1.7"></div>
         </div>
       </div>
@@ -972,11 +1047,11 @@ body::before{
       <div id="assets-charts" style="display:none">
         <div class="analyst-row">
           <div class="analyst-card">
-            <div class="analyst-title">📈 종목별 비중</div>
+            <div class="analyst-title" style="display:flex;align-items:center;gap:6px"><span data-icon="pie" data-icon-size="14" style="display:inline-flex;color:var(--accent)"></span>종목별 비중</div>
             <div class="cw" style="height:200px"><canvas id="assets-pie"></canvas></div>
           </div>
           <div class="analyst-card">
-            <div class="analyst-title">🏭 섹터별 비중</div>
+            <div class="analyst-title" style="display:flex;align-items:center;gap:6px"><span data-icon="factory" data-icon-size="14" style="display:inline-flex;color:var(--accent)"></span>섹터별 비중</div>
             <div class="cw" style="height:200px"><canvas id="assets-sector"></canvas></div>
             <div id="assets-sector-empty" style="display:none;text-align:center;padding:40px 0;color:var(--text2);font-size:11px">종목을 추가하면 자동 분류됩니다</div>
           </div>
@@ -997,7 +1072,7 @@ body::before{
         <div class="ig"><label>티커</label><input type="text" id="assets-tk" placeholder="NVDA" style="width:90px;text-transform:uppercase"></div>
         <div class="ig"><label>수량</label><input type="number" id="assets-sh" placeholder="10" min="0" style="width:90px"></div>
         <div class="ig"><label>평단가($)</label><input type="number" id="assets-avg" placeholder="120" step="0.01" min="0" style="width:110px"></div>
-        <button class="btn btn-p" onclick="addAsset()">+ 추가</button>
+        <button class="btn btn-p btn-icon" data-icon="plus" data-icon-size="14" onclick="addAsset()"><span class="ico"></span>추가</button>
       </div>
       <div id="assets-loading" class="ltxt" style="display:none">가격 업데이트 중...</div>
     </div>
@@ -1006,7 +1081,7 @@ body::before{
   <!-- CALENDAR SCREEN -->
   <div class="screen" id="screen-calendar">
     <div class="main">
-      <div class="sec-title">📅 경제 캘린더</div>
+      <div class="sec-title"><span class="sec-icon" data-icon="calendar"></span>경제 캘린더</div>
       <div class="cal-filter">
         <button class="on" data-cal="all" onclick="setCalFilter('all')">전체</button>
         <button data-cal="econ" onclick="setCalFilter('econ')">경제 지표</button>
@@ -1027,18 +1102,18 @@ body::before{
           <div class="modal-title" id="sector-modal-title">섹터</div>
           <div class="modal-sub" id="sector-modal-sub"></div>
         </div>
-        <button class="modal-close" onclick="closeSectorModal()">✕</button>
+        <button class="modal-close" data-icon="x" data-icon-size="16" onclick="closeSectorModal()"><span class="ico"></span></button>
       </div>
       <div id="sector-modal-list" class="movers-list"></div>
     </div>
   </div>
 
   <div class="bottomnav">
-    <button class="nav-btn on" data-nav="home" onclick="navTo('home')"><span class="ico">🏠</span><span>홈</span></button>
-    <button class="nav-btn" data-nav="analysis" onclick="navTo('analysis')"><span class="ico">📊</span><span>분석</span></button>
-    <button class="nav-btn" data-nav="picks" onclick="navTo('picks')"><span class="ico">⭐</span><span>추천</span></button>
-    <button class="nav-btn" data-nav="assets" onclick="navTo('assets')"><span class="ico">💼</span><span>자산</span></button>
-    <button class="nav-btn" data-nav="calendar" onclick="navTo('calendar')"><span class="ico">📅</span><span>캘린더</span></button>
+    <button class="nav-btn on" data-nav="home" data-icon="home" onclick="navTo('home')"><span class="ico"></span><span>홈</span></button>
+    <button class="nav-btn" data-nav="analysis" data-icon="chart" onclick="navTo('analysis')"><span class="ico"></span><span>분석</span></button>
+    <button class="nav-btn" data-nav="picks" data-icon="star" onclick="navTo('picks')"><span class="ico"></span><span>추천</span></button>
+    <button class="nav-btn" data-nav="assets" data-icon="briefcase" onclick="navTo('assets')"><span class="ico"></span><span>자산</span></button>
+    <button class="nav-btn" data-nav="calendar" data-icon="calendar" onclick="navTo('calendar')"><span class="ico"></span><span>캘린더</span></button>
   </div>
 </div>
 
@@ -1056,6 +1131,63 @@ let CAL_FILTER='all';
 let EVENT_ALERTS=[];
 const $=id=>document.getElementById(id);
 const f2=n=>n==null||isNaN(n)?'—':n.toFixed(2);
+
+// ── ICON SYSTEM ─────────────────────────────────────
+// Lucide-style outline icons + emerald accent for branding
+const ICONS = {
+  // Navigation
+  home: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11.5L12 4l9 7.5"/><path d="M5 10v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V10"/><path d="M9 21V13h6v8"/></svg>',
+  chart: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-7"/><circle cx="7" cy="14" r="1.2" fill="currentColor"/><circle cx="11" cy="10" r="1.2" fill="currentColor"/><circle cx="14" cy="13" r="1.2" fill="currentColor"/></svg>',
+  star: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.5l2.9 6.3 6.6.8-4.9 4.5 1.3 6.6L12 17.4 6.1 20.7l1.3-6.6L2.5 9.6l6.6-.8z"/></svg>',
+  star_filled: '<svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M12 2.5l2.9 6.3 6.6.8-4.9 4.5 1.3 6.6L12 17.4 6.1 20.7l1.3-6.6L2.5 9.6l6.6-.8z"/></svg>',
+  briefcase: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/><path d="M3 13h18"/></svg>',
+  calendar: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/><circle cx="8.5" cy="14" r="0.8" fill="currentColor"/><circle cx="12" cy="14" r="0.8" fill="currentColor"/><circle cx="15.5" cy="14" r="0.8" fill="currentColor"/></svg>',
+
+  // Section icons
+  globe: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg>',
+  factory: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21V11l5 3V11l5 3V8l5 3v10z"/><path d="M3 21h18"/><path d="M9 17h1M13 17h1M17 17h1"/></svg>',
+  newspaper: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h13a2 2 0 0 1 2 2v12a2 2 0 0 0 2 2H6a2 2 0 0 1-2-2z"/><path d="M8 8h7M8 12h7M8 16h4"/></svg>',
+  bell: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10 21a2 2 0 0 0 4 0"/></svg>',
+
+  // Analysis tabs
+  analyst: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/></svg>',
+  ai: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="6" width="16" height="14" rx="2"/><path d="M8 2v4M16 2v4M12 11v3M9 11h6"/><circle cx="9" cy="16" r="0.8" fill="currentColor"/><circle cx="15" cy="16" r="0.8" fill="currentColor"/></svg>',
+  refresh: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 0 1-9 9c-3.5 0-6.5-2-8-5"/><path d="M3 12a9 9 0 0 1 9-9c3.5 0 6.5 2 8 5"/><path d="M16 8h5V3M8 16H3v5"/></svg>',
+  scale: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18M5 6h14M5 6l-3 7a4 4 0 0 0 6 0zM19 6l-3 7a4 4 0 0 0 6 0z"/></svg>',
+
+  // Picks page
+  fire: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.5c1 4 4 5.5 4 9.5a4 4 0 0 1-8 0c0-1.5.5-2.5 1.5-3.5C10 10 11 9 12 2.5z"/><path d="M9 16a3 3 0 0 0 6 0c0-1-1-2-1-3-1 1-2 1-3 0-1 1-2 2-2 3z"/></svg>',
+  trending_up: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l6-6 4 4 8-8"/><path d="M14 7h7v7"/></svg>',
+  trending_down: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7l6 6 4-4 8 8"/><path d="M14 17h7v-7"/></svg>',
+  activity: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l3-9 4 18 3-9h4"/></svg>',
+  algo: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><circle cx="6.5" cy="6.5" r="1.2" fill="currentColor"/><circle cx="17.5" cy="17.5" r="1.2" fill="currentColor"/></svg>',
+
+  // Hero card
+  doc: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M8 13h8M8 17h6"/></svg>',
+  link: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg>',
+  user: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.5 3.5-8 8-8s8 3.5 8 8"/></svg>',
+  users: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M3 20c0-3.5 2.7-6 6-6s6 2.5 6 6"/><circle cx="17" cy="9" r="2.5"/><path d="M15 14c2.5 0.3 5 2 5 5"/></svg>',
+  zap: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L4 14h7l-1 8 9-12h-7z"/></svg>',
+  translate: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5h12M9 3v2c0 5-2 8-7 9"/><path d="M5 9c0 4 4 7 8 7"/><path d="M11 21l5-11 5 11M13 18h6"/></svg>',
+  pulse: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l2-7 4 14 2-5h6"/></svg>',
+  check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-11"/></svg>',
+  x: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M6 18l12-12"/></svg>',
+  search: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>',
+  plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>',
+  external: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="M21 3l-9 9"/><path d="M21 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h6"/></svg>',
+  alert: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l10 18H2z"/><path d="M12 9v5"/><circle cx="12" cy="17.5" r="0.8" fill="currentColor"/></svg>',
+  flag: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 21V5a2 2 0 0 1 2-2h11l-2 5 2 5H7"/></svg>',
+  pin: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s7-7.5 7-13a7 7 0 0 0-14 0c0 5.5 7 13 7 13z"/><circle cx="12" cy="9" r="2.5"/></svg>',
+  pie: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v9l8 4.5"/><circle cx="12" cy="12" r="9"/></svg>',
+  trash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M5 6l1 14a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2l1-14"/></svg>',
+};
+
+// 아이콘 렌더 헬퍼
+function ic(name, size=18, cls=''){
+  const svg = ICONS[name] || '';
+  if(!svg) return '';
+  return `<span class="ic-wrap ${cls}" style="width:${size}px;height:${size}px;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0">${svg.replace('<svg', `<svg width="${size}" height="${size}"`)}</span>`;
+}
 const fu=n=>n==null||isNaN(n)?'—':'$'+n.toFixed(2);
 const fp=n=>n==null||isNaN(n)?'—':(n>=0?'+':'')+n.toFixed(2)+'%';
 const fk=n=>!n?'—':n>=1e12?'$'+(n/1e12).toFixed(2)+'T':n>=1e9?'$'+(n/1e9).toFixed(1)+'B':'$'+(n/1e6).toFixed(0)+'M';
@@ -1300,7 +1432,7 @@ async function go(){
     // 섹터 / 산업 / 거래소 (FMP 우선, Finnhub fallback)
     let sectorHTML='';
     if(D.isEtf){
-      sectorHTML=`<span class="sec-tag" style="background:rgba(74,158,255,0.15);color:var(--blue)">📊 ETF</span>`;
+      sectorHTML=`<span class="sec-tag" style="background:rgba(74,158,255,0.15);color:var(--blue);border-color:rgba(74,158,255,0.3)">${ic('chart',11)}<span style="margin-left:4px">ETF</span></span>`;
     }
     const sector = D.fmpProfile?.sector || '';
     const industry = D.fmpProfile?.industry || D.finProfile?.finnhubIndustry || '';
@@ -1319,8 +1451,8 @@ async function go(){
       D.descTranslated = null;
       $('hdesc').innerHTML=`
         <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px">
-          <div style="font-size:11px;color:var(--text2);font-weight:600;text-transform:uppercase;letter-spacing:0.04em">📋 회사 소개</div>
-          <button class="btn btn-sm" id="desc-trans-btn" onclick="toggleDescTrans()" style="font-size:10.5px;padding:3px 9px">🇰🇷 한국어로</button>
+          <div style="font-size:11px;color:var(--text2);font-weight:600;text-transform:uppercase;letter-spacing:0.04em;display:flex;align-items:center;gap:5px">${ic('doc',13)}회사 소개</div>
+          <button class="btn btn-sm" id="desc-trans-btn" onclick="toggleDescTrans()" style="font-size:10.5px;padding:3px 9px;display:inline-flex;align-items:center;gap:4px">${ic('translate',12)}한국어로</button>
         </div>
         <div style="line-height:1.7" id="hdesc-text">${trimmed}</div>`;
       $('hdesc').style.display='block';
@@ -1328,11 +1460,11 @@ async function go(){
 
     // 웹사이트 + CEO + 직원수
     const extras=[];
-    if(D.fmpProfile?.website)extras.push(`🌐 <a href="${D.fmpProfile.website}" target="_blank" style="color:var(--blue);text-decoration:none">${D.fmpProfile.website.replace(/^https?:\/\//,'').replace(/\/$/,'')}</a>`);
-    if(D.fmpProfile?.ceo)extras.push(`👤 CEO: ${D.fmpProfile.ceo}`);
-    if(D.fmpProfile?.fullTimeEmployees)extras.push(`👥 ${parseInt(D.fmpProfile.fullTimeEmployees).toLocaleString()}명`);
+    if(D.fmpProfile?.website)extras.push(`<span style="display:inline-flex;align-items:center;gap:4px">${ic('link',12)}<a href="${D.fmpProfile.website}" target="_blank" style="color:var(--blue);text-decoration:none">${D.fmpProfile.website.replace(/^https?:\/\//,'').replace(/\/$/,'')}</a></span>`);
+    if(D.fmpProfile?.ceo)extras.push(`<span style="display:inline-flex;align-items:center;gap:4px">${ic('user',12)}CEO: ${D.fmpProfile.ceo}</span>`);
+    if(D.fmpProfile?.fullTimeEmployees)extras.push(`<span style="display:inline-flex;align-items:center;gap:4px">${ic('users',12)}${parseInt(D.fmpProfile.fullTimeEmployees).toLocaleString()}명</span>`);
     if(extras.length){
-      $('hweb').innerHTML=extras.join(' · ');
+      $('hweb').innerHTML=`<div style="display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center">${extras.join('<span style="color:var(--text3)">·</span>')}</div>`;
       $('hweb').style.display='block';
     }else{$('hweb').style.display='none';}
 
@@ -1415,13 +1547,13 @@ async function toggleDescTrans(){
   // 이미 번역됐으면 원문 토글
   if(D.descShowing==='ko'){
     txt.textContent=D.descOriginal;
-    btn.textContent='🇰🇷 한국어로';
+    btn.innerHTML=ic('translate',12)+'한국어로';
     D.descShowing='en';
     return;
   }
   if(D.descTranslated){
     txt.textContent=D.descTranslated;
-    btn.textContent='🇺🇸 영문으로';
+    btn.innerHTML=ic('translate',12)+'영문으로';
     D.descShowing='ko';
     return;
   }
@@ -1434,6 +1566,7 @@ async function toggleDescTrans(){
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({prompt,mode:'translate',search:false}),
+      timeout:60000,
     });
     let translated=r?.text||r?.content?.[0]?.text||'';
     translated=translated.replace(/^["'`]|["'`]$/g,'').trim();
@@ -1442,13 +1575,13 @@ async function toggleDescTrans(){
       D.descShowing='ko';
       txt.textContent=translated;
       txt.style.opacity='1';
-      btn.disabled=false;btn.textContent='🇺🇸 영문으로';
+      btn.disabled=false;btn.innerHTML=ic('translate',12)+'영문으로';
     }else{
       throw new Error('번역 실패');
     }
   }catch(e){
     txt.style.opacity='1';
-    btn.disabled=false;btn.textContent='🇰🇷 한국어로';
+    btn.disabled=false;btn.innerHTML=ic('translate',12)+'한국어로';
     toast('번역 실패: '+e.message);
   }
 }
@@ -1823,8 +1956,8 @@ function removeWatch(tk){watchlist=watchlist.filter(w=>w.tk!==tk);saveWatchlist(
 function updateStarButton(){
   const star=$('watch-star');if(!star||!D)return;
   const isWatched=watchlist.some(w=>w.tk===D.tk);
-  star.style.display='inline-block';
-  star.textContent=isWatched?'★':'☆';
+  star.style.display='inline-flex';
+  star.innerHTML=isWatched?ic('star_filled',18):ic('star',18);
   star.classList.toggle('on',isWatched);
 }
 
@@ -1887,7 +2020,7 @@ function watchCardHTML(w,noX){
   const v=w.verdict;
   const vBg=v?(v.cls==='v-strong-buy'?'#0ea860':v.cls==='v-buy'?'#26d782':v.cls==='v-hold'?'#7a8499':v.cls==='v-sell'?'#ff4d6d':'#dc2949'):'#7a8499';
   return`<div class="watch-card" onclick="clickWatch('${w.tk}')">
-    ${noX?'':`<button class="wt-x" onclick="event.stopPropagation();removeWatch('${w.tk}')">✕</button>`}
+    ${noX?'':`<button class="wt-x" onclick="event.stopPropagation();removeWatch('${w.tk}')">${ic('x',12)}</button>`}
     <div class="wt-tk">${w.tk}</div>
     <div class="wt-pr">${w.price?fu(w.price):'—'}</div>
     <div class="wt-ch ${w.change>=0?'up':'down'}">${w.change!=null?fp(w.change):''}</div>
@@ -2224,7 +2357,7 @@ function renderAssets(){
       <td>${s.price?fu(s.price):'—'}</td>
       <td>${mkt?fu(mkt):'—'}</td>
       <td class="${pct>=0?'up':'down'}">${pct!=null?fp(pct):'—'}</td>
-      <td><button class="del-btn" onclick="removeAsset(${i})">✕</button></td>
+      <td><button class="del-btn" onclick="removeAsset(${i})">${ic('trash',13)}</button></td>
     </tr>`;
   }).join('');
 
@@ -2401,7 +2534,7 @@ function removeAlert(id){alerts=alerts.filter(a=>a.id!==id);saveAl();renderAlert
 function renderAlerts(){
   const list=$('al-list');
   if(!alerts.length){list.innerHTML='<div class="empty">설정된 알림이 없습니다.</div>';return;}
-  list.innerHTML=alerts.map(a=>`<div class="al-item"><span><strong>${a.tk}</strong> — 가격 <strong>$${a.val}</strong> ${a.type==='above'?'이상':'이하'} 도달 시</span><div style="display:flex;gap:6px;align-items:center"><span class="al-badge ${a.triggered?'al-tri':'al-act'}">${a.triggered?'발동':'대기'}</span><button class="del-btn" onclick="removeAlert(${a.id})">✕</button></div></div>`).join('');
+  list.innerHTML=alerts.map(a=>`<div class="al-item"><span><strong>${a.tk}</strong> — 가격 <strong>$${a.val}</strong> ${a.type==='above'?'이상':'이하'} 도달 시</span><div style="display:flex;gap:6px;align-items:center"><span class="al-badge ${a.triggered?'al-tri':'al-act'}">${a.triggered?'발동':'대기'}</span><button class="del-btn" onclick="removeAlert(${a.id})">${ic('trash',13)}</button></div></div>`).join('');
 }
 async function checkAlerts(){
   if(!alerts.length)return;let changed=false;
@@ -2499,7 +2632,7 @@ async function loadSectorsGrid(){
 // 섹터 클릭 → 시가총액 상위 종목 모달
 async function showSectorTop(sector){
   const modal=$('sector-modal');
-  $('sector-modal-title').textContent=`🏭 ${sector.name} 섹터 상위 종목`;
+  $('sector-modal-title').innerHTML=`<span style="display:inline-flex;color:var(--accent)">${ic('factory',18)}</span>${sector.name} 섹터 상위 종목`;
   $('sector-modal-sub').textContent=`${sector.tk} ETF 구성 종목 (시가총액 비중 순)`;
   $('sector-modal-list').innerHTML='<div class="ltxt">로딩 중...</div>';
   modal.classList.add('on');
@@ -2755,7 +2888,7 @@ function renderCalendar(){
         return`<div class="event-item" style="${itemStyle}">
           <div class="event-imp imp-${e.imp}"></div>
           <div class="event-content"><div class="event-title">${titleEmoji}${e.title}</div><div class="event-meta">${e.meta}</div></div>
-          ${isHoliday?'':`<button class="event-bell ${on?'on':''}" onclick="toggleEventAlert('${id}')">${on?'🔔':'🔕'}</button>`}
+          ${isHoliday?'':`<button class="event-bell ${on?'on':''}" onclick="toggleEventAlert('${id}')">${ic('bell',16)}</button>`}
         </div>`;
       }).join('')}
     </div>`;
@@ -2826,6 +2959,34 @@ function getKoreanPreOpenTime(){
 loadPF();loadAl();loadWatchlist();loadEventAlerts();
 renderPF();renderAlerts();renderWatchlist();
 fetchKRW();
+
+// 아이콘 자동 주입 (data-icon 속성이 있는 요소 모두)
+function injectIcons(root){
+  (root||document).querySelectorAll('[data-icon]').forEach(el=>{
+    const iconName=el.dataset.icon;
+    const slot=el.querySelector('.ico')||(el.classList.contains('sec-icon')?el:null)||el;
+    if(slot.dataset.injected)return;
+    let sz=parseInt(el.dataset.iconSize);
+    if(!sz){
+      if(el.classList.contains('nav-btn'))sz=22;
+      else if(el.classList.contains('sec-icon'))sz=16;
+      else if(el.classList.contains('tab'))sz=15;
+      else if(el.classList.contains('picks-tab'))sz=14;
+      else sz=16;
+    }
+    slot.innerHTML=ic(iconName,sz);
+    slot.dataset.injected='1';
+  });
+}
+injectIcons();
+
+// 동적으로 추가된 요소도 자동 처리 (debounced)
+let _iconInjectTimer=null;
+const _iconObserver=new MutationObserver(()=>{
+  clearTimeout(_iconInjectTimer);
+  _iconInjectTimer=setTimeout(()=>injectIcons(),50);
+});
+_iconObserver.observe(document.body,{childList:true,subtree:true});
 
 // === 30초 자동 갱신 ===
 // 1. 현재 분석 중인 종목 (분석 화면에 있을 때만)
