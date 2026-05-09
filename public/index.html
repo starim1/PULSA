@@ -1370,10 +1370,10 @@ async function go(){
     D={...d,lr,lm,ls};
     loadSupportLines(d.tk);
 
-    // 데이터 소스: Finnhub (메트릭/프로필) + Twelve Data (목표가) + FMP (목표가/ETF) + Yahoo (차트)
-    let recommend=null, finProfile=null, finMetric=null, twelveTarget=null, twelveStats=null, fmpProfile=null, fmpTarget=null, fmpEtf=null;
+    // 데이터 소스: Finnhub (메트릭/프로필/ETF) + Twelve Data + FMP (목표가/profile) + Yahoo (차트)
+    let recommend=null, finProfile=null, finMetric=null, twelveTarget=null, twelveStats=null, fmpProfile=null, fmpTarget=null, fmpEtf=null, finEtf=null;
     try{
-      [recommend, finProfile, finMetric, twelveTarget, twelveStats, fmpProfile, fmpTarget, fmpEtf] = await Promise.all([
+      [recommend, finProfile, finMetric, twelveTarget, twelveStats, fmpProfile, fmpTarget, fmpEtf, finEtf] = await Promise.all([
         tryFetch(`/api/finnhub?symbol=${tk}&type=recommend`).catch(()=>null),
         tryFetch(`/api/finnhub?symbol=${tk}&type=profile`).catch(()=>null),
         tryFetch(`/api/finnhub?symbol=${tk}&type=metric`).catch(()=>null),
@@ -1382,6 +1382,7 @@ async function go(){
         tryFetch(`/api/fmp?symbol=${tk}&type=profile`).catch(()=>null),
         tryFetch(`/api/fmp?symbol=${tk}&type=target`).catch(()=>null),
         tryFetch(`/api/fmp?symbol=${tk}&type=etf_holdings`).catch(()=>null),
+        tryFetch(`/api/finnhub?symbol=${tk}&type=etf_holdings`).catch(()=>null),
       ]);
     }catch(e){console.warn('[Pulsa] Promise.all 실패:',e);}
 
@@ -1392,8 +1393,22 @@ async function go(){
     D.twelveStats = twelveStats;
     D.fmpProfile = fmpProfile?.[0] || null;
     D.fmpTarget = fmpTarget?.[0] || fmpTarget || null;
-    D.fmpEtf = Array.isArray(fmpEtf) ? fmpEtf : null;
-    D.isEtf = !!(D.fmpEtf && D.fmpEtf.length > 0) || (D.fmpProfile?.isEtf);
+
+    // ETF holdings: FMP 우선 → Finnhub 폴백
+    let etfHoldings = null;
+    if(Array.isArray(fmpEtf) && fmpEtf.length > 0){
+      etfHoldings = fmpEtf;
+    }else if(finEtf?.holdings && Array.isArray(finEtf.holdings) && finEtf.holdings.length > 0){
+      // Finnhub 형식: { holdings: [{symbol, name, percent, ...}] }
+      etfHoldings = finEtf.holdings.map(h=>({
+        asset: h.symbol || h.isin,
+        symbol: h.symbol || h.isin,
+        name: h.name,
+        weightPercentage: typeof h.percent === 'number' ? h.percent : null,
+      }));
+    }
+    D.fmpEtf = etfHoldings;
+    D.isEtf = !!(etfHoldings && etfHoldings.length > 0) || (D.fmpProfile?.isEtf);
 
     console.log('[Pulsa] 데이터 상태:', {
       finProfile: !!finProfile?.name,
@@ -1401,6 +1416,7 @@ async function go(){
       fmpTarget: !!D.fmpTarget?.targetConsensus,
       isEtf: D.isEtf,
       etfCount: D.fmpEtf?.length||0,
+      etfSource: fmpEtf?.length ? 'FMP' : (finEtf?.holdings ? 'Finnhub' : 'none'),
     });
 
     let analystScore=null;
@@ -2637,12 +2653,28 @@ async function showSectorTop(sector){
   $('sector-modal-list').innerHTML='<div class="ltxt">로딩 중...</div>';
   modal.classList.add('on');
   try{
-    const holdings=await tryFetch(`/api/fmp?symbol=${sector.tk}&type=etf_holdings`);
-    if(!holdings||!holdings.length){
+    // FMP 시도 (지금은 무료 미지원)
+    let holdings = await tryFetch(`/api/fmp?symbol=${sector.tk}&type=etf_holdings`).catch(()=>null);
+    let normalized = null;
+    if(Array.isArray(holdings) && holdings.length>0){
+      normalized = holdings;
+    }else{
+      // Finnhub fallback
+      const finData = await tryFetch(`/api/finnhub?symbol=${sector.tk}&type=etf_holdings`).catch(()=>null);
+      if(finData?.holdings && Array.isArray(finData.holdings) && finData.holdings.length>0){
+        normalized = finData.holdings.map(h=>({
+          asset: h.symbol||h.isin,
+          symbol: h.symbol||h.isin,
+          name: h.name,
+          weightPercentage: typeof h.percent==='number'?h.percent:null,
+        }));
+      }
+    }
+    if(!normalized || !normalized.length){
       $('sector-modal-list').innerHTML='<div class="ltxt">데이터 없음</div>';
       return;
     }
-    const top=holdings.slice(0,15);
+    const top=normalized.slice(0,15);
     $('sector-modal-list').innerHTML=top.map((h,i)=>{
       const sym=h.asset||h.symbol||'';
       const name=h.name||h.companyName||'';
