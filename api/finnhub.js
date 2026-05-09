@@ -12,6 +12,8 @@ export default async function handler(req, res) {
     profile: `/stock/profile2?symbol=${symbol}`,
     metric: `/stock/metric?symbol=${symbol}&metric=all`,
     quote: `/quote?symbol=${symbol}`,
+    etf_holdings: `/etf/holdings?symbol=${symbol}`,
+    etf_profile: `/etf/profile?symbol=${symbol}`,
   };
 
   const path = endpoints[type] || endpoints.recommend;
