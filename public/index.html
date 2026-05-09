@@ -2980,9 +2980,20 @@ function injectIcons(root){
 }
 injectIcons();
 
-// 동적으로 추가된 요소도 자동 처리 (debounced)
+// 동적으로 추가된 요소도 자동 처리 (필요할 때만)
 let _iconInjectTimer=null;
-const _iconObserver=new MutationObserver(()=>{
+const _iconObserver=new MutationObserver((mutations)=>{
+  // data-icon 속성이 있는 새 요소가 실제로 추가된 경우만 처리
+  let hasNewIcons=false;
+  for(const m of mutations){
+    for(const node of m.addedNodes){
+      if(node.nodeType!==1)continue; // Element만
+      if(node.hasAttribute&&node.hasAttribute('data-icon')){hasNewIcons=true;break;}
+      if(node.querySelector&&node.querySelector('[data-icon]:not([data-injected])')){hasNewIcons=true;break;}
+    }
+    if(hasNewIcons)break;
+  }
+  if(!hasNewIcons)return;
   clearTimeout(_iconInjectTimer);
   _iconInjectTimer=setTimeout(()=>injectIcons(),50);
 });
