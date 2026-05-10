@@ -956,13 +956,9 @@ body::before{
                 <div id="metrics-key" class="mets"></div>
               </div>
               <div class="card" style="margin-bottom:12px">
-                <div class="analyst-title" style="display:flex;align-items:center;gap:6px;margin-bottom:12px"><span data-icon="trending_up" data-icon-size="14" style="display:inline-flex;color:var(--accent)"></span>EPS 추이 <span style="color:var(--text3);font-weight:400;font-size:10.5px">최근 8분기</span></div>
-                <div class="cw" style="height:180px"><canvas id="metrics-eps"></canvas></div>
-                <div id="metrics-eps-empty" style="display:none;text-align:center;padding:20px;color:var(--text2);font-size:11px">EPS 데이터 없음</div>
-              </div>
-              <div class="card">
-                <div class="analyst-title" style="display:flex;align-items:center;gap:6px;margin-bottom:12px"><span data-icon="users" data-icon-size="14" style="display:inline-flex;color:var(--accent)"></span>최근 인사이더 거래 <span style="color:var(--text3);font-weight:400;font-size:10.5px">상위 10건</span></div>
-                <div id="metrics-insider"></div>
+                <div class="analyst-title" style="display:flex;align-items:center;gap:6px;margin-bottom:12px"><span data-icon="trending_up" data-icon-size="14" style="display:inline-flex;color:var(--accent)"></span>수익성 추이 <span style="color:var(--text3);font-weight:400;font-size:10.5px">연간 비교</span></div>
+                <div class="cw" style="height:200px"><canvas id="metrics-eps"></canvas></div>
+                <div id="metrics-eps-empty" style="display:none;text-align:center;padding:20px;color:var(--text2);font-size:11px">데이터 없음</div>
               </div>
             </div>
           </div>
@@ -2014,30 +2010,27 @@ async function loadMetrics(){
   $('metrics-b').style.display='block';
   $('metrics-ratios').innerHTML='<div class="ltxt" style="grid-column:1/-1">로딩 중...</div>';
   $('metrics-key').innerHTML='';
-  $('metrics-insider').innerHTML='';
 
   try{
-    const [ratios,keyMetrics,insider,earnings]=await Promise.all([
+    const [ratios,keyMetrics]=await Promise.all([
       tryFetch(`/api/fmp?symbol=${D.tk}&type=ratios`).catch(()=>null),
       tryFetch(`/api/fmp?symbol=${D.tk}&type=key_metrics`).catch(()=>null),
-      tryFetch(`/api/fmp?symbol=${D.tk}&type=insider`).catch(()=>null),
-      tryFetch(`/api/fmp?symbol=${D.tk}&type=earnings_history`).catch(()=>null),
     ]);
 
-    // 재무비율
+    // 재무비율 (FMP stable 응답: priceToEarningsRatio 등)
     if(Array.isArray(ratios)&&ratios[0]){
       const r=ratios[0];
       const ratioItems=[
-        ['PER',r.priceEarningsRatio||r.peRatioTTM,2],
-        ['PBR',r.priceToBookRatio||r.pbRatio,2],
-        ['PSR',r.priceToSalesRatio||r.psRatioTTM,2],
-        ['PEG',r.priceEarningsToGrowthRatio||r.pegRatio,2],
-        ['배당수익률',r.dividendYield?r.dividendYield*100:null,2,'%'],
-        ['ROE',r.returnOnEquity?r.returnOnEquity*100:null,1,'%'],
-        ['ROA',r.returnOnAssets?r.returnOnAssets*100:null,1,'%'],
-        ['부채/자본',r.debtEquityRatio,2],
-        ['영업이익률',r.operatingProfitMargin?r.operatingProfitMargin*100:null,1,'%'],
-        ['순이익률',r.netProfitMargin?r.netProfitMargin*100:null,1,'%'],
+        ['PER',r.priceToEarningsRatio,2],
+        ['PBR',r.priceToBookRatio,2],
+        ['PSR',r.priceToSalesRatio,2],
+        ['PEG',r.priceToEarningsGrowthRatio,2],
+        ['배당수익률',r.dividendYieldPercentage!=null?r.dividendYieldPercentage:(r.dividendYield!=null?r.dividendYield*100:null),2,'%'],
+        ['ROE',r.returnOnEquity!=null?r.returnOnEquity*100:null,1,'%'],
+        ['ROA',r.returnOnAssets!=null?r.returnOnAssets*100:null,1,'%'],
+        ['부채/자본',r.debtToEquityRatio,2],
+        ['영업이익률',r.operatingProfitMargin!=null?r.operatingProfitMargin*100:null,1,'%'],
+        ['순이익률',r.netProfitMargin!=null?r.netProfitMargin*100:null,1,'%'],
       ];
       $('metrics-ratios').innerHTML=ratioItems.map(([l,v,d,s='']) =>{
         const val=(v==null||isNaN(v))?'—':(typeof v==='number'?v.toFixed(d):v)+s;
@@ -2047,7 +2040,7 @@ async function loadMetrics(){
       $('metrics-ratios').innerHTML='<div class="ltxt" style="grid-column:1/-1">데이터 없음</div>';
     }
 
-    // 핵심 지표
+    // 핵심 지표 (FMP stable 응답: evToEBITDA 등)
     if(Array.isArray(keyMetrics)&&keyMetrics[0]){
       const k=keyMetrics[0];
       const fmtBig=v=>{
@@ -2061,12 +2054,14 @@ async function loadMetrics(){
       const keyItems=[
         ['시가총액',fmtBig(k.marketCap)],
         ['기업가치',fmtBig(k.enterpriseValue)],
-        ['EV/EBITDA',k.enterpriseValueOverEBITDA?k.enterpriseValueOverEBITDA.toFixed(1):'—'],
-        ['주당순이익',k.netIncomePerShare?'$'+k.netIncomePerShare.toFixed(2):'—'],
-        ['주당매출',k.revenuePerShare?'$'+k.revenuePerShare.toFixed(2):'—'],
-        ['장부가치/주',k.bookValuePerShare?'$'+k.bookValuePerShare.toFixed(2):'—'],
-        ['현금/주',k.cashPerShare?'$'+k.cashPerShare.toFixed(2):'—'],
-        ['ROIC',k.roic?(k.roic*100).toFixed(1)+'%':'—'],
+        ['EV/EBITDA',k.evToEBITDA!=null?k.evToEBITDA.toFixed(1):'—'],
+        ['EV/매출',k.evToSales!=null?k.evToSales.toFixed(1):'—'],
+        ['ROIC',k.returnOnCapitalEmployed!=null?(k.returnOnCapitalEmployed*100).toFixed(1)+'%':'—'],
+        ['투입자본수익률',k.returnOnInvestedCapital!=null?(k.returnOnInvestedCapital*100).toFixed(1)+'%':'—'],
+        ['유동비율',k.currentRatio!=null?k.currentRatio.toFixed(2):'—'],
+        ['EPS 수익률',k.earningsYield!=null?(k.earningsYield*100).toFixed(2)+'%':'—'],
+        ['잉여현금수익률',k.freeCashFlowYield!=null?(k.freeCashFlowYield*100).toFixed(2)+'%':'—'],
+        ['세금부담',k.taxBurden!=null?(k.taxBurden*100).toFixed(1)+'%':'—'],
       ];
       $('metrics-key').innerHTML=keyItems.map(([l,v])=>
         `<div class="mc"><div class="mc-l">${l}</div><div class="mc-v">${v}</div></div>`
@@ -2075,61 +2070,37 @@ async function loadMetrics(){
       $('metrics-key').innerHTML='<div class="ltxt" style="grid-column:1/-1">데이터 없음</div>';
     }
 
-    // EPS 차트
-    if(Array.isArray(earnings)&&earnings.length>0){
-      const valid=earnings.filter(e=>e.eps!=null||e.epsActual!=null).slice(0,8).reverse();
-      if(valid.length>0){
-        $('metrics-eps-empty').style.display='none';
-        const ctx=$('metrics-eps');
-        if(CH.eps){try{CH.eps.destroy();}catch(e){}}
-        const labels=valid.map(e=>{
-          const d=new Date(e.date||e.fiscalDateEnding);
-          return `Q${Math.ceil((d.getMonth()+1)/3)}'${String(d.getFullYear()).slice(2)}`;
-        });
-        const epsActual=valid.map(e=>e.epsActual||e.eps);
-        const epsEst=valid.map(e=>e.epsEstimated);
-        CH.eps=new Chart(ctx,{
-          type:'bar',
-          data:{labels,datasets:[
-            {label:'실제 EPS',data:epsActual,backgroundColor:'rgba(38,215,130,0.7)',borderRadius:4},
-            {label:'예상 EPS',data:epsEst,backgroundColor:'rgba(150,150,170,0.4)',borderRadius:4},
-          ]},
-          options:{responsive:true,maintainAspectRatio:false,
-            plugins:{legend:{display:true,labels:{font:{size:10},color:'var(--text2)'}}},
-            scales:{
-              x:{grid:{display:false},ticks:{font:{size:10},color:'var(--text2)'}},
-              y:{grid:{color:'rgba(150,150,170,.08)'},ticks:{font:{size:10},color:'var(--text2)',callback:v=>'$'+v}}
-            }
+    // EPS/수익률 추이 차트 (ratios의 분기별 priceToEarningsRatio 활용)
+    if(Array.isArray(ratios)&&ratios.length>1){
+      const recent=ratios.slice(0,8).reverse();
+      $('metrics-eps-empty').style.display='none';
+      const ctx=$('metrics-eps');
+      if(CH.eps){try{CH.eps.destroy();}catch(e){}}
+      const labels=recent.map(r=>{
+        const d=new Date(r.date);
+        return `${r.fiscalYear||d.getFullYear()}`;
+      });
+      // 영업이익률 + 순이익률 (시간별 추이)
+      const opMargin=recent.map(r=>r.operatingProfitMargin!=null?(r.operatingProfitMargin*100).toFixed(2):null);
+      const netMargin=recent.map(r=>r.netProfitMargin!=null?(r.netProfitMargin*100).toFixed(2):null);
+      const grossMargin=recent.map(r=>r.grossProfitMargin!=null?(r.grossProfitMargin*100).toFixed(2):null);
+      CH.eps=new Chart(ctx,{
+        type:'line',
+        data:{labels,datasets:[
+          {label:'매출총이익률',data:grossMargin,borderColor:'#26d782',backgroundColor:'rgba(38,215,130,0.1)',borderWidth:2,tension:0.3,fill:true},
+          {label:'영업이익률',data:opMargin,borderColor:'#4a9eff',backgroundColor:'rgba(74,158,255,0.1)',borderWidth:2,tension:0.3,fill:false},
+          {label:'순이익률',data:netMargin,borderColor:'#f5b53d',backgroundColor:'rgba(245,181,61,0.1)',borderWidth:2,tension:0.3,fill:false},
+        ]},
+        options:{responsive:true,maintainAspectRatio:false,
+          plugins:{legend:{display:true,labels:{font:{size:10},color:'var(--text2)'}}},
+          scales:{
+            x:{grid:{display:false},ticks:{font:{size:10},color:'var(--text2)'}},
+            y:{grid:{color:'rgba(150,150,170,.08)'},ticks:{font:{size:10},color:'var(--text2)',callback:v=>v+'%'}}
           }
-        });
-      }else{
-        $('metrics-eps-empty').style.display='block';
-      }
+        }
+      });
     }else{
       $('metrics-eps-empty').style.display='block';
-    }
-
-    // 인사이더 거래
-    if(Array.isArray(insider)&&insider.length>0){
-      $('metrics-insider').innerHTML=insider.slice(0,10).map(i=>{
-        const isBuy=(i.transactionType||'').toLowerCase().includes('buy')||(i.acquistionOrDisposition==='A');
-        const date=i.transactionDate||i.filingDate||'';
-        const dateStr=date?new Date(date).toLocaleDateString('ko-KR'):'';
-        const shares=i.securitiesTransacted||i.shares||0;
-        const price=i.price||0;
-        return `<div class="insider-row">
-          <div style="flex:1;min-width:0">
-            <div class="ir-name">${i.reportingName||'—'}</div>
-            <div class="ir-pos">${i.typeOfOwner||''} · ${dateStr}</div>
-          </div>
-          <div style="text-align:right">
-            <div class="ir-action ${isBuy?'buy':'sell'}">${isBuy?'매수':'매도'}</div>
-            <div class="ir-shares">${Number(shares).toLocaleString()}주 · $${Number(price).toFixed(2)}</div>
-          </div>
-        </div>`;
-      }).join('');
-    }else{
-      $('metrics-insider').innerHTML='<div class="ltxt">인사이더 거래 데이터 없음</div>';
     }
   }catch(e){
     $('metrics-ratios').innerHTML='<div class="ltxt" style="grid-column:1/-1">로드 실패: '+e.message+'</div>';
