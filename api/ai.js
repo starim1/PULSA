@@ -6,8 +6,10 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  if (!process.env.GEMINI_API_KEY) {
-    return res.status(500).json({ error: 'GEMINI_API_KEY not set' });
+  const hasGemini = !!process.env.GEMINI_API_KEY;
+  const hasClaude = !!process.env.ANTHROPIC_API_KEY;
+  if (!hasGemini && !hasClaude) {
+    return res.status(500).json({ error: 'No AI API key configured' });
   }
 
   try {
@@ -30,99 +32,122 @@ export default async function handler(req, res) {
     } else {
       systemContext = `당신은 전문 주식 애널리스트입니다.
 **중요: 현재 시점은 ${krDate}입니다. 절대 다른 날짜를 사용하지 마세요.**
-최신 뉴스는 Google 검색을 활용하세요.`;
+최신 뉴스는 검색을 활용하세요.`;
     }
 
     const fullPrompt = systemContext + '\n\n' + userPrompt;
-
-    // 모델 폴백 순서: lite (빠름/저렴) → flash (안정) → flash-002 (백업)
-    const models = ['gemini-2.5-flash-lite', 'gemini-2.0-flash', 'gemini-2.0-flash-001'];
-
-    const body = {
-      contents: [{ parts: [{ text: fullPrompt }] }],
-      generationConfig: {
-        temperature: isShort ? 0.5 : 0.7,
-        maxOutputTokens: mode === 'short' ? 200 : (mode === 'translate' ? 1024 : 2048),
-      },
-    };
-    if (useSearch && !isShort && mode !== 'translate') {
-      body.tools = [{ google_search: {} }];
-    }
-
     const errors = [];
-    
-    // 각 모델당 3회 시도 (지수 백오프: 2초 → 5초 → 다음 모델)
-    const RETRY_DELAYS = [2000, 5000];  // 1차 실패 후 2초, 2차 실패 후 5초
-    
-    for (const model of models) {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${process.env.GEMINI_API_KEY}`;
-      
-      for (let attempt = 0; attempt < 3; attempt++) {
-        try {
-          const response = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body),
-          });
 
-          const text = await response.text();
-          let data;
-          try { data = JSON.parse(text); } catch { data = { raw: text }; }
+    // === 1순위: Gemini ===
+    if (hasGemini) {
+      const models = ['gemini-2.5-flash-lite', 'gemini-2.0-flash'];
+      const RETRY_DELAYS = [2000, 5000];
 
-          if (response.ok) {
-            const aiText = data?.candidates?.[0]?.content?.parts
-              ?.map(p => p.text)
-              .filter(Boolean)
-              .join('\n') || '응답이 비어있습니다.';
+      for (const model of models) {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${process.env.GEMINI_API_KEY}`;
+        const body = {
+          contents: [{ parts: [{ text: fullPrompt }] }],
+          generationConfig: {
+            temperature: isShort ? 0.5 : 0.7,
+            maxOutputTokens: mode === 'short' ? 200 : (mode === 'translate' ? 1024 : 2048),
+          },
+        };
+        if (useSearch && !isShort && mode !== 'translate') {
+          body.tools = [{ google_search: {} }];
+        }
 
-            if (isShort || mode === 'translate') {
-              return res.status(200).json({ text: aiText.trim(), model });
+        for (let attempt = 0; attempt < 3; attempt++) {
+          try {
+            const response = await fetch(url, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(body),
+            });
+            const text = await response.text();
+            let data;
+            try { data = JSON.parse(text); } catch { data = { raw: text }; }
+
+            if (response.ok) {
+              const aiText = data?.candidates?.[0]?.content?.parts
+                ?.map(p => p.text).filter(Boolean).join('\n') || '';
+              if (aiText) {
+                if (isShort || mode === 'translate') {
+                  return res.status(200).json({ text: aiText.trim(), model, provider: 'gemini' });
+                }
+                const sources = data?.candidates?.[0]?.groundingMetadata?.groundingChunks
+                  ?.map(c => c.web?.title).filter(Boolean).slice(0, 3);
+                const sourceText = sources?.length ? '\n\n📚 참고 출처: ' + sources.join(', ') : '';
+                return res.status(200).json({
+                  content: [{ type: 'text', text: aiText + sourceText }],
+                  model, provider: 'gemini',
+                });
+              }
             }
 
-            const sources = data?.candidates?.[0]?.groundingMetadata?.groundingChunks
-              ?.map(c => c.web?.title)
-              .filter(Boolean)
-              .slice(0, 3);
-            const sourceText = sources?.length ? '\n\n📚 참고 출처: ' + sources.join(', ') : '';
+            if (response.status === 503 || response.status === 429 || response.status === 500) {
+              errors.push({ provider: 'gemini', model, attempt: attempt+1, status: response.status });
+              if (attempt < 2) {
+                await new Promise(r => setTimeout(r, RETRY_DELAYS[attempt]));
+                continue;
+              }
+              break;
+            }
 
-            return res.status(200).json({
-              content: [{ type: 'text', text: aiText + sourceText }],
-              model,
-            });
-          }
-
-          // 503, 429, 500: 재시도 가치 있음
-          if (response.status === 503 || response.status === 429 || response.status === 500) {
-            errors.push({ model, attempt: attempt+1, status: response.status });
-            // 마지막 시도가 아니면 백오프 후 재시도
+            // 다른 에러 (400, 401 등) - Claude 폴백 의미 있음
+            errors.push({ provider: 'gemini', model, status: response.status });
+            break;
+          } catch (e) {
+            errors.push({ provider: 'gemini', model, attempt: attempt+1, error: e.message });
             if (attempt < 2) {
               await new Promise(r => setTimeout(r, RETRY_DELAYS[attempt]));
               continue;
             }
-            // 3번 다 실패: 다음 모델로
             break;
           }
-
-          // 400, 401 등 다른 에러는 재시도/폴백 의미 없음
-          return res.status(response.status).json({
-            error: 'Gemini API error',
-            status: response.status,
-            model,
-            details: data,
-          });
-
-        } catch (e) {
-          errors.push({ model, attempt: attempt+1, error: e.message });
-          if (attempt < 2) {
-            await new Promise(r => setTimeout(r, RETRY_DELAYS[attempt]));
-            continue;
-          }
-          break;
         }
       }
     }
 
-    // 모든 시도 실패
+    // === 2순위: Claude (Gemini 모두 실패 시 폴백) ===
+    if (hasClaude) {
+      try {
+        const claudeBody = {
+          model: 'claude-haiku-4-5-20251001',
+          max_tokens: mode === 'short' ? 200 : (mode === 'translate' ? 1024 : 2048),
+          messages: [{ role: 'user', content: fullPrompt }],
+        };
+        // Claude는 web search tool도 있지만 일단 단순 호출
+        const r = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': process.env.ANTHROPIC_API_KEY,
+            'anthropic-version': '2023-06-01',
+          },
+          body: JSON.stringify(claudeBody),
+        });
+
+        if (r.ok) {
+          const data = await r.json();
+          const aiText = data?.content?.[0]?.text || '';
+          if (aiText) {
+            if (isShort || mode === 'translate') {
+              return res.status(200).json({ text: aiText.trim(), model: claudeBody.model, provider: 'claude' });
+            }
+            return res.status(200).json({
+              content: [{ type: 'text', text: aiText + '\n\n_(Gemini 과부하로 Claude로 분석)_' }],
+              model: claudeBody.model, provider: 'claude',
+            });
+          }
+        } else {
+          const errText = await r.text();
+          errors.push({ provider: 'claude', status: r.status, body: errText.substring(0, 200) });
+        }
+      } catch (e) {
+        errors.push({ provider: 'claude', error: e.message });
+      }
+    }
+
     return res.status(503).json({
       error: 'AI 서비스 일시 과부하. 잠시 후 다시 시도해주세요.',
       attempts: errors,
