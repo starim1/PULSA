@@ -1678,20 +1678,16 @@ function drawPrice(){
   }));
 
   if(CURRENT_CHART_MODE==='candle'){
-    // chartjs-chart-financial은 x축이 timestamp(ms)여야 함
-    // d.la는 이미 날짜 문자열, 이걸 timestamp로 변환
-    const candleData=d.la.map((label,i)=>{
-      const ts=new Date(label).getTime();
-      return {
-        x:isNaN(ts)?i*86400000:ts,  // 파싱 실패 시 인덱스 기반 fallback
-        o:d.opens[i]??d.cl[i],
-        h:d.highs[i]??d.cl[i],
-        l:d.lows[i]??d.cl[i],
-        c:d.cl[i]
-      };
-    });
+    // D.ts에 이미 밀리초 timestamp가 있음 (parseYahoo에서 저장)
+    const candleData=d.cl.map((c,i)=>({
+      x:d.ts[i],
+      o:d.opens[i]??c,
+      h:d.highs[i]??c,
+      l:d.lows[i]??c,
+      c:c
+    }));
     // SMA/BB 데이터도 같은 timestamp로 매핑
-    const lineDataFromArr=(arr)=>arr.map((v,i)=>({x:candleData[i].x,y:v}));
+    const lineDataFromArr=(arr)=>arr.map((v,i)=>({x:d.ts[i],y:v}));
     try{
       CH.p=new Chart(newCanvas,{
         type:'candlestick',
@@ -1704,12 +1700,35 @@ function drawPrice(){
           {type:'line',label:'SMA50',data:lineDataFromArr(d.s50),borderColor:'#D85A30',borderWidth:1.2,pointRadius:0,fill:false,tension:.2},
           {type:'line',label:'BB상단',data:lineDataFromArr(d.bnd.U),borderColor:'rgba(150,150,170,.4)',borderWidth:1,pointRadius:0,borderDash:[4,4],fill:false},
           {type:'line',label:'BB하단',data:lineDataFromArr(d.bnd.L),borderColor:'rgba(150,150,170,.4)',borderWidth:1,pointRadius:0,borderDash:[4,4],fill:false},
-          ...slDatasets.map(s=>({...s,type:'line',data:s.data.map((v,i)=>({x:candleData[i].x,y:v}))})),
+          ...slDatasets.map(s=>({...s,type:'line',data:s.data.map((v,i)=>({x:d.ts[i],y:v}))})),
         ]},
         options:{responsive:true,maintainAspectRatio:false,animation:false,
-          plugins:{legend:{display:false},tooltip:{backgroundColor:'rgba(10,22,40,0.95)'}},
+          plugins:{legend:{display:false},tooltip:{backgroundColor:'rgba(10,22,40,0.95)',
+            callbacks:{
+              title:(items)=>{
+                if(!items.length)return '';
+                const t=items[0].parsed.x;
+                const dt=new Date(t);
+                if(CURRENT_RANGE==='1d'||CURRENT_RANGE==='5d'){
+                  return dt.toLocaleString('ko-KR',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
+                }
+                return dt.toLocaleDateString('ko-KR',{year:'numeric',month:'short',day:'numeric'});
+              }
+            }
+          }},
           scales:{
-            x:{type:'timeseries',grid:{display:false},ticks:{maxTicksLimit:8,font:{size:10},color:txt2,autoSkip:true}},
+            x:{type:'timeseries',
+              time:{
+                unit:CURRENT_RANGE==='1d'||CURRENT_RANGE==='5d'?'hour':(CURRENT_RANGE==='1mo'||CURRENT_RANGE==='3mo'?'day':'month'),
+                displayFormats:{
+                  hour:'HH:mm',
+                  day:'M/d',
+                  month:'yyyy-MM',
+                }
+              },
+              grid:{display:false},
+              ticks:{maxTicksLimit:8,font:{size:10},color:txt2,autoSkip:true}
+            },
             y:{grid:{color:'rgba(150,150,170,.08)'},ticks:{font:{size:10,family:'JetBrains Mono'},color:txt2,callback:v=>'$'+f2(v)}}
           }
         }
