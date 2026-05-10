@@ -1949,28 +1949,50 @@ async function loadNews(){
   const list=$('news-list');
   list.innerHTML='<div class="ltxt">로딩 중...</div>';
   try{
-    const news=await tryFetch(`/api/fmp?symbol=${D.tk}&type=news`);
-    if(!Array.isArray(news)||news.length===0){
+    // 1순위: Finnhub company news (정규화된 형식)
+    let news=null;
+    const finRaw=await tryFetch(`/api/finnhub?symbol=${D.tk}&type=company_news`).catch(()=>null);
+    if(Array.isArray(finRaw)&&finRaw.length>0){
+      news=finRaw.map(n=>({
+        title:n.headline||'',
+        url:n.url||'#',
+        image:n.image||'',
+        site:n.source||'',
+        date:n.datetime?n.datetime*1000:Date.now(),
+      }));
+    }else{
+      // 2순위: FMP (예전 동작)
+      const fmpRaw=await tryFetch(`/api/fmp?symbol=${D.tk}&type=news`).catch(()=>null);
+      if(Array.isArray(fmpRaw)&&fmpRaw.length>0){
+        news=fmpRaw.map(n=>({
+          title:n.title||'',
+          url:n.url||n.link||'#',
+          image:n.image||'',
+          site:n.site||n.publisher||'',
+          date:n.publishedDate?new Date(n.publishedDate).getTime():(n.date?new Date(n.date).getTime():Date.now()),
+        }));
+      }
+    }
+    if(!news||news.length===0){
       list.innerHTML='<div class="ltxt">관련 뉴스가 없습니다</div>';
       return;
     }
     list.innerHTML=news.slice(0,12).map(n=>{
       const title=n.title||'(제목 없음)';
-      const site=n.site||n.publisher||'';
-      const url=n.url||n.link||'#';
+      const site=n.site||'';
+      const url=n.url||'#';
       const img=n.image||'';
-      const dt=n.publishedDate||n.date||'';
+      const dt=n.date;
       let timeAgo='';
       if(dt){
-        const d=new Date(dt);
-        const diff=Date.now()-d.getTime();
+        const diff=Date.now()-dt;
         const min=Math.floor(diff/60000);
         const hr=Math.floor(diff/3600000);
         const day=Math.floor(diff/86400000);
         if(min<60)timeAgo=min+'분 전';
         else if(hr<24)timeAgo=hr+'시간 전';
         else if(day<30)timeAgo=day+'일 전';
-        else timeAgo=d.toLocaleDateString('ko-KR');
+        else timeAgo=new Date(dt).toLocaleDateString('ko-KR');
       }
       return `<a class="news-card" href="${url}" target="_blank" rel="noopener">
         <div class="news-card-img">${img?`<img src="${img}" alt="" onerror="this.style.display='none';this.parentElement.innerHTML='${ic('newspaper',32).replace(/'/g,'&#39;')}'">`:ic('newspaper',32)}</div>
@@ -3187,25 +3209,32 @@ async function loadBreakingNews(force=false){
   }
   list.innerHTML='<div class="ltxt">로딩 중...</div>';
   try{
-    const news=await tryFetch('/api/fmp?type=general_news');
-    if(!Array.isArray(news)||!news.length){
+    // Finnhub general news (FMP 무료 미지원으로 변경)
+    const raw=await tryFetch('/api/finnhub?type=general_news');
+    if(!Array.isArray(raw)||!raw.length){
       list.innerHTML='<div class="ltxt">속보 없음</div>';
       return;
     }
-    // 속보 필터: 최근 60분 + 키워드 + 최대 5개
-    const breakingKeywords=/halt|surge|crash|plunge|breaking|alert|sec\s|fed\s|rate\s|recall|merger|acqui|bankrupt|lawsuit|scandal|급등|급락|일시정지|폭락|폭등/i;
-    const cutoff=Date.now()-60*60*1000;
+    // Finnhub 형식 정규화 → {title, url, image, site, date(ms)}
+    const news=raw.map(n=>({
+      title:n.headline||'',
+      url:n.url||'#',
+      image:n.image||'',
+      site:n.source||'',
+      summary:n.summary||'',
+      date:n.datetime?n.datetime*1000:Date.now(),  // unix sec → ms
+    }));
+    // 속보 필터: 최근 90분 + 키워드 + 최대 5개
+    const breakingKeywords=/halt|surge|crash|plunge|breaking|alert|\bsec\b|\bfed\b|recall|merger|acqui|bankrupt|lawsuit|scandal|soar|tumble|급등|급락|일시정지|폭락|폭등/i;
+    const cutoff=Date.now()-90*60*1000;
     let breaking=news.filter(n=>{
-      const dt=new Date(n.publishedDate||n.date).getTime();
-      if(dt<cutoff)return false;
-      const text=(n.title||'')+' '+(n.text||'');
+      if(n.date<cutoff)return false;
+      const text=n.title+' '+n.summary;
       return breakingKeywords.test(text);
     }).slice(0,5);
     // 속보 부족하면 최근 뉴스로 보충
     if(breaking.length<3){
-      const recent=news
-        .filter(n=>!breaking.includes(n))
-        .slice(0,5-breaking.length);
+      const recent=news.filter(n=>!breaking.includes(n)).slice(0,5-breaking.length);
       breaking=[...breaking,...recent];
     }
     try{localStorage.setItem(cacheKey,JSON.stringify({data:breaking,time:Date.now()}));}catch(e){}
@@ -3223,14 +3252,13 @@ function renderBreakingNews(news){
   }
   list.innerHTML=news.map(n=>{
     const title=n.title||'(제목 없음)';
-    const site=n.site||n.publisher||'';
-    const url=n.url||n.link||'#';
+    const site=n.site||'';
+    const url=n.url||'#';
     const img=n.image||'';
-    const dt=n.publishedDate||n.date;
+    const dt=n.date;
     let timeAgo='';
     if(dt){
-      const d=new Date(dt);
-      const min=Math.floor((Date.now()-d.getTime())/60000);
+      const min=Math.floor((Date.now()-dt)/60000);
       if(min<60)timeAgo=min+'분 전';
       else if(min<1440)timeAgo=Math.floor(min/60)+'시간 전';
       else timeAgo=Math.floor(min/1440)+'일 전';
@@ -3262,11 +3290,18 @@ async function loadMarketNews(){
   }catch(e){}
   list.innerHTML='<div class="ltxt">로딩 중...</div>';
   try{
-    const news=await tryFetch('/api/fmp?type=general_news');
-    if(!Array.isArray(news)||!news.length){
+    const raw=await tryFetch('/api/finnhub?type=general_news');
+    if(!Array.isArray(raw)||!raw.length){
       list.innerHTML='<div class="ltxt">뉴스 없음</div>';
       return;
     }
+    const news=raw.map(n=>({
+      title:n.headline||'',
+      url:n.url||'#',
+      image:n.image||'',
+      site:n.source||'',
+      date:n.datetime?n.datetime*1000:Date.now(),
+    }));
     const top=news.slice(0,8);
     try{localStorage.setItem(cacheKey,JSON.stringify({data:top,time:Date.now()}));}catch(e){}
     renderMarketNews(top);
@@ -3280,14 +3315,13 @@ function renderMarketNews(news){
   if(!news.length){list.innerHTML='<div class="ltxt">뉴스 없음</div>';return;}
   list.innerHTML=news.map(n=>{
     const title=n.title||'(제목 없음)';
-    const site=n.site||n.publisher||'';
-    const url=n.url||n.link||'#';
+    const site=n.site||'';
+    const url=n.url||'#';
     const img=n.image||'';
-    const dt=n.publishedDate||n.date;
+    const dt=n.date;
     let timeAgo='';
     if(dt){
-      const d=new Date(dt);
-      const min=Math.floor((Date.now()-d.getTime())/60000);
+      const min=Math.floor((Date.now()-dt)/60000);
       if(min<60)timeAgo=min+'분 전';
       else if(min<1440)timeAgo=Math.floor(min/60)+'시간 전';
       else timeAgo=Math.floor(min/1440)+'일 전';
