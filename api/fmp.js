@@ -8,7 +8,7 @@ export default async function handler(req, res) {
   }
 
   // 종목 필요 없는 엔드포인트들
-  const symbolFreeTypes = new Set(['gainers', 'losers', 'actives', 'earnings_cal']);
+  const symbolFreeTypes = new Set(['gainers', 'losers', 'actives', 'earnings_cal', 'general_news']);
   if (!symbol && !symbolFreeTypes.has(type)) {
     return res.status(400).json({ error: 'symbol required' });
   }
@@ -27,7 +27,12 @@ export default async function handler(req, res) {
     gainers: `/stable/biggest-gainers`,
     losers: `/stable/biggest-losers`,
     actives: `/stable/most-actives`,
-    news: `/stable/news/stock?symbols=${symbol}&limit=5`,
+    news: `/stable/news/stock?symbols=${symbol}&limit=12`,
+    general_news: `/stable/news/general-latest?limit=20`,
+    ratios: `/stable/ratios?symbol=${symbol}&limit=4`,
+    key_metrics: `/stable/key-metrics?symbol=${symbol}&limit=4`,
+    insider: `/stable/insider-trading?symbol=${symbol}&limit=15`,
+    earnings_history: `/stable/historical-earnings?symbol=${symbol}&limit=8`,
     grades: `/stable/grades-consensus?symbol=${symbol}`,
     earnings_cal: `/stable/earnings-calendar${from?`?from=${from}&to=${to}`:''}`,
   };
