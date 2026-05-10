@@ -8,6 +8,9 @@
   "functions": {
     "api/ai.js": {
       "maxDuration": 60
+    },
+    "api/etf.js": {
+      "maxDuration": 30
     }
   }
 }
