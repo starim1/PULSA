@@ -1370,10 +1370,10 @@ async function go(){
     D={...d,lr,lm,ls};
     loadSupportLines(d.tk);
 
-    // 데이터 소스: Finnhub (메트릭/프로필/ETF) + Twelve Data + FMP (목표가/profile) + Yahoo (차트)
-    let recommend=null, finProfile=null, finMetric=null, twelveTarget=null, twelveStats=null, fmpProfile=null, fmpTarget=null, fmpEtf=null, finEtf=null;
+    // 데이터 소스: Finnhub (메트릭/프로필/ETF) + Twelve Data + FMP (목표가/profile) + 자체 ETF API + Yahoo (차트)
+    let recommend=null, finProfile=null, finMetric=null, twelveTarget=null, twelveStats=null, fmpProfile=null, fmpTarget=null, fmpEtf=null, ourEtf=null;
     try{
-      [recommend, finProfile, finMetric, twelveTarget, twelveStats, fmpProfile, fmpTarget, fmpEtf, finEtf] = await Promise.all([
+      [recommend, finProfile, finMetric, twelveTarget, twelveStats, fmpProfile, fmpTarget, fmpEtf, ourEtf] = await Promise.all([
         tryFetch(`/api/finnhub?symbol=${tk}&type=recommend`).catch(()=>null),
         tryFetch(`/api/finnhub?symbol=${tk}&type=profile`).catch(()=>null),
         tryFetch(`/api/finnhub?symbol=${tk}&type=metric`).catch(()=>null),
@@ -1382,7 +1382,7 @@ async function go(){
         tryFetch(`/api/fmp?symbol=${tk}&type=profile`).catch(()=>null),
         tryFetch(`/api/fmp?symbol=${tk}&type=target`).catch(()=>null),
         tryFetch(`/api/fmp?symbol=${tk}&type=etf_holdings`).catch(()=>null),
-        tryFetch(`/api/finnhub?symbol=${tk}&type=etf_holdings`).catch(()=>null),
+        tryFetch(`/api/etf?symbol=${tk}`).catch(()=>null),
       ]);
     }catch(e){console.warn('[Pulsa] Promise.all 실패:',e);}
 
@@ -1394,18 +1394,22 @@ async function go(){
     D.fmpProfile = fmpProfile?.[0] || null;
     D.fmpTarget = fmpTarget?.[0] || fmpTarget || null;
 
-    // ETF holdings: FMP 우선 → Finnhub 폴백
+    // ETF holdings: 우리 자체 API (SSGA/Invesco 공식) → FMP → Finnhub 순
     let etfHoldings = null;
-    if(Array.isArray(fmpEtf) && fmpEtf.length > 0){
-      etfHoldings = fmpEtf;
-    }else if(finEtf?.holdings && Array.isArray(finEtf.holdings) && finEtf.holdings.length > 0){
-      // Finnhub 형식: { holdings: [{symbol, name, percent, ...}] }
-      etfHoldings = finEtf.holdings.map(h=>({
-        asset: h.symbol || h.isin,
-        symbol: h.symbol || h.isin,
+    let etfSource = null;
+    if(ourEtf?.holdings && Array.isArray(ourEtf.holdings) && ourEtf.holdings.length > 0){
+      // 자체 API 형식: { holdings: [{symbol, name, weight, sector}] }
+      etfHoldings = ourEtf.holdings.map(h=>({
+        asset: h.symbol,
+        symbol: h.symbol,
         name: h.name,
-        weightPercentage: typeof h.percent === 'number' ? h.percent : null,
+        weightPercentage: h.weight,
+        sector: h.sector,
       }));
+      etfSource = 'official';
+    }else if(Array.isArray(fmpEtf) && fmpEtf.length > 0){
+      etfHoldings = fmpEtf;
+      etfSource = 'FMP';
     }
     D.fmpEtf = etfHoldings;
     D.isEtf = !!(etfHoldings && etfHoldings.length > 0) || (D.fmpProfile?.isEtf);
@@ -1416,7 +1420,7 @@ async function go(){
       fmpTarget: !!D.fmpTarget?.targetConsensus,
       isEtf: D.isEtf,
       etfCount: D.fmpEtf?.length||0,
-      etfSource: fmpEtf?.length ? 'FMP' : (finEtf?.holdings ? 'Finnhub' : 'none'),
+      etfSource,
     });
 
     let analystScore=null;
@@ -2653,21 +2657,22 @@ async function showSectorTop(sector){
   $('sector-modal-list').innerHTML='<div class="ltxt">로딩 중...</div>';
   modal.classList.add('on');
   try{
-    // FMP 시도 (지금은 무료 미지원)
-    let holdings = await tryFetch(`/api/fmp?symbol=${sector.tk}&type=etf_holdings`).catch(()=>null);
+    // 자체 API (SSGA 공식) 우선 시도
     let normalized = null;
-    if(Array.isArray(holdings) && holdings.length>0){
-      normalized = holdings;
+    const ourData = await tryFetch(`/api/etf?symbol=${sector.tk}`).catch(()=>null);
+    if(ourData?.holdings && Array.isArray(ourData.holdings) && ourData.holdings.length>0){
+      normalized = ourData.holdings.map(h=>({
+        asset: h.symbol,
+        symbol: h.symbol,
+        name: h.name,
+        weightPercentage: h.weight,
+        sector: h.sector,
+      }));
     }else{
-      // Finnhub fallback
-      const finData = await tryFetch(`/api/finnhub?symbol=${sector.tk}&type=etf_holdings`).catch(()=>null);
-      if(finData?.holdings && Array.isArray(finData.holdings) && finData.holdings.length>0){
-        normalized = finData.holdings.map(h=>({
-          asset: h.symbol||h.isin,
-          symbol: h.symbol||h.isin,
-          name: h.name,
-          weightPercentage: typeof h.percent==='number'?h.percent:null,
-        }));
+      // FMP 폴백
+      const holdings = await tryFetch(`/api/fmp?symbol=${sector.tk}&type=etf_holdings`).catch(()=>null);
+      if(Array.isArray(holdings) && holdings.length>0){
+        normalized = holdings;
       }
     }
     if(!normalized || !normalized.length){
