@@ -141,7 +141,100 @@ function getSourceInfo(symbol) {
       type: 'vanguard',
     };
   }
-  return null;
+  // stockanalysis.com fallback - 거의 모든 미국 ETF 지원
+  return {
+    url: `https://stockanalysis.com/etf/${sym.toLowerCase()}/holdings/`,
+    type: 'stockanalysis',
+  };
+}
+
+// stockanalysis.com HTML 파싱 (모든 ETF 폴백)
+async function fetchStockAnalysis(url) {
+  const r = await fetch(url, {
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/121.0.0.0 Safari/537.36',
+      'Accept': 'text/html,application/xhtml+xml',
+      'Accept-Language': 'en-US,en;q=0.9',
+    },
+  });
+  if (!r.ok) throw new Error(`StockAnalysis fetch failed: ${r.status}`);
+  const html = await r.text();
+
+  // <script id="__NEXT_DATA__" type="application/json">에 데이터가 있음
+  const match = html.match(/<script[^>]*id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/);
+  if (match) {
+    try {
+      const json = JSON.parse(match[1]);
+      // pageProps.data 또는 pageProps.holdings 찾기
+      const props = json?.props?.pageProps || {};
+      let rawHoldings = props.data?.holdings || props.holdings || props.data?.data || null;
+      if (Array.isArray(rawHoldings) && rawHoldings.length > 0) {
+        const holdings = rawHoldings.map(h => ({
+          symbol: h.symbol || h.ticker || h.s || '',
+          name: h.name || h.n || '',
+          weight: typeof h.percent === 'number' ? h.percent
+                 : typeof h.weight === 'number' ? h.weight
+                 : typeof h.assetsPercent === 'number' ? h.assetsPercent
+                 : (parseFloat(h.percent) || parseFloat(h.weight) || null),
+          sector: h.sector || h.industry || '',
+        })).filter(h => h.symbol);
+        if (holdings.length > 0) {
+          holdings.sort((a, b) => (b.weight || 0) - (a.weight || 0));
+          return holdings;
+        }
+      }
+    } catch (e) {
+      // JSON 파싱 실패 시 HTML 테이블 파싱으로 폴백
+    }
+  }
+
+  // HTML 테이블 직접 파싱 (백업)
+  const tableMatch = html.match(/<table[^>]*id="main-table"[^>]*>([\s\S]*?)<\/table>/i)
+                  || html.match(/<table[^>]*holdings[^>]*>([\s\S]*?)<\/table>/i)
+                  || html.match(/<tbody[^>]*>([\s\S]*?)<\/tbody>/i);
+  if (!tableMatch) throw new Error('No table found in stockanalysis page');
+
+  const rowRegex = /<tr[^>]*>([\s\S]*?)<\/tr>/g;
+  const cellRegex = /<t[hd][^>]*>([\s\S]*?)<\/t[hd]>/g;
+  const stripTags = s => s.replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&nbsp;/g, ' ').trim();
+
+  const rows = [];
+  let m;
+  while ((m = rowRegex.exec(tableMatch[1])) !== null) {
+    const cells = [];
+    let cm;
+    cellRegex.lastIndex = 0;
+    while ((cm = cellRegex.exec(m[1])) !== null) {
+      cells.push(stripTags(cm[1]));
+    }
+    if (cells.length > 0) rows.push(cells);
+  }
+
+  if (rows.length < 2) throw new Error('No rows in stockanalysis table');
+
+  const holdings = [];
+  for (let i = 1; i < rows.length; i++) {
+    const cells = rows[i];
+    if (cells.length < 2) continue;
+    // 보통 형식: [#, Symbol, Name, %Assets, Shares, Value, ...]
+    let symbol = '', name = '', weight = null;
+    for (const cell of cells) {
+      if (!symbol && /^[A-Z]{1,6}$/.test(cell.trim())) {
+        symbol = cell.trim();
+      } else if (!weight && /%/.test(cell)) {
+        const w = parseFloat(cell.replace('%', '').replace(/,/g, '').trim());
+        if (!isNaN(w) && w >= 0 && w <= 100) weight = w;
+      } else if (!name && cell.length > 2 && !/^\d/.test(cell) && !/%/.test(cell) && cell !== symbol) {
+        name = cell;
+      }
+    }
+    if (symbol) {
+      holdings.push({ symbol, name, weight, sector: '' });
+    }
+  }
+  if (holdings.length === 0) throw new Error('No holdings extracted');
+  holdings.sort((a, b) => (b.weight || 0) - (a.weight || 0));
+  return holdings;
 }
 
 async function fetchSSGA(url) {
@@ -383,6 +476,7 @@ export default async function handler(req, res) {
       case 'ark': holdings = await fetchARK(info.url); break;
       case 'ishares': holdings = await fetchIShares(info.url); break;
       case 'vanguard': holdings = await fetchVanguard(info.url); break;
+      case 'stockanalysis': holdings = await fetchStockAnalysis(info.url); break;
       default: return res.status(500).json({ error: 'unknown source' });
     }
 
