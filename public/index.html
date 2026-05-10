@@ -1471,12 +1471,29 @@ async function go(){
       D.descTranslated = null;
       $('hdesc').innerHTML=`
         <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px">
-          <div style="font-size:11px;color:var(--text2);font-weight:600;text-transform:uppercase;letter-spacing:0.04em;display:flex;align-items:center;gap:5px">${ic('doc',13)}회사 소개</div>
+          <div style="font-size:11px;color:var(--text2);font-weight:600;text-transform:uppercase;letter-spacing:0.04em;display:flex;align-items:center;gap:5px">${ic('doc',13)}${D.isEtf?'ETF 소개':'회사 소개'}</div>
           <button class="btn btn-sm" id="desc-trans-btn" onclick="toggleDescTrans()" style="font-size:10.5px;padding:3px 9px;display:inline-flex;align-items:center;gap:4px">${ic('translate',12)}한국어로</button>
         </div>
         <div style="line-height:1.7" id="hdesc-text">${trimmed}</div>`;
       $('hdesc').style.display='block';
     }else{$('hdesc').style.display='none';}
+
+    // ETF 구성종목 보기 버튼 (ETF인 경우만)
+    const etfBtnEl = $('etf-holdings-btn');
+    if(D.isEtf && D.fmpEtf && D.fmpEtf.length > 0){
+      if(!etfBtnEl){
+        const btn = document.createElement('div');
+        btn.id='etf-holdings-btn';
+        btn.style.cssText='margin-top:12px';
+        btn.innerHTML=`<button class="btn btn-icon" onclick="showEtfHoldings()" style="width:100%;background:linear-gradient(135deg,rgba(74,158,255,0.12) 0%,rgba(16,208,144,0.12) 100%);border-color:rgba(74,158,255,0.3);color:var(--text);font-weight:600">${ic('briefcase',15)}구성 종목 보기 <span style="color:var(--text2);font-weight:400;margin-left:4px">(${D.fmpEtf.length}개)</span></button>`;
+        $('hdesc').parentElement.insertBefore(btn, $('hdesc').nextSibling);
+      }else{
+        etfBtnEl.style.display='block';
+        etfBtnEl.querySelector('button').innerHTML=`${ic('briefcase',15)}구성 종목 보기 <span style="color:var(--text2);font-weight:400;margin-left:4px">(${D.fmpEtf.length}개)</span>`;
+      }
+    }else{
+      if(etfBtnEl)etfBtnEl.style.display='none';
+    }
 
     // 웹사이트 + CEO + 직원수
     const extras=[];
@@ -2679,7 +2696,8 @@ async function showSectorTop(sector){
       $('sector-modal-list').innerHTML='<div class="ltxt">데이터 없음</div>';
       return;
     }
-    const top=normalized.slice(0,15);
+    const top=normalized.slice(0,30);
+    $('sector-modal-sub').textContent = `${sector.tk} ETF 구성 종목 · 총 ${normalized.length}개 (시가총액 비중 순)`;
     $('sector-modal-list').innerHTML=top.map((h,i)=>{
       const sym=h.asset||h.symbol||'';
       const name=h.name||h.companyName||'';
@@ -2701,6 +2719,35 @@ async function showSectorTop(sector){
   }
 }
 function closeSectorModal(){$('sector-modal').classList.remove('on');}
+
+// 분석 화면에서 ETF 구성종목 모달
+function showEtfHoldings(){
+  if(!D || !D.fmpEtf || !D.fmpEtf.length) return;
+  const modal = $('sector-modal');
+  const longName = D.fmpProfile?.companyName || D.finProfile?.name || D.tk;
+  $('sector-modal-title').innerHTML = `<span style="display:inline-flex;color:var(--accent)">${ic('briefcase',18)}</span>${D.tk} 구성 종목`;
+  $('sector-modal-sub').textContent = `${longName} · 총 ${D.fmpEtf.length}개 종목 (시가총액 비중 순)`;
+
+  // Top 30 표시 (스크롤 가능)
+  const top = D.fmpEtf.slice(0, 30);
+  $('sector-modal-list').innerHTML = top.map((h, i) => {
+    const sym = h.asset || h.symbol || '';
+    const name = h.name || h.companyName || '';
+    const wt = typeof h.weightPercentage === 'number' ? h.weightPercentage : (typeof h.weight === 'number' ? h.weight : null);
+    return `<div class="mover-item" onclick="closeSectorModal();$('ti').value='${sym}';go();">
+      <div style="font-size:11px;color:var(--text2);font-weight:600;width:24px">${i+1}</div>
+      <div class="mover-info">
+        <div class="mover-tk">${sym}</div>
+        <div class="mover-name">${name}</div>
+      </div>
+      <div class="mover-price-block">
+        <div class="mover-price">${wt!=null?wt.toFixed(2)+'%':'—'}</div>
+        <div class="mover-chg" style="color:var(--text2)">비중</div>
+      </div>
+    </div>`;
+  }).join('');
+  modal.classList.add('on');
+}
 
 // AI 시황 분석
 async function loadMarketAnalysis(period){
