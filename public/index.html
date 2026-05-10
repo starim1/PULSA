@@ -508,6 +508,16 @@ body::before{
 .news-card-meta{font-size:10.5px;color:var(--text2);margin-top:6px;display:flex;justify-content:space-between;gap:8px;}
 .news-card-source{font-weight:600;color:var(--accent);}
 
+/* Guru cards */
+.guru-card{
+  background:var(--bg-card);border:1px solid var(--border);border-radius:12px;
+  padding:14px 12px;cursor:pointer;transition:all .15s;text-align:center;
+}
+.guru-card:hover{
+  background:var(--bg3);border-color:var(--accent);transform:translateY(-2px);
+  box-shadow:0 4px 12px rgba(16,208,144,0.15);
+}
+
 /* Insider trading row */
 .insider-row{
   display:flex;justify-content:space-between;align-items:center;
@@ -771,6 +781,9 @@ body::before{
       <div class="sec-title"><span class="sec-icon" data-icon="factory"></span>섹터별 변동 <span style="text-transform:none;font-weight:500;color:var(--text3);font-size:10px;letter-spacing:0">(S&P 500 ETF)</span></div>
       <div class="sector-grid" id="sector-grid"></div>
 
+      <!-- 아침 브리핑 (한국 시간 아침 7시 이후, 하루 1회) -->
+      <div id="morning-brief-wrap" style="display:none;margin-bottom:18px"></div>
+
       <div class="sec-title"><span class="sec-icon" data-icon="star"></span>내 관심종목 <button class="btn btn-sm" onclick="navTo('analysis');stab('watch')" style="margin-left:auto">관리</button></div>
       <div class="watch-home-grid" id="watch-home"></div>
 
@@ -801,7 +814,7 @@ body::before{
     <div class="main">
       <div class="search-bar">
         <span class="search-bar-icon" data-icon="search" data-icon-size="16"><span class="ico"></span></span>
-        <input type="text" id="ti" value="NVDA" placeholder="종목 검색 (NVDA, AAPL, TSLA...)" onkeydown="if(event.key==='Enter')go()">
+        <input type="text" id="ti" value="NVDA" placeholder="NVDA, AAPL, 삼성전자, 005930..." onkeydown="if(event.key==='Enter')go()">
         <button class="btn btn-p btn-icon" onclick="go()"><span data-icon="zap" data-icon-size="14" class="ico"></span>분석</button>
       </div>
 
@@ -972,12 +985,32 @@ body::before{
               </div>
               <div id="ail" class="ltxt" style="display:none">AI가 분석 중입니다...</div>
               <div id="aio" class="ai-box" style="display:none"></div>
+
+              <!-- AI 소셜 센티먼트 -->
+              <div class="card" style="margin-top:16px">
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+                  <div class="analyst-title" style="display:flex;align-items:center;gap:6px"><span data-icon="users" data-icon-size="14" style="display:inline-flex;color:var(--accent)"></span>소셜 센티먼트 <span style="color:var(--text3);font-weight:400;font-size:10.5px">Reddit · Twitter</span></div>
+                  <button class="btn btn-sm btn-icon" onclick="loadSocialSentiment()" id="sentiment-btn"><span data-icon="zap" data-icon-size="12" class="ico"></span>분위기 분석</button>
+                </div>
+                <div id="sentiment-result" style="font-size:13px;line-height:1.7;color:var(--text2)">버튼을 누르면 AI가 최근 소셜 미디어 분위기를 검색해 분석합니다</div>
+              </div>
             </div>
           </div>
 
           <div id="tc-bt" class="tc">
             <div id="bt-e" class="empty">종목을 먼저 검색해주세요.</div>
             <div id="bt-b" style="display:none">
+              <!-- AI 자연어 시뮬레이터 -->
+              <div class="card" style="margin-bottom:14px">
+                <div class="analyst-title" style="display:flex;align-items:center;gap:6px;margin-bottom:10px"><span data-icon="ai" data-icon-size="14" style="display:inline-flex;color:var(--accent)"></span>AI 시뮬레이터 <span style="color:var(--text3);font-weight:400;font-size:10.5px">자연어로 가상 시나리오</span></div>
+                <div style="font-size:11.5px;color:var(--text2);line-height:1.6;margin-bottom:10px">
+                  예시: "코로나 저점에 1000만원 샀으면 지금 얼마?" / "작년에 100주 매수했으면 평가금액?" / "2020년 1월에 들어갔으면 수익률은?"
+                </div>
+                <textarea id="ai-sim-input" placeholder="자연어로 시뮬레이션 시나리오를 입력하세요..." style="width:100%;min-height:60px;padding:10px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;font-size:13px;resize:vertical"></textarea>
+                <button class="btn btn-p btn-icon" onclick="runAISimulator()" id="ai-sim-btn" style="width:100%;margin-top:10px"><span data-icon="zap" data-icon-size="14" class="ico"></span>시뮬레이션 실행</button>
+                <div id="ai-sim-result" style="margin-top:12px;font-size:13px;line-height:1.7"></div>
+              </div>
+
               <div style="background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:12px;font-size:12px;color:var(--text2);line-height:1.6">
                 <strong style="color:var(--accent)">📚 백테스트란?</strong><br>
                 선택한 기간 내 <strong style="color:var(--text)">SMA20/SMA50 이동평균선 전략</strong>으로 거래했다면 어떤 결과였을지 시뮬레이션합니다. <strong style="color:var(--up)">골든크로스</strong>(20일선이 50일선 위로)에 매수, <strong style="color:var(--down)">데스크로스</strong>(아래로)에 매도. 단순 보유와 비교해 전략이 효과적이었는지 확인하세요.
@@ -1070,6 +1103,7 @@ body::before{
         <button class="picks-tab on" data-tab="movers" data-icon="trending_up" onclick="switchPicksTab('movers')"><span class="ico"></span>Top Movers</button>
         <button class="picks-tab" data-tab="algo" data-icon="algo" onclick="switchPicksTab('algo')"><span class="ico"></span>알고리즘 추천</button>
         <button class="picks-tab" data-tab="ai" data-icon="ai" onclick="switchPicksTab('ai')"><span class="ico"></span>AI 추천</button>
+        <button class="picks-tab" data-tab="gurus" data-icon="user" onclick="switchPicksTab('gurus')"><span class="ico"></span>거장 포트폴리오</button>
       </div>
 
       <!-- Movers content -->
@@ -1115,6 +1149,18 @@ body::before{
         </div>
         <div id="picks-ai-list" style="margin-top:12px"><div class="ltxt">"AI 추천 받기" 버튼을 눌러주세요</div></div>
         <button class="btn btn-p btn-icon" onclick="runAIPicks()" id="picks-ai-btn" style="width:100%;margin-top:12px"><span data-icon="ai" data-icon-size="16" style="display:inline-flex"></span>AI 추천 받기</button>
+      </div>
+
+      <!-- Gurus tab -->
+      <div id="picks-gurus" class="picks-content">
+        <div class="card">
+          <div style="font-size:12px;color:var(--text2);line-height:1.6">
+            <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;color:var(--accent);font-weight:600;font-size:13px"><span data-icon="user" data-icon-size="16" style="display:inline-flex"></span>유명 투자자 포트폴리오</div>
+            13F 공시 기반 분기별 보유 종목. 거장 한 명을 선택하면 AI가 최신 13F 데이터를 검색합니다.
+          </div>
+        </div>
+        <div id="gurus-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin-top:12px"></div>
+        <div id="gurus-result" style="margin-top:14px"></div>
       </div>
     </div>
   </div>
@@ -1306,7 +1352,12 @@ function ic(name, size=18, cls=''){
   if(!svg) return '';
   return `<span class="ic-wrap ${cls}" style="width:${size}px;height:${size}px;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0">${svg.replace('<svg', `<svg width="${size}" height="${size}"`)}</span>`;
 }
-const fu=n=>n==null||isNaN(n)?'—':'$'+n.toFixed(2);
+// 통화 표시: 한국 종목이면 ₩원화, 아니면 $달러
+const fu=(n)=>{
+  if(n==null||isNaN(n))return '—';
+  if(D&&isKRTicker(D.tk))return '₩'+Math.round(n).toLocaleString();
+  return '$'+n.toFixed(2);
+};
 const fp=n=>n==null||isNaN(n)?'—':(n>=0?'+':'')+n.toFixed(2)+'%';
 const fk=n=>!n?'—':n>=1e12?'$'+(n/1e12).toFixed(2)+'T':n>=1e9?'$'+(n/1e9).toFixed(1)+'B':'$'+(n/1e6).toFixed(0)+'M';
 const fkrw=usd=>'≈ ₩'+Math.round(usd*USD_KRW).toLocaleString();
@@ -1474,8 +1525,49 @@ function calcVerdict(d, analystScore=null){
 }
 
 // ── Main analyze ──────────────────────────────────────
+// 한국 주요 종목: 한글명 → Yahoo 티커 (KS=KOSPI, KQ=KOSDAQ)
+const KR_TICKER_MAP = {
+  '삼성전자':'005930.KS','SK하이닉스':'000660.KS','LG에너지솔루션':'373220.KS',
+  '삼성바이오로직스':'207940.KS','현대차':'005380.KS','기아':'000270.KS',
+  '셀트리온':'068270.KS','POSCO홀딩스':'005490.KS','POSCO':'005490.KS',
+  'NAVER':'035420.KS','네이버':'035420.KS','카카오':'035720.KS',
+  'LG화학':'051910.KS','삼성SDI':'006400.KS','한화에어로스페이스':'012450.KS',
+  '두산에너빌리티':'034020.KS','HD현대중공업':'329180.KS','삼성물산':'028260.KS',
+  '한미반도체':'042700.KS','크래프톤':'259960.KS','LG전자':'066570.KS',
+  'KB금융':'105560.KS','신한지주':'055550.KS','하나금융지주':'086790.KS',
+  '메리츠금융지주':'138040.KS','삼성생명':'032830.KS','삼성화재':'000810.KS',
+  'KT&G':'033780.KS','SK텔레콤':'017670.KS','KT':'030200.KS',
+  '아모레퍼시픽':'090430.KS','LG생활건강':'051900.KS','오리온':'271560.KS',
+  'CJ제일제당':'097950.KS','대한항공':'003490.KS','HMM':'011200.KS',
+  'SK이노베이션':'096770.KS','SK':'034730.KS','LG':'003550.KS',
+  'KOSPI':'^KS11','코스피':'^KS11','KOSDAQ':'^KQ11','코스닥':'^KQ11',
+  // 코스닥
+  '에코프로비엠':'247540.KQ','에코프로':'086520.KQ','알테오젠':'196170.KQ',
+  '엔켐':'348370.KQ','HLB':'028300.KQ','셀트리온헬스케어':'091990.KQ',
+  '리노공업':'058470.KQ','펄어비스':'263750.KQ','JYP Ent.':'035900.KQ',
+  '카카오게임즈':'293490.KQ','SK스퀘어':'402340.KS',
+};
+
+function resolveTicker(input){
+  if(!input)return input;
+  const trimmed=input.trim();
+  // 한글명 매핑 (영문은 그대로)
+  if(KR_TICKER_MAP[trimmed])return KR_TICKER_MAP[trimmed];
+  // 6자리 숫자만 입력하면 KS로 자동 변환
+  if(/^\d{6}$/.test(trimmed))return trimmed+'.KS';
+  return trimmed.toUpperCase();
+}
+
+// 한국 종목 여부 판별
+function isKRTicker(tk){
+  return tk&&(tk.endsWith('.KS')||tk.endsWith('.KQ')||tk.startsWith('^KS')||tk.startsWith('^KQ'));
+}
+
 async function go(){
-  const tk=$('ti').value.trim().toUpperCase();if(!tk)return;
+  const rawInput=$('ti').value.trim();if(!rawInput)return;
+  const tk=resolveTicker(rawInput);
+  // 변환된 경우 입력창에 반영
+  if(tk!==rawInput.toUpperCase())$('ti').value=tk;
   $('lmsg').textContent=tk+' 분석 중...';$('lmsg').style.display='block';
   $('ph').style.display='none';$('ch-b').style.display='none';$('ch-e').style.display='block';
   $('ai-b').style.display='none';$('ai-e').style.display='block';
@@ -1627,8 +1719,17 @@ async function go(){
     }else{$('hweb').style.display='none';}
 
     $('hp').textContent=fu(d.cp);
-    $('krw').textContent=fkrw(d.cp);
-    const ce=$('hc');ce.textContent=`${d.dc>=0?'+':''}$${Math.abs(d.dc).toFixed(2)} (${fp(d.dcp)})`;ce.className='h-chg '+(d.dc>=0?'up':'down');
+    if(isKRTicker(d.tk)){
+      $('krw').textContent='';  // 한국 주식은 환율 변환 불필요
+    }else{
+      $('krw').textContent=fkrw(d.cp);
+    }
+    const ce=$('hc');
+    const dcSign=d.dc>=0?'+':'-';
+    const dcAbs=Math.abs(d.dc);
+    const dcStr=isKRTicker(d.tk)?`${dcSign}₩${Math.round(dcAbs).toLocaleString()}`:`${dcSign}$${dcAbs.toFixed(2)}`;
+    ce.textContent=`${dcStr} (${fp(d.dcp)})`;
+    ce.className='h-chg '+(d.dc>=0?'up':'down');
 
     // Verdict
     const vd=$('verdict');vd.style.display='inline-flex';vd.className='verdict '+v.cls;
@@ -2491,7 +2592,378 @@ function loadPicksTab(tab){
   if(tab==='algo'&&!PICKS_LOADED.algo){
     $('picks-algo-list').innerHTML='<div class="ltxt">"알고리즘 분석 실행" 버튼을 눌러주세요</div>';
   }
+  if(tab==='gurus')renderGurus();
   // ai 탭은 사용자가 버튼 누를 때만
+}
+
+// 유명 투자자 (13F 공시자)
+const GURUS=[
+  {name:'Warren Buffett',company:'Berkshire Hathaway',ticker:'BRK.B',emoji:'🎩',desc:'가치투자의 전설'},
+  {name:'Bill Ackman',company:'Pershing Square Capital',ticker:'',emoji:'🦅',desc:'액티비스트 헤지펀드'},
+  {name:'Michael Burry',company:'Scion Asset Management',ticker:'',emoji:'🎯',desc:'빅쇼트의 주인공'},
+  {name:'Ray Dalio',company:'Bridgewater Associates',ticker:'',emoji:'⚖️',desc:'올웨더 포트폴리오'},
+  {name:'Cathie Wood',company:'ARK Invest',ticker:'ARKK',emoji:'🚀',desc:'혁신 기술주 집중'},
+  {name:'Stanley Druckenmiller',company:'Duquesne Family Office',ticker:'',emoji:'📈',desc:'매크로 투자 거장'},
+  {name:'David Tepper',company:'Appaloosa Management',ticker:'',emoji:'💎',desc:'역발상 투자'},
+  {name:'Bill Gates',company:'Bill & Melinda Gates Foundation Trust',ticker:'',emoji:'💼',desc:'재단 자선 포트폴리오'},
+  {name:'Daniel Loeb',company:'Third Point LLC',ticker:'',emoji:'🔥',desc:'액티비스트 행동주의'},
+  {name:'Ken Griffin',company:'Citadel Advisors',ticker:'',emoji:'⚡',desc:'멀티스트래티지 헤지펀드'},
+];
+
+function renderGurus(){
+  const grid=$('gurus-grid');
+  if(!grid)return;
+  grid.innerHTML=GURUS.map((g,i)=>`
+    <div class="guru-card" onclick="loadGuruPortfolio(${i})">
+      <div style="font-size:24px;margin-bottom:6px">${g.emoji}</div>
+      <div style="font-weight:700;font-size:12.5px;line-height:1.3;margin-bottom:3px">${g.name}</div>
+      <div style="font-size:10.5px;color:var(--text2);line-height:1.3">${g.company}</div>
+      <div style="font-size:10.5px;color:var(--accent);margin-top:5px;font-weight:500">${g.desc}</div>
+    </div>
+  `).join('');
+}
+
+// AI 소셜 센티먼트
+async function loadSocialSentiment(){
+  if(!D)return;
+  const btn=$('sentiment-btn');
+  const out=$('sentiment-result');
+  btn.disabled=true;
+  out.innerHTML='<div class="ltxt" style="text-align:left">🔍 소셜 미디어 검색 중... (15~30초)</div>';
+
+  // 24시간 캐시
+  const cacheKey=`sentiment_${D.tk}`;
+  try{
+    const cached=localStorage.getItem(cacheKey);
+    if(cached){
+      const {data,time}=JSON.parse(cached);
+      if(Date.now()-time<24*60*60*1000){
+        renderSentiment(data);
+        btn.disabled=false;
+        return;
+      }
+    }
+  }catch(e){}
+
+  const longName=D.fmpProfile?.companyName||D.finProfile?.name||D.tk;
+  const prompt=`${D.tk} (${longName}) 종목에 대한 최근 1주일 동안의 소셜 미디어 분위기를 검색해서 분석해주세요. Reddit (r/wallstreetbets, r/stocks, r/investing 등), Twitter/X, StockTwits 등을 검색하세요.
+
+다음 JSON 형식만 출력하고 다른 설명은 하지 마세요. 마크다운 코드블록(\`\`\`)도 사용하지 마세요:
+
+{
+  "overall": "bullish | bearish | neutral | mixed",
+  "score": 7.5,
+  "bullishPct": 65,
+  "bearishPct": 25,
+  "neutralPct": 10,
+  "summary": "한국어로 2~3문장 분위기 요약",
+  "bullPoints": [
+    "강세 의견 1 (한국어)",
+    "강세 의견 2"
+  ],
+  "bearPoints": [
+    "약세 의견 1",
+    "약세 의견 2"
+  ],
+  "trending": "한국어로 1문장 (현재 가장 화제인 토픽)"
+}
+
+score는 0~10 (0=극도로 비관, 10=극도로 낙관). 비율 합계는 100. 키워드: moon, hodl, diamond hands, calls, bag holder, puts 등도 참고.`;
+
+  try{
+    const r=await tryFetch('/api/ai',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({prompt}),
+      timeout:60000,
+    });
+    let txt=r?.content?.[0]?.text||r?.text||'';
+    const jsonMatch=txt.match(/\{[\s\S]*"overall"[\s\S]*\}/);
+    if(!jsonMatch){
+      out.innerHTML='<div class="ltxt" style="text-align:left">분석 실패. 다시 시도해주세요</div>';
+      btn.disabled=false;
+      return;
+    }
+    let data;
+    try{data=JSON.parse(jsonMatch[0]);}catch(e){
+      out.innerHTML='<div class="ltxt" style="text-align:left">JSON 파싱 실패</div>';
+      btn.disabled=false;
+      return;
+    }
+    try{localStorage.setItem(cacheKey,JSON.stringify({data,time:Date.now()}));}catch(e){}
+    renderSentiment(data);
+    btn.disabled=false;
+  }catch(e){
+    out.innerHTML='<div class="ltxt" style="text-align:left">분석 실패: '+e.message+'</div>';
+    btn.disabled=false;
+  }
+}
+
+function renderSentiment(data){
+  const out=$('sentiment-result');
+  if(!data){out.innerHTML='<div class="ltxt" style="text-align:left">데이터 없음</div>';return;}
+  const colorMap={
+    'bullish':{label:'🚀 강세',color:'var(--up)'},
+    'bearish':{label:'📉 약세',color:'var(--down)'},
+    'neutral':{label:'😐 중립',color:'var(--text2)'},
+    'mixed':{label:'⚖️ 혼조',color:'var(--blue)'},
+  };
+  const ov=colorMap[data.overall]||colorMap.neutral;
+  const score=data.score||5;
+  const bull=data.bullishPct||0;
+  const bear=data.bearishPct||0;
+  const neut=data.neutralPct||0;
+  out.innerHTML=`
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:12px;flex-wrap:wrap">
+      <div>
+        <div style="font-size:11px;color:var(--text2)">전체 분위기</div>
+        <div style="font-size:18px;font-weight:700;color:${ov.color}">${ov.label}</div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-size:11px;color:var(--text2)">센티먼트 점수</div>
+        <div style="font-size:18px;font-weight:700;font-family:'JetBrains Mono',monospace">${score}/10</div>
+      </div>
+    </div>
+    <div style="display:flex;height:8px;border-radius:4px;overflow:hidden;margin-bottom:14px;background:var(--bg3)">
+      <div style="width:${bull}%;background:var(--up)"></div>
+      <div style="width:${neut}%;background:var(--text3)"></div>
+      <div style="width:${bear}%;background:var(--down)"></div>
+    </div>
+    <div style="display:flex;justify-content:space-between;font-size:10.5px;color:var(--text2);margin-bottom:14px">
+      <span style="color:var(--up)">🟢 강세 ${bull}%</span>
+      <span>⚪ 중립 ${neut}%</span>
+      <span style="color:var(--down)">🔴 약세 ${bear}%</span>
+    </div>
+    <div style="background:var(--bg3);padding:10px 12px;border-radius:8px;margin-bottom:12px;line-height:1.6;border-left:3px solid var(--accent)">
+      💬 ${data.summary||'요약 없음'}
+    </div>
+    ${data.trending?`<div style="background:var(--bg3);padding:10px 12px;border-radius:8px;margin-bottom:12px;line-height:1.6;border-left:3px solid var(--blue);font-size:12px">
+      🔥 <strong>화제:</strong> ${data.trending}
+    </div>`:''}
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px">
+      ${data.bullPoints&&data.bullPoints.length?`<div>
+        <div style="font-size:11px;color:var(--up);font-weight:700;margin-bottom:6px">🚀 강세 의견</div>
+        ${data.bullPoints.map(p=>`<div style="font-size:11.5px;color:var(--text2);margin-bottom:5px;line-height:1.5">• ${p}</div>`).join('')}
+      </div>`:''}
+      ${data.bearPoints&&data.bearPoints.length?`<div>
+        <div style="font-size:11px;color:var(--down);font-weight:700;margin-bottom:6px">📉 약세 의견</div>
+        ${data.bearPoints.map(p=>`<div style="font-size:11.5px;color:var(--text2);margin-bottom:5px;line-height:1.5">• ${p}</div>`).join('')}
+      </div>`:''}
+    </div>
+    <div style="font-size:10px;color:var(--text3);margin-top:12px;text-align:center">
+      ※ AI가 검색한 결과 기반. 24시간 캐싱됨
+    </div>
+  `;
+}
+
+// AI 자연어 시뮬레이터
+async function runAISimulator(){
+  if(!D)return;
+  const input=$('ai-sim-input').value.trim();
+  if(!input){toast('시나리오를 입력해주세요');return;}
+  const btn=$('ai-sim-btn');
+  const out=$('ai-sim-result');
+  btn.disabled=true;
+  out.innerHTML='<div class="ltxt" style="text-align:left">🤖 시뮬레이션 중... (15~30초)</div>';
+
+  // 과거 데이터를 AI가 활용할 수 있도록 정리 (5년치 월별 샘플)
+  const sampledData=[];
+  if(D.cl&&D.ts){
+    const len=D.cl.length;
+    const step=Math.max(1,Math.floor(len/40));  // 약 40개 샘플
+    for(let i=0;i<len;i+=step){
+      const ts=D.ts[i];
+      const close=D.cl[i];
+      if(close!=null&&ts){
+        const date=new Date(ts).toISOString().split('T')[0];
+        sampledData.push({date,close});
+      }
+    }
+    // 마지막 데이터 포함
+    const lastTs=D.ts[len-1];
+    const lastCl=D.cl[len-1];
+    if(lastTs&&lastCl!=null&&sampledData[sampledData.length-1]?.close!==lastCl){
+      sampledData.push({date:new Date(lastTs).toISOString().split('T')[0],close:lastCl});
+    }
+  }
+
+  const tk=D.tk;
+  const longName=D.fmpProfile?.companyName||D.finProfile?.name||tk;
+  const currency=isKRTicker(tk)?'KRW (₩)':'USD ($)';
+  const todayDate=new Date().toLocaleDateString('ko-KR');
+
+  const prompt=`사용자가 ${tk} (${longName}) 주식에 대해 가상 시나리오를 시뮬레이션하고 싶어합니다.
+
+오늘 날짜: ${todayDate}
+현재가: ${currency} ${D.cp}
+통화: ${currency}
+
+종목 과거 가격 데이터 (날짜별 종가):
+${JSON.stringify(sampledData)}
+
+사용자 시나리오: "${input}"
+
+다음 형식으로 한국어 답변 작성 (마크다운 ** 굵은 글씨 사용):
+
+**📊 시뮬레이션 결과**
+- 매수 시점:
+- 매수 가격:
+- 매수 수량 (또는 투자금):
+- 현재 평가금액:
+- 수익/손실:
+- 수익률:
+
+**📈 분석**
+2~3문장으로 결과 해석. 같은 기간 S&P 500 대비 수치적으로 어땠는지도 언급.
+
+**💡 시사점**
+짧게 1~2문장 인사이트.
+
+데이터에 없는 시점이면 가장 가까운 데이터로 추정. 추정치임을 명시.`;
+
+  try{
+    const r=await tryFetch('/api/ai',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({prompt}),
+      timeout:60000,
+    });
+    let txt=r?.content?.[0]?.text||r?.text||'';
+    if(!txt){
+      out.innerHTML='<div class="ltxt" style="text-align:left">결과 없음. 다시 시도해주세요</div>';
+      btn.disabled=false;
+      return;
+    }
+    let html=txt
+      .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
+      .replace(/\n\n/g,'</p><p style="margin-top:10px">')
+      .replace(/^- /gm,'• ')
+      .replace(/\n/g,'<br>');
+    out.innerHTML='<p>'+html+'</p>';
+    btn.disabled=false;
+  }catch(e){
+    out.innerHTML='<div class="ltxt" style="text-align:left">시뮬레이션 실패: '+e.message+'</div>';
+    btn.disabled=false;
+  }
+}
+
+async function loadGuruPortfolio(idx){
+  const g=GURUS[idx];
+  const out=$('gurus-result');
+  out.innerHTML=`<div class="card">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+      <div style="font-size:28px">${g.emoji}</div>
+      <div>
+        <div style="font-weight:700;font-size:14px">${g.name}</div>
+        <div style="font-size:11px;color:var(--text2)">${g.company}</div>
+      </div>
+    </div>
+    <div class="ltxt" style="text-align:left">🤖 AI가 최신 13F 공시 데이터를 검색 중... (15~30초)</div>
+  </div>`;
+  // 24시간 캐시
+  const cacheKey=`guru_${idx}`;
+  try{
+    const cached=localStorage.getItem(cacheKey);
+    if(cached){
+      const {data,time}=JSON.parse(cached);
+      if(Date.now()-time<24*60*60*1000){
+        renderGuruResult(g,data);
+        return;
+      }
+    }
+  }catch(e){}
+
+  const prompt=`${g.name} (${g.company})의 가장 최근 13F 공시(SEC Form 13F)를 찾아 현재 보유 중인 상위 10개 종목을 알려주세요. 다음 JSON 형식만 출력하고 다른 설명은 하지 마세요. 마크다운 코드블록(\`\`\`)도 사용하지 마세요:
+
+{
+  "filingDate": "YYYY-MM-DD (공시일)",
+  "quarter": "예: 2025 Q4",
+  "totalValue": "전체 운용규모 (예: $300B)",
+  "holdings": [
+    {"ticker": "AAPL", "name": "Apple Inc.", "weight": 25.3, "shares": "300M", "change": "neutral"},
+    ...
+  ],
+  "comment": "이 분기 주요 변화 1~2문장 (한국어)"
+}
+
+change는 "buy" (신규/추가매수) | "sell" (감소) | "neutral" (변동 없음).
+weight는 % 단위 숫자만.
+${g.ticker?`참고: ${g.ticker}는 본인 회사 티커입니다.`:''}
+WhaleWisdom, Stockcircle, SEC EDGAR 공식 13F 등을 검색해 정확한 최신 데이터를 사용해주세요.`;
+
+  try{
+    const r=await tryFetch('/api/ai',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({prompt}),
+      timeout:60000,
+    });
+    let txt=r?.content?.[0]?.text||r?.text||'';
+    // JSON 추출
+    const jsonMatch=txt.match(/\{[\s\S]*"holdings"[\s\S]*\}/);
+    if(!jsonMatch){
+      out.innerHTML=`<div class="card"><div class="ltxt">데이터 파싱 실패. 다시 시도해주세요</div></div>`;
+      return;
+    }
+    let data;
+    try{data=JSON.parse(jsonMatch[0]);}catch(e){
+      out.innerHTML=`<div class="card"><div class="ltxt">JSON 파싱 실패</div></div>`;
+      return;
+    }
+    try{localStorage.setItem(cacheKey,JSON.stringify({data,time:Date.now()}));}catch(e){}
+    renderGuruResult(g,data);
+  }catch(e){
+    out.innerHTML=`<div class="card"><div class="ltxt">로드 실패: ${e.message}</div></div>`;
+  }
+}
+
+function renderGuruResult(g,data){
+  const out=$('gurus-result');
+  if(!data||!Array.isArray(data.holdings)){
+    out.innerHTML=`<div class="card"><div class="ltxt">데이터 없음</div></div>`;
+    return;
+  }
+  const changeMap={
+    'buy':{label:'매수↑',color:'var(--up)',bg:'var(--up-bg)'},
+    'sell':{label:'매도↓',color:'var(--down)',bg:'var(--down-bg)'},
+    'neutral':{label:'유지',color:'var(--text2)',bg:'var(--bg3)'},
+  };
+  out.innerHTML=`<div class="card">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:14px;flex-wrap:wrap">
+      <div style="display:flex;align-items:center;gap:10px">
+        <div style="font-size:28px">${g.emoji}</div>
+        <div>
+          <div style="font-weight:700;font-size:14px">${g.name}</div>
+          <div style="font-size:11px;color:var(--text2)">${g.company}</div>
+        </div>
+      </div>
+      <div style="text-align:right;font-size:11px;color:var(--text2)">
+        <div>${data.quarter||''}</div>
+        <div style="font-family:'JetBrains Mono',monospace">${data.totalValue||''}</div>
+      </div>
+    </div>
+    ${data.comment?`<div style="font-size:12px;color:var(--text2);background:var(--bg3);padding:10px 12px;border-radius:8px;margin-bottom:14px;line-height:1.6;border-left:3px solid var(--accent)">💡 ${data.comment}</div>`:''}
+    <div style="display:flex;flex-direction:column;gap:6px">
+      ${data.holdings.slice(0,10).map((h,i)=>{
+        const ch=changeMap[h.change]||changeMap.neutral;
+        return `<div class="mover-item" onclick="$('ti').value='${h.ticker}';navTo('analysis');stab('chart');go();">
+          <div style="font-size:11px;color:var(--text2);font-weight:600;width:24px">${i+1}</div>
+          <div class="mover-info">
+            <div class="mover-tk">${h.ticker||'—'}</div>
+            <div class="mover-name">${h.name||''}</div>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px">
+            <div style="font-family:'JetBrains Mono',monospace;font-weight:700;font-size:13px">${h.weight!=null?h.weight.toFixed(2)+'%':'—'}</div>
+            <div style="font-size:9.5px;padding:2px 7px;border-radius:5px;background:${ch.bg};color:${ch.color};font-weight:600">${ch.label}</div>
+          </div>
+        </div>`;
+      }).join('')}
+    </div>
+    <div style="font-size:10.5px;color:var(--text3);margin-top:12px;text-align:center">
+      ※ 13F 공시는 분기별 (45일 후 공개), 실제와 시점 차이 있음<br>
+      ${data.filingDate?'공시일: '+data.filingDate:''}
+    </div>
+  </div>`;
 }
 
 async function loadTopMovers(){
@@ -3159,6 +3631,120 @@ async function loadHome(){
   renderWatchHome();
   loadBreakingNews();
   loadMarketNews();
+  loadMorningBrief();
+}
+
+// 야간 자동 리포트 (한국 시간 아침 7시 이후, 하루 1회)
+async function loadMorningBrief(){
+  const wrap=$('morning-brief-wrap');
+  if(!wrap)return;
+  // 한국 시간 기준
+  const now=new Date();
+  const krNow=new Date(now.toLocaleString('en-US',{timeZone:'Asia/Seoul'}));
+  const hour=krNow.getHours();
+  // 아침 7시 ~ 오후 9시 사이만 (밤엔 의미 없음)
+  if(hour<7){wrap.style.display='none';return;}
+
+  const today=krNow.toISOString().split('T')[0];
+  const cacheKey='morning_brief';
+
+  // 오늘 이미 본 캐시
+  try{
+    const cached=localStorage.getItem(cacheKey);
+    if(cached){
+      const {data,date,dismissed}=JSON.parse(cached);
+      if(date===today){
+        if(dismissed){wrap.style.display='none';return;}
+        renderMorningBrief(data);
+        return;
+      }
+    }
+  }catch(e){}
+
+  // 새로 생성
+  wrap.style.display='block';
+  wrap.innerHTML=`<div class="card" style="background:linear-gradient(135deg,rgba(74,158,255,0.1) 0%,rgba(16,208,144,0.1) 100%);border-color:rgba(74,158,255,0.3)">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+      <span style="font-size:20px">☀️</span>
+      <strong style="font-size:13px;color:var(--text)">오늘의 아침 브리핑</strong>
+    </div>
+    <div class="ltxt" style="text-align:left">🤖 AI가 어젯밤 미국장 + 내 관심·보유 종목 변화를 정리 중...</div>
+  </div>`;
+
+  // 관심종목 + 보유종목 + 메이저 인덱스 정리
+  const tickers=[...new Set([...watchlist.map(w=>w.tk),...portfolio.map(p=>p.tk)])].slice(0,15);
+  const krDate=now.toLocaleDateString('ko-KR',{year:'numeric',month:'long',day:'numeric',weekday:'long'});
+
+  const prompt=`현재 한국 시간: ${krDate} ${hour}시.
+
+다음 형식으로 한국 투자자를 위한 "오늘의 아침 브리핑"을 한국어로 작성해주세요. 어젯밤(한국 시간) 미국 증시 마감 결과와 주요 사건을 중심으로.
+
+${tickers.length?`사용자 관심·보유 종목: ${tickers.join(', ')}\n위 종목들의 어제 변동도 포함해주세요.`:''}
+
+다음 형식 (마크다운 ** 굵은 글씨):
+
+**📊 어젯밤 미국장**
+S&P 500, 나스닥, 다우 마감 (수치 포함). 1~2문장으로.
+
+**🔥 핫뉴스**
+가장 중요한 어제~오늘 이슈 2~3개 (불릿).
+
+${tickers.length?`**💼 내 종목 변화**\n관심·보유 종목 중 의미 있는 변동 3개 정도 (불릿).`:''}
+
+**🌅 오늘 체크 포인트**
+한국/아시아 장에서 신경 쓸 점 또는 미국 프리장 동향. 1~2문장.
+
+각 섹션 사이는 빈 줄. 짧고 핵심만.`;
+
+  try{
+    const r=await tryFetch('/api/ai',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({prompt}),
+      timeout:60000,
+    });
+    let txt=r?.content?.[0]?.text||r?.text||'';
+    if(!txt){
+      wrap.style.display='none';
+      return;
+    }
+    try{localStorage.setItem(cacheKey,JSON.stringify({data:txt,date:today,dismissed:false}));}catch(e){}
+    renderMorningBrief(txt);
+  }catch(e){
+    wrap.style.display='none';
+  }
+}
+
+function renderMorningBrief(txt){
+  const wrap=$('morning-brief-wrap');
+  let html=txt
+    .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
+    .replace(/\n\n/g,'</p><p style="margin-top:10px">')
+    .replace(/^- /gm,'• ')
+    .replace(/\n/g,'<br>');
+  wrap.innerHTML=`<div class="card" style="background:linear-gradient(135deg,rgba(74,158,255,0.08) 0%,rgba(16,208,144,0.08) 100%);border-color:rgba(74,158,255,0.25);position:relative">
+    <button onclick="dismissMorningBrief()" style="position:absolute;top:10px;right:10px;background:transparent;border:none;color:var(--text3);cursor:pointer;font-size:14px;padding:4px;width:24px;height:24px;border-radius:6px;display:inline-flex;align-items:center;justify-content:center" title="오늘 닫기">${ic('x',14)}</button>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+      <span style="font-size:22px">☀️</span>
+      <div>
+        <strong style="font-size:13.5px;color:var(--text)">오늘의 아침 브리핑</strong>
+        <div style="font-size:10.5px;color:var(--text2)">${new Date().toLocaleDateString('ko-KR',{month:'long',day:'numeric',weekday:'long'})}</div>
+      </div>
+    </div>
+    <div style="font-size:13px;line-height:1.7;color:var(--text)"><p>${html}</p></div>
+  </div>`;
+}
+
+function dismissMorningBrief(){
+  $('morning-brief-wrap').style.display='none';
+  try{
+    const cached=localStorage.getItem('morning_brief');
+    if(cached){
+      const obj=JSON.parse(cached);
+      obj.dismissed=true;
+      localStorage.setItem('morning_brief',JSON.stringify(obj));
+    }
+  }catch(e){}
 }
 
 // 속보: 시간 가까운 뉴스 + 강한 키워드 필터
