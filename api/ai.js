@@ -38,85 +38,72 @@ export default async function handler(req, res) {
     const fullPrompt = systemContext + '\n\n' + userPrompt;
     const errors = [];
 
-    // === 1순위: Gemini ===
+    // === Gemini 시도 (빠르게: 1개 모델, 1회만) ===
     if (hasGemini) {
-      const models = ['gemini-2.5-flash-lite', 'gemini-2.0-flash'];
-      const RETRY_DELAYS = [2000, 5000];
+      const model = 'gemini-2.5-flash-lite';
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${process.env.GEMINI_API_KEY}`;
+      const body = {
+        contents: [{ parts: [{ text: fullPrompt }] }],
+        generationConfig: {
+          temperature: isShort ? 0.5 : 0.7,
+          maxOutputTokens: mode === 'short' ? 200 : (mode === 'translate' ? 1024 : 2048),
+        },
+      };
+      if (useSearch && !isShort && mode !== 'translate') {
+        body.tools = [{ google_search: {} }];
+      }
 
-      for (const model of models) {
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${process.env.GEMINI_API_KEY}`;
-        const body = {
-          contents: [{ parts: [{ text: fullPrompt }] }],
-          generationConfig: {
-            temperature: isShort ? 0.5 : 0.7,
-            maxOutputTokens: mode === 'short' ? 200 : (mode === 'translate' ? 1024 : 2048),
-          },
-        };
-        if (useSearch && !isShort && mode !== 'translate') {
-          body.tools = [{ google_search: {} }];
-        }
+      try {
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        const text = await response.text();
+        let data;
+        try { data = JSON.parse(text); } catch { data = { raw: text }; }
 
-        for (let attempt = 0; attempt < 3; attempt++) {
-          try {
-            const response = await fetch(url, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(body),
+        if (response.ok) {
+          const aiText = data?.candidates?.[0]?.content?.parts
+            ?.map(p => p.text).filter(Boolean).join('\n') || '';
+          if (aiText) {
+            if (isShort || mode === 'translate') {
+              return res.status(200).json({ text: aiText.trim(), model, provider: 'gemini' });
+            }
+            const sources = data?.candidates?.[0]?.groundingMetadata?.groundingChunks
+              ?.map(c => c.web?.title).filter(Boolean).slice(0, 3);
+            const sourceText = sources?.length ? '\n\n📚 참고 출처: ' + sources.join(', ') : '';
+            return res.status(200).json({
+              content: [{ type: 'text', text: aiText + sourceText }],
+              model, provider: 'gemini',
             });
-            const text = await response.text();
-            let data;
-            try { data = JSON.parse(text); } catch { data = { raw: text }; }
-
-            if (response.ok) {
-              const aiText = data?.candidates?.[0]?.content?.parts
-                ?.map(p => p.text).filter(Boolean).join('\n') || '';
-              if (aiText) {
-                if (isShort || mode === 'translate') {
-                  return res.status(200).json({ text: aiText.trim(), model, provider: 'gemini' });
-                }
-                const sources = data?.candidates?.[0]?.groundingMetadata?.groundingChunks
-                  ?.map(c => c.web?.title).filter(Boolean).slice(0, 3);
-                const sourceText = sources?.length ? '\n\n📚 참고 출처: ' + sources.join(', ') : '';
-                return res.status(200).json({
-                  content: [{ type: 'text', text: aiText + sourceText }],
-                  model, provider: 'gemini',
-                });
-              }
-            }
-
-            if (response.status === 503 || response.status === 429 || response.status === 500) {
-              errors.push({ provider: 'gemini', model, attempt: attempt+1, status: response.status });
-              if (attempt < 2) {
-                await new Promise(r => setTimeout(r, RETRY_DELAYS[attempt]));
-                continue;
-              }
-              break;
-            }
-
-            // 다른 에러 (400, 401 등) - Claude 폴백 의미 있음
-            errors.push({ provider: 'gemini', model, status: response.status });
-            break;
-          } catch (e) {
-            errors.push({ provider: 'gemini', model, attempt: attempt+1, error: e.message });
-            if (attempt < 2) {
-              await new Promise(r => setTimeout(r, RETRY_DELAYS[attempt]));
-              continue;
-            }
-            break;
           }
         }
+        errors.push({ provider: 'gemini', status: response.status });
+        // Gemini 실패 → 즉시 Claude로 (재시도 X)
+      } catch (e) {
+        errors.push({ provider: 'gemini', error: e.message });
       }
     }
 
-    // === 2순위: Claude (Gemini 모두 실패 시 폴백) ===
+    // === Claude 폴백 (Gemini 실패 시 즉시 호출) ===
     if (hasClaude) {
       try {
+        // web search가 필요한 경우 Claude도 web_search tool 사용
+        const needsSearch = useSearch && !isShort && mode !== 'translate';
         const claudeBody = {
           model: 'claude-haiku-4-5-20251001',
-          max_tokens: mode === 'short' ? 200 : (mode === 'translate' ? 1024 : 2048),
+          max_tokens: mode === 'short' ? 200 : (mode === 'translate' ? 1024 : 4096),
           messages: [{ role: 'user', content: fullPrompt }],
         };
-        // Claude는 web search tool도 있지만 일단 단순 호출
+        if (needsSearch) {
+          claudeBody.tools = [{
+            type: 'web_search_20250305',
+            name: 'web_search',
+            max_uses: 5,
+          }];
+        }
+
         const r = await fetch('https://api.anthropic.com/v1/messages', {
           method: 'POST',
           headers: {
@@ -129,19 +116,23 @@ export default async function handler(req, res) {
 
         if (r.ok) {
           const data = await r.json();
-          const aiText = data?.content?.[0]?.text || '';
+          // text 블록들을 모아서 반환
+          const aiText = (data?.content || [])
+            .filter(b => b.type === 'text')
+            .map(b => b.text)
+            .join('\n');
           if (aiText) {
             if (isShort || mode === 'translate') {
               return res.status(200).json({ text: aiText.trim(), model: claudeBody.model, provider: 'claude' });
             }
             return res.status(200).json({
-              content: [{ type: 'text', text: aiText + '\n\n_(Gemini 과부하로 Claude로 분석)_' }],
+              content: [{ type: 'text', text: aiText }],
               model: claudeBody.model, provider: 'claude',
             });
           }
         } else {
           const errText = await r.text();
-          errors.push({ provider: 'claude', status: r.status, body: errText.substring(0, 200) });
+          errors.push({ provider: 'claude', status: r.status, body: errText.substring(0, 300) });
         }
       } catch (e) {
         errors.push({ provider: 'claude', error: e.message });
