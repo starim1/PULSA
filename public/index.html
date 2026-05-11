@@ -751,7 +751,7 @@ body::before{
 <div class="app">
   <div class="topbar">
     <div class="tb-title">
-      <div class="tb-mark">
+      <div class="tb-mark" onclick="navTo('home')" style="cursor:pointer">
         <svg viewBox="0 0 192 192" xmlns="http://www.w3.org/2000/svg">
           <!-- Heart -->
           <path d="M 96 138 C 96 138 56 110 56 78 A 20 20 0 0 1 96 70 A 20 20 0 0 1 136 78 C 136 110 96 138 96 138 Z"
@@ -763,7 +763,7 @@ body::before{
                 fill="none" stroke="#22e8a8" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
       </div>
-      <span class="brand-text">PULSA</span>
+      <span class="brand-text" onclick="navTo('home')" style="cursor:pointer">PULSA</span>
       <span class="mkt-status" id="mkt-status">—</span>
     </div>
     <div class="tb-time" id="tb-time"></div>
@@ -1573,6 +1573,14 @@ async function go(){
   $('ai-b').style.display='none';$('ai-e').style.display='block';
   $('bt-b').style.display='none';$('bt-e').style.display='block';
   $('an-b').style.display='none';$('an-e').style.display='block';
+  // 새 종목 검색 시 이전 결과 초기화
+  if($('news-b'))$('news-b').style.display='none';
+  if($('news-e'))$('news-e').style.display='block';
+  if($('metrics-b'))$('metrics-b').style.display='none';
+  if($('metrics-e'))$('metrics-e').style.display='block';
+  if($('sentiment-result'))$('sentiment-result').innerHTML='버튼을 누르면 AI가 최근 소셜 미디어 분위기를 검색해 분석합니다';
+  if($('ai-sim-result'))$('ai-sim-result').innerHTML='';
+  if($('ai-sim-input'))$('ai-sim-input').value='';
   Object.values(CH).forEach(c=>c&&c.destroy&&c.destroy());CH={};
   $('aio').style.display='none';$('ail').style.display='none';
   try{
@@ -2763,6 +2771,26 @@ async function runAISimulator(){
   if(!input){toast('시나리오를 입력해주세요');return;}
   const btn=$('ai-sim-btn');
   const out=$('ai-sim-result');
+
+  // 12시간 캐시 (티커 + 입력 해시 기준)
+  const inputHash=btoa(unescape(encodeURIComponent(input))).slice(0,40);
+  const cacheKey=`ai_sim_${D.tk}_${inputHash}`;
+  try{
+    const cached=localStorage.getItem(cacheKey);
+    if(cached){
+      const {text,time}=JSON.parse(cached);
+      if(Date.now()-time<12*60*60*1000){
+        let html=text
+          .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
+          .replace(/\n\n/g,'</p><p style="margin-top:10px">')
+          .replace(/^- /gm,'• ')
+          .replace(/\n/g,'<br>');
+        out.innerHTML='<p>'+html+'</p>';
+        return;
+      }
+    }
+  }catch(e){}
+
   btn.disabled=true;
   out.innerHTML='<div class="ltxt" style="text-align:left">🤖 시뮬레이션 중... (15~30초)</div>';
 
@@ -2840,6 +2868,8 @@ ${JSON.stringify(sampledData)}
       .replace(/^- /gm,'• ')
       .replace(/\n/g,'<br>');
     out.innerHTML='<p>'+html+'</p>';
+    // 결과 캐시 저장
+    try{localStorage.setItem(cacheKey,JSON.stringify({text:txt,time:Date.now()}));}catch(e){}
     btn.disabled=false;
   }catch(e){
     out.innerHTML='<div class="ltxt" style="text-align:left">시뮬레이션 실패: '+e.message+'</div>';
@@ -3668,35 +3698,94 @@ async function loadMorningBrief(){
       <span style="font-size:20px">☀️</span>
       <strong style="font-size:13px;color:var(--text)">오늘의 아침 브리핑</strong>
     </div>
-    <div class="ltxt" style="text-align:left">🤖 AI가 어젯밤 미국장 + 내 관심·보유 종목 변화를 정리 중...</div>
+    <div class="ltxt" style="text-align:left">🤖 데이터 수집 + AI 분석 중...</div>
   </div>`;
 
-  // 관심종목 + 보유종목 + 메이저 인덱스 정리
-  const tickers=[...new Set([...watchlist.map(w=>w.tk),...portfolio.map(p=>p.tk)])].slice(0,15);
-  const krDate=now.toLocaleDateString('ko-KR',{year:'numeric',month:'long',day:'numeric',weekday:'long'});
+  try{
+    // === 1. 자체 데이터 수집 ===
+    // 메이저 인덱스 (어제 마감)
+    const indexTickers=[{tk:'^GSPC',name:'S&P 500'},{tk:'^IXIC',name:'나스닥'},{tk:'^DJI',name:'다우'}];
+    const indexData=await Promise.all(indexTickers.map(async i=>{
+      const d=await fetchIdx(i.tk).catch(()=>null);
+      return d?{name:i.name,price:d.price,chg:d.chgPct,prev:d.prevClose}:null;
+    }));
 
-  const prompt=`현재 한국 시간: ${krDate} ${hour}시.
+    // 휴장일 감지: 모든 인덱스의 변동률이 0이거나, 마지막 데이터 시점이 오래되었으면 휴장
+    const allZero=indexData.every(d=>d&&Math.abs(d.chg)<0.001);
+    let isHoliday=allZero;
+    // 또는 캘린더 데이터에서 확인
+    try{
+      const holidays=typeof getMarketHolidays==='function'?getMarketHolidays():[];
+      const yesterday=new Date(krNow);
+      yesterday.setDate(yesterday.getDate()-1);
+      const yest=yesterday.toISOString().split('T')[0];
+      isHoliday=isHoliday||holidays.some(h=>{
+        const hd=new Date(h.date).toISOString().split('T')[0];
+        return hd===yest;
+      });
+    }catch(e){}
 
-다음 형식으로 한국 투자자를 위한 "오늘의 아침 브리핑"을 한국어로 작성해주세요. 어젯밤(한국 시간) 미국 증시 마감 결과와 주요 사건을 중심으로.
+    // 관심종목/보유종목 가격
+    const userTickers=[...new Set([...watchlist.map(w=>w.tk),...portfolio.map(p=>p.tk)])].slice(0,12);
+    const userPrices=await Promise.all(userTickers.map(async tk=>{
+      const d=await fetchIdx(tk).catch(()=>null);
+      return d?{tk,name:d.shortName||tk,price:d.price,chg:d.chgPct}:null;
+    }));
+    const validUserPrices=userPrices.filter(Boolean);
 
-${tickers.length?`사용자 관심·보유 종목: ${tickers.join(', ')}\n위 종목들의 어제 변동도 포함해주세요.`:''}
+    // === 2. 프롬프트 작성 (실제 수치 + 휴장 정보 포함) ===
+    const krDate=now.toLocaleDateString('ko-KR',{year:'numeric',month:'long',day:'numeric',weekday:'long'});
+    const indexLines=indexData.filter(Boolean).map(d=>
+      `- ${d.name}: ${d.price.toLocaleString('en-US',{maximumFractionDigits:2})} (${d.chg>=0?'+':''}${d.chg.toFixed(2)}%)`
+    ).join('\n');
+    const userLines=validUserPrices.map(p=>
+      `- ${p.tk}: $${p.price.toFixed(2)} (${p.chg>=0?'+':''}${p.chg.toFixed(2)}%)`
+    ).join('\n');
 
-다음 형식 (마크다운 ** 굵은 글씨):
+    let prompt;
+    if(isHoliday){
+      prompt=`현재 한국 시간: ${krDate} ${hour}시.
+
+⚠️ **어제는 미국장 휴장일입니다.** (인덱스 변동률이 0이거나, 메모리얼 데이/추수감사절 등 휴장일)
+
+다음 형식으로 한국 투자자를 위한 "오늘의 아침 브리핑"을 한국어로 작성해주세요:
+
+**📊 시장 현황**
+"어제 미국장은 휴장이었습니다."로 시작. 다음 거래일이 언제인지 명시. 휴장 사유도 알면 언급.
+
+**🔥 주요 이슈**
+지난 며칠간 발생한 글로벌 시장/경제 이슈 2~3개 (불릿). 검색 활용.
+
+${validUserPrices.length?`**💼 내 종목 현황**\n사용자 종목들 현재 가격 (휴장이라 변동 없음):\n${userLines}\n\n위 종목 관련 최근 며칠간의 뉴스나 이슈 있으면 짧게 언급.`:''}
+
+**🌅 다음 거래일 체크 포인트**
+다음 미국장 개장 시 주목할 점. 1~2문장.
+
+각 섹션 사이는 빈 줄. 핵심만 짧게.`;
+    }else{
+      prompt=`현재 한국 시간: ${krDate} ${hour}시.
+
+어젯밤 미국 증시 실제 마감 결과:
+${indexLines}
+
+${validUserPrices.length?`사용자 관심·보유 종목의 어제 변동 (실제 데이터):\n${userLines}`:''}
+
+다음 형식으로 한국 투자자를 위한 "오늘의 아침 브리핑"을 한국어로 작성해주세요 (위 실제 데이터를 그대로 활용, 임의 추정 금지):
 
 **📊 어젯밤 미국장**
-S&P 500, 나스닥, 다우 마감 (수치 포함). 1~2문장으로.
+위에 제공한 실제 인덱스 수치를 사용. 1~2문장으로 전체 분위기 요약.
 
 **🔥 핫뉴스**
-가장 중요한 어제~오늘 이슈 2~3개 (불릿).
+어제~오늘 가장 중요한 시장 이슈 2~3개 (불릿). 검색 활용해서 최신 정보로.
 
-${tickers.length?`**💼 내 종목 변화**\n관심·보유 종목 중 의미 있는 변동 3개 정도 (불릿).`:''}
+${validUserPrices.length?`**💼 내 종목 변화**\n위 사용자 종목 중 의미 있는 변동(±2% 이상) 3개 정도 골라서 (불릿). 실제 수치 사용.`:''}
 
 **🌅 오늘 체크 포인트**
-한국/아시아 장에서 신경 쓸 점 또는 미국 프리장 동향. 1~2문장.
+한국/아시아 장 또는 미국 프리장에서 신경 쓸 점. 1~2문장.
 
-각 섹션 사이는 빈 줄. 짧고 핵심만.`;
+각 섹션 사이는 빈 줄. 짧고 핵심만. 데이터에 없는 수치는 절대 만들지 말 것.`;
+    }
 
-  try{
     const r=await tryFetch('/api/ai',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
@@ -4024,7 +4113,26 @@ function showEtfHoldings(){
 async function loadMarketAnalysis(period){
   document.querySelectorAll('[data-period]').forEach(b=>b.classList.toggle('on',b.dataset.period===period));
   const out=$('market-analysis-content');
-  out.innerHTML='<div class="ltxt" style="text-align:left">🤖 AI가 시황 분석 중... (최대 60초 소요)<br><span style="font-size:11px;color:var(--text2)">서버 과부하 시 자동으로 재시도하니 잠시만 기다려주세요</span></div>';
+
+  // 캐시: 1d=2시간, 그 외=6시간
+  const cacheTTL=period==='1d'?2*60*60*1000:6*60*60*1000;
+  const cacheKey=`market_analysis_${period}`;
+  try{
+    const cached=localStorage.getItem(cacheKey);
+    if(cached){
+      const {text,time}=JSON.parse(cached);
+      if(Date.now()-time<cacheTTL){
+        let html=text
+          .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
+          .replace(/\n\n/g,'</p><p style="margin-top:10px">')
+          .replace(/\n/g,'<br>');
+        out.innerHTML=`<p>${html}</p>`;
+        return;
+      }
+    }
+  }catch(e){}
+
+  out.innerHTML='<div class="ltxt" style="text-align:left">🤖 AI가 시황 분석 중... (최대 60초 소요)<br><span style="font-size:11px;color:var(--text2)">잠시만 기다려주세요</span></div>';
   const periodMap={
     '1d':{label:'전날',desc:'어제 미국 증시'},
     '1w':{label:'1주',desc:'최근 1주일 미국 증시'},
@@ -4066,7 +4174,8 @@ ${p.label} 동안의 주요 뉴스 / 정책 / 실적 등 2~3개
       out.innerHTML='<div class="ltxt" style="text-align:left">분석 실패</div>';
       return;
     }
-    // 마크다운 변환
+    // 캐시 저장
+    try{localStorage.setItem(cacheKey,JSON.stringify({text:txt,time:Date.now()}));}catch(e){}
     let html=txt
       .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
       .replace(/\n\n/g,'</p><p style="margin-top:10px">')
