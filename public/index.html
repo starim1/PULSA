@@ -776,25 +776,35 @@ body::before{
 @media (max-width:600px){
   .cal-grid{padding:4px;gap:2px;}
   .cal-cell{
-    min-height:42px;padding:3px 2px;font-size:9px;
-    overflow:hidden;
+    min-height:48px;padding:4px 3px;
+    overflow:hidden;align-items:center;
   }
-  .cal-day-num{font-size:10.5px;line-height:1.2;}
-  .cal-cell-event{
-    font-size:0;line-height:0;padding:0;height:4px;border-radius:2px;
-  }
-  .cal-cell-event.econ{background:#4a9eff;}
-  .cal-cell-event.earn{background:#f5b53d;}
-  .cal-cell-event.holiday{background:#ff5b6e;}
-  .cal-cell-event.watch{background:#26d782;}
+  .cal-day-num{font-size:11px;line-height:1.2;text-align:center;width:100%;}
   .cal-cell-events{
-    flex-direction:row;flex-wrap:wrap;gap:2px;align-items:flex-start;
+    display:flex;flex-direction:row;flex-wrap:wrap;
+    gap:2px;justify-content:center;align-items:center;
+    width:100%;margin-top:2px;
   }
-  .cal-cell-more{font-size:8.5px;color:var(--text3);font-weight:600;width:100%;text-align:left;line-height:1;margin-top:2px;}
-  .cal-dow{font-size:9.5px;padding:3px 0;}
+  .cal-cell-event{
+    font-size:0 !important;line-height:0;padding:0;
+    width:6px !important;height:6px !important;
+    border-radius:50%;flex-shrink:0;
+    color:transparent;overflow:hidden;
+  }
+  .cal-cell-event.econ{background:#4a9eff !important;}
+  .cal-cell-event.earn{background:#f5b53d !important;}
+  .cal-cell-event.holiday{background:#ff5b6e !important;}
+  .cal-cell-event.watch{background:#26d782 !important;}
+  .cal-cell-more{
+    font-size:9px;color:var(--text3);font-weight:600;
+    width:100%;text-align:center;line-height:1;margin-top:2px;
+  }
+  .cal-dow{font-size:10px;padding:4px 0;}
 }
 @media (max-width:380px){
-  .cal-cell{min-height:38px;}
+  .cal-cell{min-height:42px;padding:3px 2px;}
+  .cal-day-num{font-size:10px;}
+  .cal-cell-event{width:5px !important;height:5px !important;}
 }
 .cal-filter button{
   padding:6px 12px;font-size:11px;cursor:pointer;border-radius:7px;
@@ -3031,7 +3041,9 @@ function drawPrice(){
                 }
               },
               grid:{display:false},
-              ticks:{maxTicksLimit:8,font:{size:10},color:txt2,autoSkip:true}
+              ticks:{maxTicksLimit:8,font:{size:10},color:txt2,autoSkip:true},
+              min:ZOOM_RANGE&&d.ts?d.ts[ZOOM_RANGE.min]:undefined,
+              max:ZOOM_RANGE&&d.ts?d.ts[ZOOM_RANGE.max]:undefined,
             },
             y:{grid:{color:'rgba(150,150,170,.08)'},ticks:{font:{size:10,family:'JetBrains Mono'},color:txt2,callback:v=>'$'+f2(v)}}
           }
@@ -5857,6 +5869,163 @@ function getStaticEvents(){
   let jacksonHole=new Date(yr,7,31);  // 8월 31일에서 거꾸로
   while(jacksonHole.getDay()!==4)jacksonHole.setDate(jacksonHole.getDate()-1);
   events.push({date:jacksonHole,title:'잭슨홀 심포지엄',type:'econ',meta:'Fed · 캔자스시티 · 글로벌 통화정책',imp:3});
+
+  // ─── 추가 주요 이벤트: 미국 국채 발행 + 시장 영향 큰 발표 ───
+  for(let i=-1;i<12;i++){
+    const m=mo+i;
+    const baseDate=new Date(yr,m,1);
+    const y=baseDate.getFullYear(),mm=baseDate.getMonth();
+
+    // 매주 화/수/목: 10년물·30년물·2년물 국채 입찰 (대략 패턴)
+    // 실제 일정은 변동 있으나 보통 분기 첫 주 + 중순
+    // 2년물 - 매월 마지막 주 월요일
+    let yr2=new Date(y,mm+1,0);
+    while(yr2.getDay()!==1)yr2.setDate(yr2.getDate()-1);
+    events.push({date:new Date(yr2),title:'미국 2년물 국채 입찰',type:'econ',meta:'재무부 · 02:00 KST · 단기금리',imp:2});
+
+    // 10년물 - 매월 둘째 수요일
+    let yr10=new Date(y,mm,1);
+    while(yr10.getDay()!==3)yr10.setDate(yr10.getDate()+1);
+    yr10.setDate(yr10.getDate()+7);
+    events.push({date:new Date(yr10),title:'미국 10년물 국채 입찰',type:'econ',meta:'재무부 · 02:00 KST · 시장 벤치마크',imp:3});
+
+    // 30년물 - 매월 둘째 목요일
+    let yr30=new Date(yr10);yr30.setDate(yr30.getDate()+1);
+    events.push({date:new Date(yr30),title:'미국 30년물 국채 입찰',type:'econ',meta:'재무부 · 02:00 KST · 장기금리',imp:2});
+
+    // 7년물 - 매월 마지막 주 목요일
+    let yr7=new Date(y,mm+1,0);
+    while(yr7.getDay()!==4)yr7.setDate(yr7.getDate()-1);
+    events.push({date:new Date(yr7),title:'미국 7년물 국채 입찰',type:'econ',meta:'재무부 · 02:00 KST',imp:1});
+
+    // 5년물 - 매월 마지막 주 화요일
+    let yr5=new Date(y,mm+1,0);
+    while(yr5.getDay()!==2)yr5.setDate(yr5.getDate()-1);
+    events.push({date:new Date(yr5),title:'미국 5년물 국채 입찰',type:'econ',meta:'재무부 · 02:00 KST',imp:1});
+
+    // FOMC 의사록 - FOMC 3주 후 (대략)
+    // 신규 주택판매 - 매월 25일 근처
+    let newHome=new Date(y,mm,25);
+    if(newHome.getDay()===0)newHome.setDate(newHome.getDate()+1);
+    else if(newHome.getDay()===6)newHome.setDate(newHome.getDate()+2);
+    events.push({date:newHome,title:'미국 신규주택판매',type:'econ',meta:'Census · 23:00 KST',imp:2});
+
+    // 케이스실러 주택가격지수 - 매월 마지막 화요일
+    let csi=new Date(y,mm+1,0);
+    while(csi.getDay()!==2)csi.setDate(csi.getDate()-1);
+    events.push({date:csi,title:'케이스실러 주택가격지수',type:'econ',meta:'S&P · 22:00 KST',imp:2});
+
+    // 컨퍼런스보드 소비자신뢰지수 - 매월 마지막 화요일
+    let ccb=new Date(csi);
+    events.push({date:new Date(ccb),title:'컨퍼런스보드 소비자신뢰지수',type:'econ',meta:'CB · 23:00 KST',imp:2});
+
+    // 시카고 PMI - 매월 마지막 영업일
+    let chgPmi=new Date(y,mm+1,0);
+    while(chgPmi.getDay()===0||chgPmi.getDay()===6)chgPmi.setDate(chgPmi.getDate()-1);
+    events.push({date:chgPmi,title:'시카고 PMI',type:'econ',meta:'ISM · 22:45 KST',imp:1});
+
+    // 건설지출 - 매월 첫째 영업일
+    let constr=new Date(y,mm,1);
+    while(constr.getDay()===0||constr.getDay()===6)constr.setDate(constr.getDate()+1);
+    events.push({date:constr,title:'건설지출',type:'econ',meta:'Census · 23:00 KST',imp:1});
+
+    // 자동차 판매 - 매월 첫째 영업일 근처
+    let autoSale=new Date(constr);autoSale.setDate(autoSale.getDate()+2);
+    if(autoSale.getDay()===0)autoSale.setDate(autoSale.getDate()+1);
+    else if(autoSale.getDay()===6)autoSale.setDate(autoSale.getDate()+2);
+    events.push({date:autoSale,title:'자동차 판매',type:'econ',meta:'Auto · 종일',imp:1});
+
+    // EIA 원유재고 - 매주 수요일
+    let firstWed=new Date(y,mm,1);
+    while(firstWed.getDay()!==3)firstWed.setDate(firstWed.getDate()+1);
+    for(let w=0;w<5;w++){
+      const wed=new Date(firstWed);wed.setDate(wed.getDate()+w*7);
+      if(wed.getMonth()===mm){
+        events.push({date:wed,title:'EIA 원유재고',type:'econ',meta:'EIA · 23:30 KST · 유가 영향',imp:1});
+      }
+    }
+
+    // OPEC+ 회의 (연 8회, 1·3·6·8·10·12월) - 매월 첫째 월요일
+    if([0,2,5,7,9,11].includes(mm)){
+      let opec=new Date(y,mm,1);
+      while(opec.getDay()!==1)opec.setDate(opec.getDate()+1);
+      events.push({date:opec,title:'OPEC+ 회의',type:'econ',meta:'산유국 회의 · 원자재 영향',imp:2});
+    }
+
+    // 미시간대 인플레이션 기대치 - 미시간대 심리지수 발표일과 동일
+    // 베이지북 - FOMC 2주 전 (수요일)
+    // (FOMC 일정 기반으로 간접 계산)
+
+    // CB 경기선행지수 - 매월 20일 근처
+    let lei=new Date(y,mm,20);
+    if(lei.getDay()===0)lei.setDate(lei.getDate()+1);
+    else if(lei.getDay()===6)lei.setDate(lei.getDate()+2);
+    events.push({date:lei,title:'CB 경기선행지수 (LEI)',type:'econ',meta:'CB · 23:00 KST',imp:1});
+
+    // 미국 무역수지 - 매월 중순
+    let trade=new Date(y,mm,8);
+    if(trade.getDay()===0)trade.setDate(trade.getDate()+1);
+    else if(trade.getDay()===6)trade.setDate(trade.getDate()+2);
+    events.push({date:trade,title:'미국 무역수지',type:'econ',meta:'Census/BEA · 21:30 KST',imp:1});
+
+    // 한국 금통위 (매월 둘째 또는 셋째 목요일, 연 8회)
+    if([0,1,3,4,6,7,9,10].includes(mm)){
+      let bok=new Date(y,mm,1);
+      while(bok.getDay()!==4)bok.setDate(bok.getDate()+1);
+      bok.setDate(bok.getDate()+7);  // 둘째 목요일
+      events.push({date:new Date(bok),title:'한국은행 금통위',type:'econ',meta:'BOK · 09:00 KST · 한국 기준금리',imp:2});
+    }
+
+    // ECB 회의 (연 8회) - 매월 첫째 목요일 (대략)
+    if([0,2,3,5,6,8,9,11].includes(mm)){
+      let ecb=new Date(y,mm,1);
+      while(ecb.getDay()!==4)ecb.setDate(ecb.getDate()+1);
+      events.push({date:new Date(ecb),title:'ECB 통화정책 회의',type:'econ',meta:'ECB · 22:15 KST · 유럽금리',imp:2});
+    }
+
+    // BOJ 회의 (연 8회) - 1, 3, 4, 6, 7, 9, 10, 12월 중순
+    if([0,2,3,5,6,8,9,11].includes(mm)){
+      let boj=new Date(y,mm,18);
+      while(boj.getDay()===0||boj.getDay()===6)boj.setDate(boj.getDate()+1);
+      events.push({date:new Date(boj),title:'BOJ 통화정책 회의',type:'econ',meta:'BOJ · 일본 금리·엔화 영향',imp:2});
+    }
+
+    // 옵션 만기일 (트리플 위칭) - 3, 6, 9, 12월 셋째 금요일
+    if([2,5,8,11].includes(mm)){
+      let opex=new Date(y,mm,1);
+      while(opex.getDay()!==5)opex.setDate(opex.getDate()+1);
+      opex.setDate(opex.getDate()+14);
+      events.push({date:new Date(opex),title:'쿼드러플 위칭 (옵션만기)',type:'econ',meta:'NYSE · 변동성 확대',imp:3});
+    }
+    // 매월 셋째 금요일은 일반 옵션 만기
+    else{
+      let opex=new Date(y,mm,1);
+      while(opex.getDay()!==5)opex.setDate(opex.getDate()+1);
+      opex.setDate(opex.getDate()+14);
+      events.push({date:new Date(opex),title:'월간 옵션 만기',type:'econ',meta:'NYSE · 변동성 주의',imp:1});
+    }
+  }
+
+  // 러셀 리밸런싱 - 6월 마지막 금요일
+  let russell=new Date(yr,5,30);
+  while(russell.getDay()!==5)russell.setDate(russell.getDate()-1);
+  events.push({date:russell,title:'러셀지수 리밸런싱',type:'econ',meta:'FTSE Russell · 소형주 변동',imp:2});
+
+  // S&P 분기 리밸런싱 - 3, 6, 9, 12월 셋째 금요일 (옵션 만기와 동일)
+  // 이미 위에서 처리
+
+  // CES (1월 초)
+  let ces=new Date(yr+(mo>0?1:0),0,7);
+  events.push({date:ces,title:'CES 2026 (Tech 전시회)',type:'econ',meta:'라스베가스 · 기술주 영향',imp:2});
+
+  // WWDC (6월 첫째 월요일)
+  let wwdc=new Date(yr,5,1);
+  while(wwdc.getDay()!==1)wwdc.setDate(wwdc.getDate()+1);
+  events.push({date:wwdc,title:'Apple WWDC',type:'econ',meta:'AAPL · 신제품/iOS',imp:2});
+
+  // GTC (3월 중순) - NVIDIA 주관
+  let gtc=new Date(yr,2,17);
+  events.push({date:gtc,title:'NVIDIA GTC',type:'econ',meta:'NVDA · AI 컨퍼런스',imp:2});
 
   return events;
 }
