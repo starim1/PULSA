@@ -11,6 +11,15 @@
     },
     "api/etf.js": {
       "maxDuration": 30
+    },
+    "api/cron-warmup.js": {
+      "maxDuration": 60
     }
-  }
+  },
+  "crons": [
+    {
+      "path": "/api/cron-warmup",
+      "schedule": "0 22 * * *"
+    }
+  ]
 }
