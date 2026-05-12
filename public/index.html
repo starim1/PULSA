@@ -551,12 +551,47 @@ body::before{
   background:var(--bg3);overflow:hidden;
   display:flex;align-items:center;justify-content:center;color:var(--text3);
 }
-.news-card-img img{width:100%;height:100%;object-fit:cover;}
+.news-card-img img{width:100%;height:100%;object-fit:cover;display:block;}
 .news-card-body{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:space-between;}
 .news-card-title{font-size:13px;font-weight:600;line-height:1.4;color:var(--text);
   display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
-.news-card-meta{font-size:10.5px;color:var(--text2);margin-top:6px;display:flex;justify-content:space-between;gap:8px;}
+.news-card-en{font-size:10.5px;color:var(--text3);line-height:1.4;margin-top:4px;
+  display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden;font-style:italic;}
+.news-card-meta{font-size:10.5px;color:var(--text2);margin-top:6px;display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap;}
 .news-card-source{font-weight:600;color:var(--accent);}
+.news-card-cat{
+  font-size:9.5px;padding:1px 6px;border-radius:4px;font-weight:600;
+  background:var(--bg3);color:var(--text2);
+}
+.news-card-cat.market{background:rgba(38,215,130,0.12);color:#26d782;}
+.news-card-cat.policy{background:rgba(74,158,255,0.12);color:#4a9eff;}
+.news-card-cat.international{background:rgba(245,181,61,0.12);color:#f5b53d;}
+.news-card-cat.tech{background:rgba(160,100,255,0.18);color:#b489ff;}
+.news-card-cat.earnings{background:rgba(255,180,0,0.12);color:#ffb400;}
+.news-card-cat.commodity{background:rgba(255,150,90,0.15);color:#ff965a;}
+.news-card.pos{border-left:3px solid var(--up);}
+.news-card.neg{border-left:3px solid var(--down);}
+.news-card.breaking{border-left:3px solid var(--down);background:rgba(255,77,109,0.04);}
+
+/* 뉴스 카테고리 필터 */
+.news-cat-filter{
+  display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;
+  overflow-x:auto;-webkit-overflow-scrolling:touch;
+}
+.news-cat-filter button{
+  padding:7px 14px;border:1px solid var(--border);border-radius:7px;
+  background:var(--bg-card);color:var(--text2);font-weight:600;
+  cursor:pointer;font-size:11.5px;transition:all .15s;white-space:nowrap;
+}
+.news-cat-filter button.on{background:var(--accent);color:#fff;border-color:var(--accent);}
+.news-cat-filter button:hover:not(.on){background:var(--bg3);}
+
+@media (max-width:600px){
+  .news-card{padding:10px;gap:10px;}
+  .news-card-img{width:75px;height:75px;}
+  .news-card-title{font-size:12.5px;}
+  .news-cat-filter{padding-bottom:4px;}
+}
 
 /* Search autocomplete dropdown */
 .search-dropdown{
@@ -980,11 +1015,11 @@ body::before{
       <div class="sec-title"><span class="sec-icon" data-icon="star"></span>내 관심종목 <button class="btn btn-sm" onclick="navTo('analysis');stab('watch')" style="margin-left:auto">관리</button></div>
       <div class="watch-home-grid" id="watch-home"></div>
 
-      <div class="sec-title"><span class="sec-icon" data-icon="zap"></span>속보 <button class="btn btn-sm" onclick="loadBreakingNews(true)" style="margin-left:auto">새로고침</button></div>
-      <div id="breaking-news-list"><div class="ltxt">로딩 중...</div></div>
-
-      <div class="sec-title"><span class="sec-icon" data-icon="newspaper"></span>시장 뉴스</div>
-      <div id="market-news-list"><div class="ltxt">로딩 중...</div></div>
+      <div class="sec-title">
+        <span class="sec-icon" data-icon="newspaper"></span>최신 뉴스
+        <button class="btn btn-sm" onclick="navTo('news')" style="margin-left:auto">전체 보기</button>
+      </div>
+      <div id="home-news-summary"><div class="ltxt">로딩 중...</div></div>
 
       <div class="sec-title"><span class="sec-icon" data-icon="ai"></span>AI 시황 분석</div>
       <div class="card">
@@ -1504,6 +1539,61 @@ body::before{
   </div>
 
   <!-- CALENDAR SCREEN -->
+  <!-- 뉴스 화면 -->
+  <div class="screen" id="screen-news">
+    <div class="main">
+      <div class="sec-title">
+        <span class="sec-icon" data-icon="newspaper"></span>뉴스
+        <button class="btn btn-sm" onclick="refreshNews()" style="margin-left:auto">새로고침</button>
+      </div>
+
+      <!-- 카테고리 필터 -->
+      <div class="news-cat-filter">
+        <button class="on" data-cat="all" onclick="setNewsCat('all')">전체</button>
+        <button data-cat="market" onclick="setNewsCat('market')">시장</button>
+        <button data-cat="policy" onclick="setNewsCat('policy')">정책·금리</button>
+        <button data-cat="international" onclick="setNewsCat('international')">국제정세</button>
+        <button data-cat="tech" onclick="setNewsCat('tech')">기술</button>
+        <button data-cat="earnings" onclick="setNewsCat('earnings')">실적</button>
+        <button data-cat="commodity" onclick="setNewsCat('commodity')">원자재</button>
+      </div>
+
+      <div id="news-status" style="font-size:11px;color:var(--text2);margin-bottom:8px;text-align:center"></div>
+
+      <!-- 속보 (시장에 큰 영향 키워드 매치) -->
+      <div id="news-breaking-wrap" style="display:none;margin-bottom:18px">
+        <div class="sec-title" style="font-size:12px;color:var(--down)">
+          <span class="sec-icon" data-icon="zap" style="color:var(--down)"></span>속보
+        </div>
+        <div id="news-breaking-list"></div>
+      </div>
+
+      <!-- 긍정적 뉴스 -->
+      <div class="sec-title" style="font-size:12px;color:var(--up);margin-top:6px">
+        <span class="sec-icon" data-icon="trending_up" style="color:var(--up)"></span>긍정적 뉴스
+        <span id="news-pos-count" style="font-size:10px;color:var(--text2);font-weight:400;margin-left:6px"></span>
+      </div>
+      <div id="news-positive-list"><div class="ltxt">로딩 중...</div></div>
+      <div style="text-align:center;margin-top:8px"><button class="btn btn-sm" onclick="loadMorePosNews()" id="news-more-pos-btn" style="display:none">더 보기</button></div>
+
+      <!-- 부정적 뉴스 -->
+      <div class="sec-title" style="font-size:12px;color:var(--down);margin-top:18px">
+        <span class="sec-icon" data-icon="trending_down" style="color:var(--down)"></span>부정적 뉴스
+        <span id="news-neg-count" style="font-size:10px;color:var(--text2);font-weight:400;margin-left:6px"></span>
+      </div>
+      <div id="news-negative-list"><div class="ltxt">로딩 중...</div></div>
+      <div style="text-align:center;margin-top:8px"><button class="btn btn-sm" onclick="loadMoreNegNews()" id="news-more-neg-btn" style="display:none">더 보기</button></div>
+
+      <!-- 중립 뉴스 -->
+      <div class="sec-title" style="font-size:12px;color:var(--text2);margin-top:18px">
+        <span class="sec-icon" data-icon="newspaper" style="color:var(--text2)"></span>기타 뉴스
+        <span id="news-neu-count" style="font-size:10px;color:var(--text2);font-weight:400;margin-left:6px"></span>
+      </div>
+      <div id="news-neutral-list"><div class="ltxt">로딩 중...</div></div>
+      <div style="text-align:center;margin-top:8px;margin-bottom:30px"><button class="btn btn-sm" onclick="loadMoreNeuNews()" id="news-more-neu-btn" style="display:none">더 보기</button></div>
+    </div>
+  </div>
+
   <div class="screen" id="screen-calendar">
     <div class="main">
       <div class="sec-title"><span class="sec-icon" data-icon="calendar"></span>경제 캘린더 <button class="btn btn-sm" onclick="refreshCalendar()" style="margin-left:auto">새로고침</button></div>
@@ -1567,6 +1657,7 @@ body::before{
   <div class="bottomnav">
     <button class="nav-btn on" data-nav="home" data-icon="home" onclick="navTo('home')"><span class="ico"></span><span>홈</span></button>
     <button class="nav-btn" data-nav="analysis" data-icon="chart" onclick="navTo('analysis')"><span class="ico"></span><span>분석</span></button>
+    <button class="nav-btn" data-nav="news" data-icon="newspaper" onclick="navTo('news')"><span class="ico"></span><span>뉴스</span></button>
     <button class="nav-btn" data-nav="picks" data-icon="star" onclick="navTo('picks')"><span class="ico"></span><span>추천</span></button>
     <button class="nav-btn" data-nav="assets" data-icon="briefcase" onclick="navTo('assets')"><span class="ico"></span><span>자산</span></button>
     <button class="nav-btn" data-nav="calendar" data-icon="calendar" onclick="navTo('calendar')"><span class="ico"></span><span>캘린더</span></button>
@@ -1629,6 +1720,7 @@ const ICONS = {
   // Picks page
   fire: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.5c1 4 4 5.5 4 9.5a4 4 0 0 1-8 0c0-1.5.5-2.5 1.5-3.5C10 10 11 9 12 2.5z"/><path d="M9 16a3 3 0 0 0 6 0c0-1-1-2-1-3-1 1-2 1-3 0-1 1-2 2-2 3z"/></svg>',
   trending_up: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l6-6 4 4 8-8"/><path d="M14 7h7v7"/></svg>',
+  trending_down: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7l6 6 4-4 8 8"/><path d="M14 17h7v-7"/></svg>',
   trending_down: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7l6 6 4-4 8 8"/><path d="M14 17h7v-7"/></svg>',
   activity: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l3-9 4 18 3-9h4"/></svg>',
   algo: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><circle cx="6.5" cy="6.5" r="1.2" fill="currentColor"/><circle cx="17.5" cy="17.5" r="1.2" fill="currentColor"/></svg>',
@@ -2101,11 +2193,78 @@ function navTo(name){
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.toggle('on',b.dataset.nav===name));
   $('screen-'+name).classList.add('on');
   if(name==='home')loadHome();
+  if(name==='news')loadAllNews();
   if(name==='calendar')loadCalendar();
   if(name==='assets')loadAssets();
   if(name==='picks')loadPicks();
   window.scrollTo(0,0);
 }
+
+// ═══════════════════════════════════════════════════════════
+// 좌우 스와이프로 탭 이동 (모바일)
+// ═══════════════════════════════════════════════════════════
+const NAV_ORDER=['home','analysis','news','picks','assets','calendar'];
+let SWIPE_START_X=0,SWIPE_START_Y=0,SWIPE_START_TIME=0,SWIPE_ACTIVE=false;
+
+function setupSwipeNav(){
+  // 본문 영역 (네비 제외)
+  const body=document.body;
+  body.addEventListener('touchstart',(e)=>{
+    if(e.touches.length!==1)return;
+    // 이미 다른 제스처 중인 요소면 무시 (차트 그리기, 핀치 줌, 모달, 입력 등)
+    const target=e.target;
+    if(target.closest('.chart-wrap.drawing'))return;       // 차트 그리기 중
+    if(target.closest('canvas'))return;                     // 모든 캔버스 (차트 등)
+    if(target.closest('.search-dropdown'))return;           // 검색 자동완성
+    if(target.closest('.modal-overlay.on'))return;          // 열린 모달
+    if(target.closest('input,textarea,select'))return;      // 입력 폼
+    if(target.closest('.cmp-row'))return;                   // 비교 입력
+    if(target.closest('.cal-grid'))return;                  // 캘린더 셀
+    if(target.closest('.news-cat-filter'))return;           // 뉴스 카테고리 가로 스크롤
+    if(target.closest('.cal-filter'))return;                // 캘린더 필터
+    if(target.closest('.cal-view-toggle'))return;
+    if(target.closest('.picks-tabs'))return;
+    if(target.closest('.tabs'))return;                      // 분석 탭바
+    SWIPE_START_X=e.touches[0].clientX;
+    SWIPE_START_Y=e.touches[0].clientY;
+    SWIPE_START_TIME=Date.now();
+    SWIPE_ACTIVE=true;
+  },{passive:true});
+
+  body.addEventListener('touchend',(e)=>{
+    if(!SWIPE_ACTIVE)return;
+    SWIPE_ACTIVE=false;
+    const dt=Date.now()-SWIPE_START_TIME;
+    if(dt>500)return;  // 500ms 이상은 스와이프로 안 침
+    const touch=e.changedTouches[0];
+    if(!touch)return;
+    const dx=touch.clientX-SWIPE_START_X;
+    const dy=touch.clientY-SWIPE_START_Y;
+    // 가로 스와이프 우세 + 임계값
+    if(Math.abs(dx)<70)return;                       // 70px 이상
+    if(Math.abs(dy)>Math.abs(dx)*0.7)return;         // 세로가 크면 무시
+    // 현재 탭
+    const curScreen=document.querySelector('.screen.on');
+    if(!curScreen)return;
+    const curName=curScreen.id.replace('screen-','');
+    const curIdx=NAV_ORDER.indexOf(curName);
+    if(curIdx<0)return;
+    let nextIdx;
+    if(dx<0){
+      // 왼쪽으로 스와이프 → 다음 탭
+      nextIdx=curIdx+1;
+      if(nextIdx>=NAV_ORDER.length)return;  // 마지막 탭이면 더 이상 X
+    }else{
+      // 오른쪽으로 스와이프 → 이전 탭
+      nextIdx=curIdx-1;
+      if(nextIdx<0)return;
+    }
+    navTo(NAV_ORDER[nextIdx]);
+  },{passive:true});
+
+  body.addEventListener('touchcancel',()=>{SWIPE_ACTIVE=false;},{passive:true});
+}
+
 
 function stab(n){
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('on'));
@@ -5070,9 +5229,51 @@ async function loadHome(){
   loadCommoditiesGrid();
   loadSectorsGrid();
   renderWatchHome();
-  loadBreakingNews();
-  loadMarketNews();
+  loadHomeNewsSummary();
   loadMorningBrief();
+}
+
+// 홈에 표시할 짧은 뉴스 요약 (긍정 2, 부정 2)
+async function loadHomeNewsSummary(){
+  const wrap=$('home-news-summary');
+  if(!wrap)return;
+  // 이미 처리된 뉴스가 있으면 그걸 사용, 없으면 백그라운드 로드
+  if(!NEWS_ALL.length){
+    // raw 캐시 + 번역 캐시 조합으로 즉시 표시 시도
+    try{
+      const rawCached=localStorage.getItem('news_raw');
+      const transCached=localStorage.getItem('news_translations');
+      if(rawCached){
+        const {data}=JSON.parse(rawCached);
+        const transMap=transCached?JSON.parse(transCached):{};
+        if(data&&data.length){
+          NEWS_ALL=data.map(n=>{
+            const t=transMap[n.url];
+            if(t&&t.ko)return {...n,ko:t.ko,sent:t.sent,cat:t.cat};
+            return fallbackClassify(n);
+          });
+        }
+      }
+    }catch(e){}
+  }
+  if(!NEWS_ALL.length){
+    wrap.innerHTML='<div class="ltxt">뉴스 로딩 중... <button class="btn btn-sm" onclick="navTo(\'news\')" style="margin-left:8px">뉴스 탭에서 받기</button></div>';
+    return;
+  }
+  // 가장 최신 긍정 2 + 부정 2
+  const pos=NEWS_ALL.filter(n=>n.sent==='positive').slice(0,2);
+  const neg=NEWS_ALL.filter(n=>n.sent==='negative').slice(0,2);
+  const combined=[];
+  // 교차로 섞기
+  for(let i=0;i<2;i++){
+    if(pos[i])combined.push({...pos[i],_cls:'pos'});
+    if(neg[i])combined.push({...neg[i],_cls:'neg'});
+  }
+  if(!combined.length){
+    wrap.innerHTML='<div class="ltxt">표시할 뉴스 없음</div>';
+    return;
+  }
+  wrap.innerHTML=combined.map(n=>newsCardHTML(n,n._cls)).join('');
 }
 
 // 야간 자동 리포트 (한국 시간 아침 7시 이후, 하루 1회)
@@ -5297,151 +5498,366 @@ function dismissMorningBrief(){
   }catch(e){}
 }
 
-// 속보: 시간 가까운 뉴스 + 강한 키워드 필터
-async function loadBreakingNews(force=false){
-  const list=$('breaking-news-list');
-  if(!list)return;
-  const cacheKey='breaking_news';
-  if(!force){
-    try{
-      const cached=localStorage.getItem(cacheKey);
-      if(cached){
-        const {data,time}=JSON.parse(cached);
-        if(Date.now()-time<5*60*1000){  // 5분 캐시
-          renderBreakingNews(data);
-          return;
-        }
-      }
-    }catch(e){}
-  }
-  list.innerHTML='<div class="ltxt">로딩 중...</div>';
+
+// ═══════════════════════════════════════════════════════════
+// 통합 뉴스 시스템 (분류 + 번역 + 속보 알림)
+// ═══════════════════════════════════════════════════════════
+let NEWS_ALL=[];
+let NEWS_FILTER='all';
+let NEWS_LIMIT={pos:5,neg:5,neu:5};
+const NEWS_BREAKING_KEYWORDS=/halt|surge\s|plunge|crash|breaking|emergency|bankrupt|recall|lawsuit|scandal|war\s|invade|sanction|attack|terror|cyberattack|hack|leak|급등|급락|폭락|폭등|일시정지|사이버|해킹|전쟁|침공|제재|테러/i;
+
+async function refreshNews(){
   try{
-    // Finnhub general news (FMP 무료 미지원으로 변경)
-    const raw=await tryFetch('/api/finnhub?type=general_news');
-    if(!Array.isArray(raw)||!raw.length){
-      list.innerHTML='<div class="ltxt">속보 없음</div>';
-      return;
-    }
-    // Finnhub 형식 정규화 → {title, url, image, site, date(ms)}
-    const news=raw.map(n=>({
-      title:n.headline||'',
-      url:n.url||'#',
-      image:n.image||'',
-      site:n.source||'',
-      summary:n.summary||'',
-      date:n.datetime?n.datetime*1000:Date.now(),  // unix sec → ms
-    }));
-    // 속보 필터: 최근 90분 + 키워드 + 최대 5개
-    const breakingKeywords=/halt|surge|crash|plunge|breaking|alert|\bsec\b|\bfed\b|recall|merger|acqui|bankrupt|lawsuit|scandal|soar|tumble|급등|급락|일시정지|폭락|폭등/i;
-    const cutoff=Date.now()-90*60*1000;
-    let breaking=news.filter(n=>{
-      if(n.date<cutoff)return false;
-      const text=n.title+' '+n.summary;
-      return breakingKeywords.test(text);
-    }).slice(0,5);
-    // 속보 부족하면 최근 뉴스로 보충
-    if(breaking.length<3){
-      const recent=news.filter(n=>!breaking.includes(n)).slice(0,5-breaking.length);
-      breaking=[...breaking,...recent];
-    }
-    try{localStorage.setItem(cacheKey,JSON.stringify({data:breaking,time:Date.now()}));}catch(e){}
-    renderBreakingNews(breaking);
-  }catch(e){
-    list.innerHTML='<div class="ltxt">속보 로드 실패</div>';
-  }
+    localStorage.removeItem('news_raw');
+    // 번역 캐시는 유지 (영구) - 의미 없는 재번역 방지
+  }catch(e){}
+  loadAllNews();
 }
 
-function renderBreakingNews(news){
-  const list=$('breaking-news-list');
-  if(!news.length){
-    list.innerHTML='<div class="ltxt">속보 없음</div>';
-    return;
-  }
-  list.innerHTML=news.map(n=>{
-    const title=n.title||'(제목 없음)';
-    const site=n.site||'';
-    const url=n.url||'#';
-    const img=n.image||'';
-    const dt=n.date;
-    let timeAgo='';
-    if(dt){
-      const min=Math.floor((Date.now()-dt)/60000);
-      if(min<60)timeAgo=min+'분 전';
-      else if(min<1440)timeAgo=Math.floor(min/60)+'시간 전';
-      else timeAgo=Math.floor(min/1440)+'일 전';
-    }
-    return `<a class="news-card" href="${url}" target="_blank" rel="noopener" style="border-left:3px solid var(--down)">
-      <div class="news-card-img">${img?`<img src="${img}" alt="" onerror="this.style.display='none';this.parentElement.innerHTML='${ic('zap',32).replace(/'/g,'&#39;')}'">`:ic('zap',32)}</div>
-      <div class="news-card-body">
-        <div class="news-card-title">${title}</div>
-        <div class="news-card-meta"><span style="color:var(--down);font-weight:700">🔥 ${site}</span><span>${timeAgo}</span></div>
-      </div>
-    </a>`;
-  }).join('');
-}
+async function loadAllNews(){
+  // ─── 단계 1: 즉시 표시 (5분 캐시) ───
+  // raw 뉴스를 빠르게 받아서 영문 + 키워드 분류로 즉시 표시
+  // AI 번역은 백그라운드에서 점진적으로
 
-// 시장 뉴스: 일반 뉴스 큐레이션
-async function loadMarketNews(){
-  const list=$('market-news-list');
-  if(!list)return;
-  const cacheKey='market_news';
+  const rawCacheKey='news_raw';
+  let rawList=null;
+  // 5분 캐시 확인
   try{
-    const cached=localStorage.getItem(cacheKey);
+    const cached=localStorage.getItem(rawCacheKey);
     if(cached){
       const {data,time}=JSON.parse(cached);
-      if(Date.now()-time<15*60*1000){  // 15분 캐시
-        renderMarketNews(data);
-        return;
+      if(Date.now()-time<5*60*1000){
+        rawList=data;
       }
     }
   }catch(e){}
-  list.innerHTML='<div class="ltxt">로딩 중...</div>';
-  try{
-    const raw=await tryFetch('/api/finnhub?type=general_news');
-    if(!Array.isArray(raw)||!raw.length){
-      list.innerHTML='<div class="ltxt">뉴스 없음</div>';
+
+  const status=$('news-status');
+
+  if(!rawList){
+    // 새로 fetch
+    if(status)status.textContent='🔄 뉴스 수집 중...';
+    try{
+      const [general,forex,merger]=await Promise.all([
+        tryFetch('/api/finnhub?type=general_news').catch(()=>[]),
+        tryFetch('/api/finnhub?type=forex_news').catch(()=>[]),
+        tryFetch('/api/finnhub?type=merger_news').catch(()=>[]),
+      ]);
+      const rawAll=[];
+      if(Array.isArray(general))rawAll.push(...general);
+      if(Array.isArray(forex))rawAll.push(...forex);
+      if(Array.isArray(merger))rawAll.push(...merger);
+
+      if(!rawAll.length){
+        if(status)status.textContent='뉴스 없음';
+        if($('news-positive-list'))$('news-positive-list').innerHTML='<div class="ltxt">뉴스 없음</div>';
+        if($('news-negative-list'))$('news-negative-list').innerHTML='<div class="ltxt">뉴스 없음</div>';
+        if($('news-neutral-list'))$('news-neutral-list').innerHTML='<div class="ltxt">뉴스 없음</div>';
+        return;
+      }
+
+      const seen=new Set();
+      const unique=rawAll.filter(n=>{
+        const title=n.headline||'';
+        if(!title||seen.has(title))return false;
+        seen.add(title);
+        return true;
+      });
+
+      rawList=unique.map(n=>({
+        title:n.headline||'',
+        summary:n.summary||'',
+        url:n.url||'#',
+        image:n.image||'',
+        site:n.source||'',
+        date:n.datetime?n.datetime*1000:Date.now(),
+      })).sort((a,b)=>b.date-a.date);
+
+      const cutoff=Date.now()-36*60*60*1000;
+      rawList=rawList.filter(n=>n.date>=cutoff).slice(0,40);
+
+      try{localStorage.setItem(rawCacheKey,JSON.stringify({data:rawList,time:Date.now()}));}catch(e){}
+    }catch(e){
+      if(status)status.textContent='로드 실패: '+e.message;
       return;
     }
-    const news=raw.map(n=>({
-      title:n.headline||'',
-      url:n.url||'#',
-      image:n.image||'',
-      site:n.source||'',
-      date:n.datetime?n.datetime*1000:Date.now(),
-    }));
-    const top=news.slice(0,8);
-    try{localStorage.setItem(cacheKey,JSON.stringify({data:top,time:Date.now()}));}catch(e){}
-    renderMarketNews(top);
-  }catch(e){
-    list.innerHTML='<div class="ltxt">뉴스 로드 실패</div>';
+  }
+
+  // ─── 영구 번역 캐시 로드 (URL 기준) ───
+  let translationCache={};
+  try{
+    const cached=localStorage.getItem('news_translations');
+    if(cached)translationCache=JSON.parse(cached);
+  }catch(e){}
+
+  // 각 뉴스에 캐시된 번역 매칭, 없으면 키워드 폴백
+  NEWS_ALL=rawList.map(n=>{
+    const t=translationCache[n.url];
+    if(t&&t.ko){
+      return {...n,ko:t.ko,sent:t.sent,cat:t.cat};
+    }
+    return fallbackClassify(n);
+  });
+
+  // 즉시 렌더 (영문 + 캐시된 번역)
+  const translatedCount=NEWS_ALL.filter(n=>!n._fallback).length;
+  if(status)status.textContent=`${rawList.length}개 뉴스 · ${translatedCount}개 번역 완료${translatedCount<rawList.length?` · ${rawList.length-translatedCount}개 번역 중`:''}`;
+  renderAllNews();
+  checkBreakingNewsAlert(NEWS_ALL);
+
+  // ─── 단계 2: 백그라운드 번역 (캐시되지 않은 것만) ───
+  const untranslated=NEWS_ALL.filter(n=>n._fallback).slice(0,30);  // 한 번에 최대 30개
+  if(untranslated.length>0){
+    // 사용자 알 수 있게 미세하게
+    translateNewsInBackground(untranslated,translationCache);
   }
 }
 
-function renderMarketNews(news){
-  const list=$('market-news-list');
-  if(!news.length){list.innerHTML='<div class="ltxt">뉴스 없음</div>';return;}
-  list.innerHTML=news.map(n=>{
-    const title=n.title||'(제목 없음)';
-    const site=n.site||'';
-    const url=n.url||'#';
-    const img=n.image||'';
-    const dt=n.date;
-    let timeAgo='';
-    if(dt){
-      const min=Math.floor((Date.now()-dt)/60000);
-      if(min<60)timeAgo=min+'분 전';
-      else if(min<1440)timeAgo=Math.floor(min/60)+'시간 전';
-      else timeAgo=Math.floor(min/1440)+'일 전';
+// 백그라운드 번역 — 결과 도착 시 점진적 업데이트
+async function translateNewsInBackground(newsArr,translationCache){
+  if(!newsArr.length)return;
+  try{
+    const translated=await processNewsBatchAI(newsArr);
+    // 캐시에 저장 (URL 기준, 영구)
+    translated.forEach(n=>{
+      if(n.ko&&!n._fallback){
+        translationCache[n.url]={ko:n.ko,sent:n.sent,cat:n.cat,time:Date.now()};
+      }
+    });
+    // 캐시 크기 제한 (500개)
+    const keys=Object.keys(translationCache);
+    if(keys.length>500){
+      const sorted=keys.map(k=>({k,t:translationCache[k].time||0})).sort((a,b)=>b.t-a.t);
+      const newCache={};
+      sorted.slice(0,500).forEach(({k})=>{newCache[k]=translationCache[k];});
+      translationCache=newCache;
     }
-    return `<a class="news-card" href="${url}" target="_blank" rel="noopener">
-      <div class="news-card-img">${img?`<img src="${img}" alt="" onerror="this.style.display='none';this.parentElement.innerHTML='${ic('newspaper',32).replace(/'/g,'&#39;')}'">`:ic('newspaper',32)}</div>
-      <div class="news-card-body">
-        <div class="news-card-title">${title}</div>
-        <div class="news-card-meta"><span class="news-card-source">${site}</span><span>${timeAgo}</span></div>
-      </div>
-    </a>`;
-  }).join('');
+    try{localStorage.setItem('news_translations',JSON.stringify(translationCache));}catch(e){}
+
+    // NEWS_ALL 업데이트 (URL 기준 매칭)
+    const updateMap={};
+    translated.forEach(t=>{updateMap[t.url]=t;});
+    NEWS_ALL=NEWS_ALL.map(n=>{
+      if(updateMap[n.url]&&!updateMap[n.url]._fallback){
+        return {...n,ko:updateMap[n.url].ko,sent:updateMap[n.url].sent,cat:updateMap[n.url].cat,_fallback:false};
+      }
+      return n;
+    });
+
+    // 부드러운 리렌더
+    const status=$('news-status');
+    if(status){
+      const translatedCount=NEWS_ALL.filter(n=>!n._fallback).length;
+      status.textContent=`${NEWS_ALL.length}개 뉴스 · ${translatedCount}개 번역 완료`;
+    }
+    renderAllNews();
+  }catch(e){
+    console.warn('[Pulsa] 백그라운드 번역 실패:',e.message);
+  }
 }
+
+
+async function processNewsBatchAI(newsArr){
+  if(!newsArr.length)return [];
+  const numbered=newsArr.map((n,i)=>`${i}. ${n.title}`).join('\n');
+  const prompt=`다음은 영문 주식·경제 뉴스 헤드라인 ${newsArr.length}개입니다. 각 헤드라인에 대해:
+
+1. **ko**: 자연스러운 한국어 번역 (의미를 명확하게, 50자 이내)
+2. **sent**: 시장 영향 판단 - "positive" (시장에 긍정적), "negative" (시장에 부정적), "neutral" (중립/혼조)
+3. **cat**: 카테고리 분류 - "market" (시장·증시 일반), "policy" (정책·금리·중앙은행), "international" (국제정세·전쟁·외교), "tech" (기술·AI·반도체), "earnings" (실적·기업 발표), "commodity" (원자재·유가·금), "other" (기타)
+
+JSON 배열만 출력 (다른 설명 없이, 마크다운 코드블록도 없이):
+[{"i":0,"ko":"...","sent":"positive","cat":"market"},...]
+
+뉴스:
+${numbered}`;
+
+  try{
+    const r=await tryFetch('/api/ai',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({prompt,search:false}),
+      timeout:60000,
+    });
+    let txt=r?.content?.[0]?.text||r?.text||'';
+    const jsonMatch=txt.match(/\[[\s\S]*\]/);
+    if(!jsonMatch){
+      // AI 실패 시: 영문 원본 + 키워드 기반 거친 분류
+      return newsArr.map(n=>fallbackClassify(n));
+    }
+    let arr;
+    try{arr=JSON.parse(jsonMatch[0]);}catch(e){
+      return newsArr.map(n=>fallbackClassify(n));
+    }
+    return newsArr.map((n,i)=>{
+      const result=arr.find(a=>a.i===i)||{};
+      // AI 결과가 비어있으면 폴백
+      if(!result.ko||!result.sent)return fallbackClassify(n);
+      return {
+        ...n,
+        ko:result.ko,
+        sent:result.sent,
+        cat:result.cat||'other',
+      };
+    });
+  }catch(e){
+    // AI 호출 자체 실패 - 원본 표시 + 키워드 분류
+    console.warn('[Pulsa] AI 실패, 키워드 분류로 폴백:',e.message);
+    return newsArr.map(n=>fallbackClassify(n));
+  }
+}
+
+// AI 실패 시 폴백: 키워드 기반 거친 분류 (한국어 번역 없이 영문 그대로)
+function fallbackClassify(n){
+  const text=(n.title+' '+(n.summary||'')).toLowerCase();
+  const POS_WORDS=/surge|rally|jump|gain|rise|beat|exceed|growth|boost|record|profit|upgrade|outperform|strong|optimistic|bullish|recovery|rebound|breakthrough/;
+  const NEG_WORDS=/crash|plunge|fall|drop|loss|miss|disappoint|recession|fear|concern|warning|bankrupt|fraud|lawsuit|downgrade|cut|weak|bearish|decline|slump|risk/;
+  let sent='neutral';
+  if(POS_WORDS.test(text))sent='positive';
+  else if(NEG_WORDS.test(text))sent='negative';
+
+  // 카테고리도 키워드로 추정
+  let cat='other';
+  if(/fed|rate|inflation|cpi|gdp|fomc|powell|central bank|treasury/i.test(text))cat='policy';
+  else if(/war|ukraine|china|russia|israel|iran|sanction|trade war|diplomatic/i.test(text))cat='international';
+  else if(/ai\b|chip|semiconductor|tech|nvidia|apple|google|microsoft|meta|tesla|software/i.test(text))cat='tech';
+  else if(/earnings|revenue|profit|quarterly|guidance|eps/i.test(text))cat='earnings';
+  else if(/oil|gold|silver|opec|crude|commodity|energy|copper/i.test(text))cat='commodity';
+  else if(/stock|market|index|s&p|nasdaq|dow/i.test(text))cat='market';
+
+  return {
+    ...n,
+    ko:n.title,  // 번역 실패 시 영문 그대로
+    sent,
+    cat,
+    _fallback:true,
+  };
+}
+
+
+function renderAllNews(){
+  if(!NEWS_ALL.length){
+    $('news-positive-list').innerHTML='<div class="ltxt">뉴스 없음</div>';
+    $('news-negative-list').innerHTML='<div class="ltxt">뉴스 없음</div>';
+    $('news-neutral-list').innerHTML='<div class="ltxt">뉴스 없음</div>';
+    return;
+  }
+  let filtered=NEWS_ALL;
+  if(NEWS_FILTER!=='all')filtered=NEWS_ALL.filter(n=>n.cat===NEWS_FILTER);
+
+  const breaking=filtered.filter(n=>NEWS_BREAKING_KEYWORDS.test(n.title+' '+(n.summary||''))).slice(0,3);
+  if(breaking.length>0){
+    $('news-breaking-wrap').style.display='block';
+    $('news-breaking-list').innerHTML=breaking.map(n=>newsCardHTML(n,'breaking')).join('');
+  }else{
+    $('news-breaking-wrap').style.display='none';
+  }
+
+  const pos=filtered.filter(n=>n.sent==='positive');
+  const neg=filtered.filter(n=>n.sent==='negative');
+  const neu=filtered.filter(n=>n.sent==='neutral');
+
+  $('news-pos-count').textContent=pos.length?`(${pos.length}개)`:'';
+  $('news-neg-count').textContent=neg.length?`(${neg.length}개)`:'';
+  $('news-neu-count').textContent=neu.length?`(${neu.length}개)`:'';
+
+  $('news-positive-list').innerHTML=pos.length?
+    pos.slice(0,NEWS_LIMIT.pos).map(n=>newsCardHTML(n,'pos')).join(''):
+    '<div class="ltxt">이 카테고리에 긍정적 뉴스 없음</div>';
+  $('news-negative-list').innerHTML=neg.length?
+    neg.slice(0,NEWS_LIMIT.neg).map(n=>newsCardHTML(n,'neg')).join(''):
+    '<div class="ltxt">이 카테고리에 부정적 뉴스 없음</div>';
+  $('news-neutral-list').innerHTML=neu.length?
+    neu.slice(0,NEWS_LIMIT.neu).map(n=>newsCardHTML(n)).join(''):
+    '<div class="ltxt">중립 뉴스 없음</div>';
+
+  $('news-more-pos-btn').style.display=pos.length>NEWS_LIMIT.pos?'inline-block':'none';
+  $('news-more-neg-btn').style.display=neg.length>NEWS_LIMIT.neg?'inline-block':'none';
+  $('news-more-neu-btn').style.display=neu.length>NEWS_LIMIT.neu?'inline-block':'none';
+}
+
+function newsCardHTML(n,cls=''){
+  const title=n.ko||n.title;
+  const enTitle=n.ko&&n.ko!==n.title?n.title:'';
+  const site=n.site||'';
+  const url=n.url||'#';
+  const img=n.image||'';
+  const dt=n.date;
+  let timeAgo='';
+  if(dt){
+    const min=Math.floor((Date.now()-dt)/60000);
+    if(min<60)timeAgo=min+'분 전';
+    else if(min<1440)timeAgo=Math.floor(min/60)+'시간 전';
+    else timeAgo=Math.floor(min/1440)+'일 전';
+  }
+  const catLabels={
+    market:'시장',policy:'정책',international:'국제',
+    tech:'기술',earnings:'실적',commodity:'원자재',other:'기타',
+  };
+  const cat=n.cat||'other';
+  const catLabel=catLabels[cat]||'기타';
+  return `<a class="news-card ${cls}" href="${url}" target="_blank" rel="noopener">
+    <div class="news-card-img">${img?`<img src="${img}" alt="" referrerpolicy="no-referrer" loading="lazy" onerror="this.style.display='none';this.parentElement.innerHTML='${ic('newspaper',32).replace(/'/g,'&#39;')}'">`:ic('newspaper',32)}</div>
+    <div class="news-card-body">
+      <div>
+        <div class="news-card-title">${title}</div>
+        ${enTitle?`<div class="news-card-en">${enTitle.length>80?enTitle.slice(0,80)+'…':enTitle}</div>`:''}
+      </div>
+      <div class="news-card-meta">
+        <span style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+          <span class="news-card-source">${site}</span>
+          <span class="news-card-cat ${cat}">${catLabel}</span>
+        </span>
+        <span>${timeAgo}</span>
+      </div>
+    </div>
+  </a>`;
+}
+
+function setNewsCat(cat){
+  NEWS_FILTER=cat;
+  document.querySelectorAll('.news-cat-filter button').forEach(b=>b.classList.toggle('on',b.dataset.cat===cat));
+  NEWS_LIMIT={pos:5,neg:5,neu:5};
+  renderAllNews();
+}
+
+function loadMorePosNews(){NEWS_LIMIT.pos+=10;renderAllNews();}
+function loadMoreNegNews(){NEWS_LIMIT.neg+=10;renderAllNews();}
+function loadMoreNeuNews(){NEWS_LIMIT.neu+=10;renderAllNews();}
+
+function checkBreakingNewsAlert(newsArr){
+  if(!newsArr||!newsArr.length)return;
+  let lastSeenIds=[];
+  try{lastSeenIds=JSON.parse(localStorage.getItem('news_seen_ids')||'[]');}catch(e){}
+  const lastSeenSet=new Set(lastSeenIds);
+
+  const cutoff=Date.now()-2*60*60*1000;
+  const breaking=newsArr.filter(n=>
+    n.date>=cutoff && NEWS_BREAKING_KEYWORDS.test(n.title+' '+(n.summary||''))
+  );
+
+  const newBreaking=breaking.filter(n=>{
+    const id=`${n.date}_${(n.title||'').slice(0,60)}`;
+    return !lastSeenSet.has(id);
+  });
+
+  for(const n of newBreaking.slice(0,3)){
+    const ttl=n.ko||n.title;
+    addToInbox({
+      type:'breaking',
+      title:`🔥 속보: ${(ttl||'').slice(0,60)}`,
+      body:`${n.site||''} · ${new Date(n.date).toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'})}\n\n${(n.summary||'').slice(0,200)}`,
+    });
+    if('Notification'in window&&Notification.permission==='granted'){
+      try{new Notification('🔥 PULSA 속보',{body:ttl,tag:'pulsa-breaking',icon:'/icon.svg'});}catch(e){}
+    }
+  }
+
+  const currentIds=newsArr.map(n=>`${n.date}_${(n.title||'').slice(0,60)}`);
+  try{localStorage.setItem('news_seen_ids',JSON.stringify(currentIds.slice(0,200)));}catch(e){}
+}
+
 
 async function loadIndicesGrid(){
   const grid=$('indices-grid');grid.innerHTML='';
@@ -6406,6 +6822,7 @@ function getKoreanPreOpenTime(){
 }
 
 loadPF();loadAl();loadWatchlist();loadEventAlerts();loadAlertInbox();loadSearchHistory();loadWatchGroups();applyStoredTheme();
+setupSwipeNav();  // 좌우 스와이프 네비게이션
 autoCleanupAlerts();  // 7일 지난 알림 자동 삭제
 checkQuarterChange();  // 분기 변경 감지 (거장 포트폴리오 갱신 안내)
 
@@ -6530,6 +6947,12 @@ async function autoRefreshAssets(){
 
 setInterval(checkAlerts,60000);
 setInterval(checkAutoAlerts,5*60000);  // 5분마다 자동 알림 체크
+setInterval(()=>{
+  // 5분마다 백그라운드 뉴스 fetch (영문 + 키워드 분류는 즉시, 새 뉴스 번역은 백그라운드)
+  loadAllNews();
+},5*60*1000);
+// 시작 후 5초 뒤 첫 뉴스 로드 (백그라운드)
+setTimeout(()=>{loadAllNews();},5000);
 setTimeout(checkAutoAlerts,3000);  // 시작 후 3초 뒤 첫 실행
 setInterval(refreshWatch,300000);
 setInterval(fetchKRW,3600000);
