@@ -3357,7 +3357,7 @@ async function loadNews(){
         else timeAgo=new Date(dt).toLocaleDateString('ko-KR');
       }
       return `<a class="news-card" href="${url}" target="_blank" rel="noopener">
-        <div class="news-card-img">${img?`<img src="${img}" alt="" onerror="this.style.display='none';this.parentElement.innerHTML='${ic('newspaper',32).replace(/'/g,'&#39;')}'">`:ic('newspaper',32)}</div>
+        <div class="news-card-img">${img?`<img src="${img}" alt="" referrerpolicy="no-referrer" loading="lazy" onerror="newsImgError(this)">`:ic('newspaper',32)}</div>
         <div class="news-card-body">
           <div class="news-card-title">${title}</div>
           <div class="news-card-meta"><span class="news-card-source">${site}</span><span>${timeAgo}</span></div>
@@ -5777,6 +5777,17 @@ function renderAllNews(){
   $('news-more-neu-btn').style.display=neu.length>NEWS_LIMIT.neu?'inline-block':'none';
 }
 
+// 뉴스 이미지 로드 실패 시 폴백 아이콘으로 안전하게 교체
+function newsImgError(img){
+  try{
+    const parent=img.parentElement;
+    if(parent){
+      parent.innerHTML='';  // 텍스트/속성 잔재 제거
+      parent.insertAdjacentHTML('beforeend',ic('newspaper',32));
+    }
+  }catch(e){}
+}
+
 function newsCardHTML(n,cls=''){
   const title=n.ko||n.title;
   const enTitle=n.ko&&n.ko!==n.title?n.title:'';
@@ -5798,7 +5809,7 @@ function newsCardHTML(n,cls=''){
   const cat=n.cat||'other';
   const catLabel=catLabels[cat]||'기타';
   return `<a class="news-card ${cls}" href="${url}" target="_blank" rel="noopener">
-    <div class="news-card-img">${img?`<img src="${img}" alt="" referrerpolicy="no-referrer" loading="lazy" onerror="this.style.display='none';this.parentElement.innerHTML='${ic('newspaper',32).replace(/'/g,'&#39;')}'">`:ic('newspaper',32)}</div>
+    <div class="news-card-img">${img?`<img src="${img}" alt="" referrerpolicy="no-referrer" loading="lazy" onerror="newsImgError(this)">`:ic('newspaper',32)}</div>
     <div class="news-card-body">
       <div>
         <div class="news-card-title">${title}</div>
