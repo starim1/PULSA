@@ -824,7 +824,14 @@ body::before{
 .imp-2{background:var(--accent);}
 .imp-1{background:var(--neutral);}
 .event-content{flex:1;}
-.event-title{font-size:13px;font-weight:600;margin-bottom:2px;}
+.event-title{font-size:13px;font-weight:600;margin-bottom:2px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+.event-stars{
+  font-size:10px;letter-spacing:-1px;
+  display:inline-flex;align-items:center;flex-shrink:0;
+}
+.event-stars[data-imp="1"]{opacity:0.55;}
+.event-stars[data-imp="2"]{opacity:0.85;}
+.event-stars[data-imp="3"]{opacity:1;}
 .event-meta{font-size:11px;color:var(--text2);}
 .event-bell{
   background:none;border:none;cursor:pointer;color:var(--text3);
@@ -1532,6 +1539,11 @@ body::before{
 
       <!-- List View -->
       <div id="cal-list-view" style="display:none">
+        <div style="display:flex;gap:8px;margin-bottom:10px;align-items:center;justify-content:flex-end">
+          <span style="font-size:11px;color:var(--text2)">정렬:</span>
+          <button class="btn btn-sm on" id="cal-sort-date-btn" onclick="setCalSort('date')">날짜순</button>
+          <button class="btn btn-sm" id="cal-sort-imp-btn" onclick="setCalSort('importance')">중요도순</button>
+        </div>
         <div id="cal-list"><div class="ltxt">로딩 중...</div></div>
       </div>
     </div>
@@ -6244,6 +6256,15 @@ function toggleEventAlert(eventId){
   saveEventAlerts();renderCalendar();
 }
 
+let CAL_SORT='date';
+
+function setCalSort(sort){
+  CAL_SORT=sort;
+  if($('cal-sort-date-btn'))$('cal-sort-date-btn').classList.toggle('on',sort==='date');
+  if($('cal-sort-imp-btn'))$('cal-sort-imp-btn').classList.toggle('on',sort==='importance');
+  renderCalendar();
+}
+
 function renderCalendar(){
   const list=$('cal-list');
   let filtered=CAL_DATA;
@@ -6252,14 +6273,47 @@ function renderCalendar(){
   else if(CAL_FILTER==='holiday')filtered=CAL_DATA.filter(e=>e.type==='holiday');
   else if(CAL_FILTER==='watch')filtered=CAL_DATA.filter(e=>e.meta==='관심 종목'||e.meta==='보유 종목');
   if(!filtered.length){list.innerHTML='<div class="empty">표시할 일정이 없습니다.</div>';return;}
-  
-  // 날짜별 그룹
+
+  if(CAL_SORT==='importance'){
+    // 중요도순: 미래 일정만, 중요도 → 날짜 순
+    const today=new Date();today.setHours(0,0,0,0);
+    const futureSorted=[...filtered]
+      .filter(e=>new Date(e.date)>=today)
+      .sort((a,b)=>(b.imp||0)-(a.imp||0)||a.date-b.date)
+      .slice(0,50);  // 상위 50개
+
+    list.innerHTML=`<div style="font-size:11px;color:var(--text2);margin-bottom:10px;text-align:center">중요도 ⭐⭐⭐ 순으로 정렬 (앞으로 50개)</div>`+
+      futureSorted.map(e=>{
+        const d=new Date(e.date);
+        const dStart=new Date(d);dStart.setHours(0,0,0,0);
+        const diff=Math.round((dStart-today)/(1000*60*60*24));
+        let label='';
+        if(diff===0)label='오늘';else if(diff===1)label='내일';else label=`${diff}일 후`;
+        const dateStr=`${d.getMonth()+1}/${d.getDate()} (${'일월화수목금토'[d.getDay()]}) · ${label}`;
+        const id=e.date.getTime()+'_'+e.title;
+        const on=isAlertOn(id);
+        const isHoliday=e.type==='holiday';
+        const itemStyle=isHoliday?'background:rgba(255,77,109,0.06);border-left:3px solid var(--down)':'';
+        const titleEmoji=isHoliday?'🔴 ':'';
+        return `<div class="event-item" style="${itemStyle};margin-bottom:6px">
+          <div class="event-imp imp-${e.imp}"></div>
+          <div class="event-content">
+            <div class="event-title">${titleEmoji}${e.title} <span class="event-stars" data-imp="${e.imp||1}">${'⭐'.repeat(e.imp||1)}</span></div>
+            <div class="event-meta">${dateStr} · ${e.meta||''}</div>
+          </div>
+          ${isHoliday?'':`<button class="event-bell ${on?'on':''}" onclick="toggleEventAlert('${id}')">${ic('bell',16)}</button>`}
+        </div>`;
+      }).join('');
+    return;
+  }
+
+  // 날짜별 그룹 (기존 방식)
   const byDate={};
   filtered.forEach(e=>{
     const k=e.date.toISOString().substring(0,10);
     if(!byDate[k])byDate[k]=[];byDate[k].push(e);
   });
-  
+
   list.innerHTML=Object.keys(byDate).sort().map(k=>{
     const d=new Date(k);const today=new Date();today.setHours(0,0,0,0);
     const dStart=new Date(d);dStart.setHours(0,0,0,0);
@@ -6267,9 +6321,11 @@ function renderCalendar(){
     let label='';
     if(diff===0)label='오늘';else if(diff===1)label='내일';else if(diff<0)label=`${-diff}일 전`;else label=`${diff}일 후`;
     const dateStr=`${d.getMonth()+1}월 ${d.getDate()}일 (${'일월화수목금토'[d.getDay()]}) · ${label}`;
+    // 각 날짜 안에서 중요도 높은 순으로 정렬
+    const dayEvents=[...byDate[k]].sort((a,b)=>(b.imp||0)-(a.imp||0));
     return`<div class="event-day">
       <div class="event-date">${dateStr}</div>
-      ${byDate[k].map(e=>{
+      ${dayEvents.map(e=>{
         const id=e.date.getTime()+'_'+e.title;
         const on=isAlertOn(id);
         const isHoliday=e.type==='holiday';
@@ -6277,7 +6333,10 @@ function renderCalendar(){
         const titleEmoji=isHoliday?'🔴 ':'';
         return`<div class="event-item" style="${itemStyle}">
           <div class="event-imp imp-${e.imp}"></div>
-          <div class="event-content"><div class="event-title">${titleEmoji}${e.title}</div><div class="event-meta">${e.meta}</div></div>
+          <div class="event-content">
+            <div class="event-title">${titleEmoji}${e.title} <span class="event-stars" data-imp="${e.imp||1}">${'⭐'.repeat(e.imp||1)}</span></div>
+            <div class="event-meta">${e.meta}</div>
+          </div>
           ${isHoliday?'':`<button class="event-bell ${on?'on':''}" onclick="toggleEventAlert('${id}')">${ic('bell',16)}</button>`}
         </div>`;
       }).join('')}
