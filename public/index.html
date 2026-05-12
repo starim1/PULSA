@@ -184,6 +184,40 @@ body::before{
   transition:all .15s;padding:0;
 }
 .tb-action-btn:hover{background:var(--border);transform:translateY(-1px);}
+
+/* Chart tools panel */
+.chart-tools{
+  display:flex;flex-wrap:wrap;gap:10px;justify-content:space-between;
+  background:var(--bg3);border:1px solid var(--border);border-radius:8px;
+  padding:8px 10px;margin-bottom:10px;align-items:center;
+}
+.ct-group{display:flex;align-items:center;gap:5px;flex-wrap:wrap;}
+.ct-btn{
+  display:flex;align-items:center;gap:5px;
+  padding:6px 10px;border-radius:6px;background:var(--bg2);
+  border:1px solid var(--border);color:var(--text2);font-weight:600;
+  cursor:pointer;font-size:11px;transition:all .12s;
+}
+.ct-btn:hover{background:var(--bg-card);color:var(--text);}
+.ct-btn.on{background:var(--accent);color:#fff;border-color:var(--accent);}
+.ct-label{font-size:11px;}
+.ct-color-row{display:inline-flex;gap:4px;padding:3px;background:var(--bg2);border-radius:6px;border:1px solid var(--border);}
+.ct-color{
+  width:18px;height:18px;border-radius:50%;cursor:pointer;
+  border:2px solid transparent;padding:0;transition:all .12s;
+}
+.ct-color.sel{border-color:var(--text);transform:scale(1.15);}
+.chart-wrap{position:relative;}
+.chart-draw-layer{
+  position:absolute;top:0;left:0;width:100%;height:100%;
+  pointer-events:none;z-index:5;
+}
+.chart-wrap.drawing .chart-draw-layer{pointer-events:auto;cursor:crosshair;}
+.chart-wrap.tool-eraser .chart-draw-layer{cursor:cell;}
+@media (max-width:600px){
+  .ct-label{display:none;}
+  .ct-btn{padding:6px 8px;}
+}
 .mkt-status{
   font-size:10px;padding:3px 9px;border-radius:6px;font-weight:700;letter-spacing:0.04em;
   text-transform:uppercase;display:inline-flex;align-items:center;gap:4px;
@@ -527,14 +561,15 @@ body::before{
 /* Search autocomplete dropdown */
 .search-dropdown{
   position:absolute;top:calc(100% + 4px);left:0;right:0;
-  background:var(--bg-card);border:1px solid var(--border);border-radius:10px;
+  background:var(--bg2);border:1px solid var(--border2);border-radius:10px;
   max-height:340px;overflow-y:auto;z-index:1000;
-  box-shadow:0 8px 24px rgba(0,0,0,0.25);
+  box-shadow:0 12px 32px rgba(0,0,0,0.5);
+  backdrop-filter:none;
 }
 .search-dropdown-item{
   display:flex;align-items:center;justify-content:space-between;
   padding:10px 14px;cursor:pointer;border-bottom:1px solid var(--border);
-  transition:background .12s;
+  transition:background .12s;background:var(--bg2);
 }
 .search-dropdown-item:last-child{border-bottom:none;}
 .search-dropdown-item:hover,.search-dropdown-item.sel{background:var(--bg3);}
@@ -547,8 +582,9 @@ body::before{
 .search-dropdown-item .sd-market.kr{background:rgba(74,158,255,0.15);color:#4a9eff;}
 .search-dropdown-item .sd-market.us{background:rgba(38,215,130,0.15);color:#26d782;}
 .search-dropdown-section-title{
-  padding:6px 14px;font-size:10px;font-weight:700;color:var(--text3);
+  padding:7px 14px;font-size:10px;font-weight:700;color:var(--text3);
   background:var(--bg3);text-transform:uppercase;letter-spacing:0.5px;
+  border-bottom:1px solid var(--border);
 }
 
 /* Guru cards */
@@ -1036,7 +1072,49 @@ body::before{
                 <button class="btn btn-sm" onclick="clearSupportLines()">전체삭제</button>
                 <span id="sl-list" style="font-size:10px;color:var(--text2)"></span>
               </div>
-              <div class="cw" style="height:300px"><canvas id="pc"></canvas></div>
+
+              <!-- 차트 도구 패널 -->
+              <div class="chart-tools">
+                <div class="ct-group">
+                  <button class="ct-btn on" data-tool="none" onclick="setChartTool('none')" title="기본 (클릭 시 지지/저항선)">
+                    <span data-icon="pin" data-icon-size="13" class="ico"></span>
+                    <span class="ct-label">선 그리기</span>
+                  </button>
+                  <button class="ct-btn" data-tool="pen" onclick="setChartTool('pen')" title="자유 그리기">
+                    <span data-icon="pen" data-icon-size="13" class="ico"></span>
+                    <span class="ct-label">펜</span>
+                  </button>
+                  <button class="ct-btn" data-tool="line" onclick="setChartTool('line')" title="직선">
+                    <span data-icon="line" data-icon-size="13" class="ico"></span>
+                    <span class="ct-label">직선</span>
+                  </button>
+                  <button class="ct-btn" data-tool="rect" onclick="setChartTool('rect')" title="사각형">
+                    <span data-icon="rect" data-icon-size="13" class="ico"></span>
+                    <span class="ct-label">박스</span>
+                  </button>
+                  <button class="ct-btn" data-tool="eraser" onclick="setChartTool('eraser')" title="지우개">
+                    <span data-icon="eraser" data-icon-size="13" class="ico"></span>
+                    <span class="ct-label">지우개</span>
+                  </button>
+                </div>
+                <div class="ct-group">
+                  <div class="ct-color-row">
+                    <button class="ct-color sel" style="background:#26d782" onclick="setDrawColor('#26d782',this)"></button>
+                    <button class="ct-color" style="background:#ff5b6e" onclick="setDrawColor('#ff5b6e',this)"></button>
+                    <button class="ct-color" style="background:#4a9eff" onclick="setDrawColor('#4a9eff',this)"></button>
+                    <button class="ct-color" style="background:#f5b53d" onclick="setDrawColor('#f5b53d',this)"></button>
+                    <button class="ct-color" style="background:#ffffff" onclick="setDrawColor('#ffffff',this)"></button>
+                  </div>
+                  <button class="btn btn-sm" onclick="clearDrawings()" title="그림 모두 지우기">전체 삭제</button>
+                  <button class="btn btn-sm" onclick="resetZoom()" title="줌 초기화">🔍 리셋</button>
+                  <button class="btn btn-sm btn-icon" onclick="shareAnalysis()" title="분석 화면 공유"><span data-icon="share" data-icon-size="13" class="ico"></span>공유</button>
+                </div>
+              </div>
+
+              <div class="cw chart-wrap" style="height:300px;position:relative">
+                <canvas id="pc"></canvas>
+                <canvas id="pc-draw" class="chart-draw-layer"></canvas>
+              </div>
               <div class="sl" style="margin-top:18px">RSI (14) · 70↑ 과매수 / 30↓ 과매도</div>
               <div class="cw" style="height:130px;margin-bottom:14px"><canvas id="rc"></canvas></div>
               <div class="sl">MACD (12, 26, 9)</div>
@@ -1478,6 +1556,16 @@ const f2=n=>n==null||isNaN(n)?'—':n.toFixed(2);
 const ICONS = {
   // Navigation
   home: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11.5L12 4l9 7.5"/><path d="M5 10v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V10"/><path d="M9 21V13h6v8"/></svg>',
+  moon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>',
+  sun: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>',
+  'chevron-left': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>',
+  'chevron-right': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>',
+  grid: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>',
+  pen: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/><circle cx="11" cy="11" r="2"/></svg>',
+  line: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="20" x2="20" y2="4"/></svg>',
+  rect: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5" width="16" height="14" rx="1"/></svg>',
+  eraser: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20H7L3 16a2 2 0 0 1 0-3l9-9a2 2 0 0 1 3 0l5 5a2 2 0 0 1 0 3l-7 7"/><path d="M14 7l5 5"/></svg>',
+  share: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>',
   chart: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-7"/><circle cx="7" cy="14" r="1.2" fill="currentColor"/><circle cx="11" cy="10" r="1.2" fill="currentColor"/><circle cx="14" cy="13" r="1.2" fill="currentColor"/></svg>',
   star: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.5l2.9 6.3 6.6.8-4.9 4.5 1.3 6.6L12 17.4 6.1 20.7l1.3-6.6L2.5 9.6l6.6-.8z"/></svg>',
   star_filled: '<svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M12 2.5l2.9 6.3 6.6.8-4.9 4.5 1.3 6.6L12 17.4 6.1 20.7l1.3-6.6L2.5 9.6l6.6-.8z"/></svg>',
@@ -1550,6 +1638,400 @@ function saveWatchlist(){try{localStorage.setItem('wl3',JSON.stringify(watchlist
 function loadWatchlist(){try{const s=localStorage.getItem('wl3');if(s)watchlist=JSON.parse(s);}catch(e){}}
 function saveSupportLines(){try{localStorage.setItem('sl3_'+(D?.tk||''),JSON.stringify(SUPPORT_LINES));}catch(e){}}
 function loadSupportLines(tk){try{const s=localStorage.getItem('sl3_'+tk);SUPPORT_LINES=s?JSON.parse(s):[];}catch(e){SUPPORT_LINES=[];}}
+
+// ═══════════════════════════════════════════════════════════
+// 차트 도구 (자유 그리기 + 줌/팬 + 클릭 지지선)
+// ═══════════════════════════════════════════════════════════
+let CHART_TOOL='none';
+let DRAW_COLOR='#26d782';
+let DRAW_STROKES=[];  // {type, color, points} 또는 {type:line, color, x1,y1,x2,y2}
+let DRAWING_NOW=false;
+let CURRENT_STROKE=null;
+let DRAW_START=null;
+let CHART_ZOOM_SETUP=false;
+
+function setChartTool(tool){
+  CHART_TOOL=tool;
+  document.querySelectorAll('.ct-btn').forEach(b=>b.classList.toggle('on',b.dataset.tool===tool));
+  const wrap=document.querySelector('.chart-wrap');
+  if(!wrap)return;
+  wrap.classList.remove('drawing','tool-eraser');
+  if(tool!=='none')wrap.classList.add('drawing');
+  if(tool==='eraser')wrap.classList.add('tool-eraser');
+}
+
+function setDrawColor(color,el){
+  DRAW_COLOR=color;
+  document.querySelectorAll('.ct-color').forEach(b=>b.classList.remove('sel'));
+  if(el)el.classList.add('sel');
+}
+
+function setupDrawLayer(){
+  const canvas=$('pc-draw');
+  if(!canvas)return;
+  // 캔버스 리사이즈
+  const resize=()=>{
+    const wrap=canvas.parentElement;
+    const dpr=window.devicePixelRatio||1;
+    canvas.width=wrap.clientWidth*dpr;
+    canvas.height=wrap.clientHeight*dpr;
+    canvas.style.width=wrap.clientWidth+'px';
+    canvas.style.height=wrap.clientHeight+'px';
+    const ctx=canvas.getContext('2d');
+    ctx.scale(dpr,dpr);
+    redrawAllStrokes();
+  };
+  resize();
+  // 리사이즈 옵저버
+  if(!canvas._observer){
+    const obs=new ResizeObserver(resize);
+    obs.observe(canvas.parentElement);
+    canvas._observer=obs;
+  }
+
+  // 이벤트 핸들러 (중복 방지)
+  if(canvas._setup)return;
+  canvas._setup=true;
+
+  const getPos=(e)=>{
+    const rect=canvas.getBoundingClientRect();
+    const x=(e.touches?e.touches[0].clientX:e.clientX)-rect.left;
+    const y=(e.touches?e.touches[0].clientY:e.clientY)-rect.top;
+    return {x,y};
+  };
+
+  const startDraw=(e)=>{
+    if(CHART_TOOL==='none')return;
+    e.preventDefault();
+    const pos=getPos(e);
+    if(CHART_TOOL==='eraser'){
+      eraseStroke(pos);
+      return;
+    }
+    DRAWING_NOW=true;
+    DRAW_START=pos;
+    if(CHART_TOOL==='pen'){
+      CURRENT_STROKE={type:'pen',color:DRAW_COLOR,points:[pos]};
+    }else{
+      CURRENT_STROKE={type:CHART_TOOL,color:DRAW_COLOR,x1:pos.x,y1:pos.y,x2:pos.x,y2:pos.y};
+    }
+  };
+
+  const moveDraw=(e)=>{
+    if(!DRAWING_NOW||!CURRENT_STROKE)return;
+    e.preventDefault();
+    const pos=getPos(e);
+    if(CHART_TOOL==='pen'){
+      CURRENT_STROKE.points.push(pos);
+    }else{
+      CURRENT_STROKE.x2=pos.x;
+      CURRENT_STROKE.y2=pos.y;
+    }
+    redrawAllStrokes(CURRENT_STROKE);
+  };
+
+  const endDraw=(e)=>{
+    if(!DRAWING_NOW)return;
+    DRAWING_NOW=false;
+    if(CURRENT_STROKE){
+      DRAW_STROKES.push(CURRENT_STROKE);
+      saveDrawings();
+    }
+    CURRENT_STROKE=null;
+    redrawAllStrokes();
+  };
+
+  // 마우스
+  canvas.addEventListener('mousedown',startDraw);
+  canvas.addEventListener('mousemove',moveDraw);
+  canvas.addEventListener('mouseup',endDraw);
+  canvas.addEventListener('mouseleave',endDraw);
+  // 터치
+  canvas.addEventListener('touchstart',startDraw,{passive:false});
+  canvas.addEventListener('touchmove',moveDraw,{passive:false});
+  canvas.addEventListener('touchend',endDraw);
+}
+
+function redrawAllStrokes(extra){
+  const canvas=$('pc-draw');
+  if(!canvas)return;
+  const ctx=canvas.getContext('2d');
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  const allStrokes=extra?[...DRAW_STROKES,extra]:DRAW_STROKES;
+  for(const s of allStrokes){
+    ctx.strokeStyle=s.color;
+    ctx.lineWidth=2.5;
+    ctx.lineCap='round';
+    ctx.lineJoin='round';
+    if(s.type==='pen'){
+      ctx.beginPath();
+      s.points.forEach((p,i)=>{
+        if(i===0)ctx.moveTo(p.x,p.y);
+        else ctx.lineTo(p.x,p.y);
+      });
+      ctx.stroke();
+    }else if(s.type==='line'){
+      ctx.beginPath();
+      ctx.moveTo(s.x1,s.y1);
+      ctx.lineTo(s.x2,s.y2);
+      ctx.stroke();
+    }else if(s.type==='rect'){
+      ctx.strokeRect(s.x1,s.y1,s.x2-s.x1,s.y2-s.y1);
+    }
+  }
+}
+
+function eraseStroke(pos){
+  // 가까운 stroke 찾아서 제거
+  const threshold=15;
+  let removed=false;
+  for(let i=DRAW_STROKES.length-1;i>=0;i--){
+    const s=DRAW_STROKES[i];
+    if(s.type==='pen'){
+      if(s.points.some(p=>Math.hypot(p.x-pos.x,p.y-pos.y)<threshold)){
+        DRAW_STROKES.splice(i,1);removed=true;break;
+      }
+    }else if(s.type==='line'){
+      // 선과의 거리
+      const dist=pointToLineDistance(pos,{x:s.x1,y:s.y1},{x:s.x2,y:s.y2});
+      if(dist<threshold){DRAW_STROKES.splice(i,1);removed=true;break;}
+    }else if(s.type==='rect'){
+      // 사각형 경계 근처
+      const xMin=Math.min(s.x1,s.x2),xMax=Math.max(s.x1,s.x2);
+      const yMin=Math.min(s.y1,s.y2),yMax=Math.max(s.y1,s.y2);
+      const inside=pos.x>=xMin&&pos.x<=xMax&&pos.y>=yMin&&pos.y<=yMax;
+      const nearEdge=Math.abs(pos.x-xMin)<threshold||Math.abs(pos.x-xMax)<threshold||Math.abs(pos.y-yMin)<threshold||Math.abs(pos.y-yMax)<threshold;
+      if(inside&&nearEdge){DRAW_STROKES.splice(i,1);removed=true;break;}
+    }
+  }
+  if(removed){saveDrawings();redrawAllStrokes();}
+}
+
+function pointToLineDistance(p,a,b){
+  const A=p.x-a.x,B=p.y-a.y,C=b.x-a.x,D=b.y-a.y;
+  const dot=A*C+B*D;
+  const lenSq=C*C+D*D;
+  const param=lenSq?dot/lenSq:-1;
+  let xx,yy;
+  if(param<0){xx=a.x;yy=a.y;}
+  else if(param>1){xx=b.x;yy=b.y;}
+  else{xx=a.x+param*C;yy=a.y+param*D;}
+  return Math.hypot(p.x-xx,p.y-yy);
+}
+
+function clearDrawings(){
+  if(!DRAW_STROKES.length)return;
+  if(!confirm('차트의 모든 그림을 삭제하시겠습니까?'))return;
+  DRAW_STROKES=[];
+  saveDrawings();
+  redrawAllStrokes();
+}
+
+function saveDrawings(){
+  if(!D)return;
+  try{localStorage.setItem('drawings_'+D.tk,JSON.stringify(DRAW_STROKES));}catch(e){}
+}
+
+function loadDrawings(tk){
+  try{
+    const s=localStorage.getItem('drawings_'+tk);
+    DRAW_STROKES=s?JSON.parse(s):[];
+  }catch(e){DRAW_STROKES=[];}
+  redrawAllStrokes();
+}
+
+// ═══════════════════════════════════════════════════════════
+// 차트 클릭으로 지지선 추가 (도구가 'none'일 때)
+// ═══════════════════════════════════════════════════════════
+function setupChartClickHandler(){
+  const canvas=$('pc');
+  if(!canvas||canvas._clickSetup)return;
+  canvas._clickSetup=true;
+  canvas.addEventListener('click',(e)=>{
+    if(CHART_TOOL!=='none')return;
+    if(!CH.price||!D)return;
+    const rect=canvas.getBoundingClientRect();
+    const y=e.clientY-rect.top;
+    // Chart.js에서 y 좌표 → 가격 변환
+    const chartArea=CH.price.chartArea;
+    if(!chartArea||y<chartArea.top||y>chartArea.bottom)return;
+    const yScale=CH.price.scales.y;
+    if(!yScale)return;
+    const price=yScale.getValueForPixel(y);
+    if(!price||isNaN(price))return;
+    const currentPrice=D.cp;
+    const type=price>currentPrice?'resistance':'support';
+    const typeLabel=type==='resistance'?'저항':'지지';
+    if(!confirm(`${typeLabel}선을 ${price.toFixed(2)}에 추가할까요?`))return;
+    SUPPORT_LINES.push({price:+price.toFixed(2),type});
+    saveSupportLines();
+    drawPrice();
+    renderSupportList();
+    toast(`${typeLabel}선 추가됨: ${fu(price)}`);
+  });
+}
+
+// ═══════════════════════════════════════════════════════════
+// 줌 / 팬 (마우스 휠 + 드래그)
+// ═══════════════════════════════════════════════════════════
+let ZOOM_RANGE=null;  // {min, max} 또는 null (전체)
+
+function setupChartZoom(){
+  const canvas=$('pc');
+  if(!canvas||canvas._zoomSetup)return;
+  canvas._zoomSetup=true;
+  // 마우스 휠로 줌
+  canvas.addEventListener('wheel',(e)=>{
+    if(CHART_TOOL!=='none')return;
+    if(!CH.price||!D||!D.cl)return;
+    e.preventDefault();
+    const len=D.cl.length;
+    if(!ZOOM_RANGE)ZOOM_RANGE={min:0,max:len-1};
+    const range=ZOOM_RANGE.max-ZOOM_RANGE.min;
+    const center=(ZOOM_RANGE.min+ZOOM_RANGE.max)/2;
+    // 줌 인/아웃
+    const factor=e.deltaY>0?1.15:0.87;
+    let newRange=range*factor;
+    if(newRange<10)newRange=10;
+    if(newRange>=len){
+      ZOOM_RANGE=null;
+      drawPrice();
+      return;
+    }
+    let newMin=Math.max(0,Math.round(center-newRange/2));
+    let newMax=Math.min(len-1,Math.round(center+newRange/2));
+    ZOOM_RANGE={min:newMin,max:newMax};
+    drawPrice();
+  },{passive:false});
+
+  // 드래그로 팬
+  let panning=false,panStartX=0,panStartRange=null;
+  canvas.addEventListener('mousedown',(e)=>{
+    if(CHART_TOOL!=='none')return;
+    if(!ZOOM_RANGE)return;
+    panning=true;
+    panStartX=e.clientX;
+    panStartRange={...ZOOM_RANGE};
+    canvas.style.cursor='grabbing';
+  });
+  canvas.addEventListener('mousemove',(e)=>{
+    if(!panning||!panStartRange||!D)return;
+    const dx=e.clientX-panStartX;
+    const rect=canvas.getBoundingClientRect();
+    const width=rect.width;
+    const rangeWidth=panStartRange.max-panStartRange.min;
+    const dataPerPixel=rangeWidth/width;
+    const shift=Math.round(-dx*dataPerPixel);
+    let newMin=panStartRange.min+shift;
+    let newMax=panStartRange.max+shift;
+    const len=D.cl.length;
+    if(newMin<0){newMax-=newMin;newMin=0;}
+    if(newMax>=len){newMin-=(newMax-len+1);newMax=len-1;}
+    if(newMin<0)newMin=0;
+    ZOOM_RANGE={min:newMin,max:newMax};
+    drawPrice();
+  });
+  const endPan=()=>{panning=false;canvas.style.cursor='';};
+  canvas.addEventListener('mouseup',endPan);
+  canvas.addEventListener('mouseleave',endPan);
+
+  // 터치 핀치 줌
+  let touchStartDist=0,touchStartRange=null;
+  canvas.addEventListener('touchstart',(e)=>{
+    if(e.touches.length===2&&D&&D.cl){
+      const dx=e.touches[0].clientX-e.touches[1].clientX;
+      const dy=e.touches[0].clientY-e.touches[1].clientY;
+      touchStartDist=Math.hypot(dx,dy);
+      touchStartRange=ZOOM_RANGE?{...ZOOM_RANGE}:{min:0,max:D.cl.length-1};
+    }
+  },{passive:true});
+  canvas.addEventListener('touchmove',(e)=>{
+    if(e.touches.length===2&&touchStartRange&&D){
+      e.preventDefault();
+      const dx=e.touches[0].clientX-e.touches[1].clientX;
+      const dy=e.touches[0].clientY-e.touches[1].clientY;
+      const dist=Math.hypot(dx,dy);
+      const factor=touchStartDist/dist;
+      const center=(touchStartRange.min+touchStartRange.max)/2;
+      const startRange=touchStartRange.max-touchStartRange.min;
+      let newRange=Math.max(10,startRange*factor);
+      const len=D.cl.length;
+      if(newRange>=len){ZOOM_RANGE=null;drawPrice();return;}
+      let newMin=Math.max(0,Math.round(center-newRange/2));
+      let newMax=Math.min(len-1,Math.round(center+newRange/2));
+      ZOOM_RANGE={min:newMin,max:newMax};
+      drawPrice();
+    }
+  },{passive:false});
+}
+
+function resetZoom(){
+  ZOOM_RANGE=null;
+  if(D)drawPrice();
+  toast('줌 초기화됨');
+}
+
+// ═══════════════════════════════════════════════════════════
+// 분석 화면 공유 (이미지 캡처)
+// ═══════════════════════════════════════════════════════════
+async function shareAnalysis(){
+  if(!D){toast('먼저 종목을 검색해주세요');return;}
+  try{
+    // 단순히 차트 캔버스를 이미지로 변환
+    const canvas=$('pc');
+    if(!canvas){toast('차트 없음');return;}
+    // 합성 이미지: 가격 차트 + 그림 레이어
+    const composite=document.createElement('canvas');
+    composite.width=canvas.width;
+    composite.height=canvas.height;
+    const ctx=composite.getContext('2d');
+    // 배경
+    const bg=getComputedStyle(document.documentElement).getPropertyValue('--bg').trim()||'#0a1628';
+    ctx.fillStyle=bg;
+    ctx.fillRect(0,0,composite.width,composite.height);
+    // 차트
+    ctx.drawImage(canvas,0,0);
+    // 그림 레이어
+    const draw=$('pc-draw');
+    if(draw)ctx.drawImage(draw,0,0);
+    // 워터마크
+    ctx.fillStyle='rgba(255,255,255,0.5)';
+    ctx.font='bold 14px Inter,sans-serif';
+    ctx.textAlign='right';
+    ctx.fillText('PULSA · '+D.tk+' · '+fu(D.cp),composite.width-20,composite.height-15);
+    // Blob으로 변환
+    composite.toBlob(async(blob)=>{
+      if(!blob){toast('이미지 생성 실패');return;}
+      // Web Share API 시도
+      if(navigator.share&&navigator.canShare){
+        const file=new File([blob],`pulsa-${D.tk}.png`,{type:'image/png'});
+        try{
+          if(navigator.canShare({files:[file]})){
+            await navigator.share({
+              files:[file],
+              title:`PULSA ${D.tk} 분석`,
+              text:`${D.tk} 현재가 ${fu(D.cp)} (${D.dcp>=0?'+':''}${D.dcp.toFixed(2)}%)`,
+            });
+            return;
+          }
+        }catch(e){
+          if(e.name==='AbortError')return;  // 사용자 취소
+        }
+      }
+      // 폴백: 다운로드
+      const url=URL.createObjectURL(blob);
+      const a=document.createElement('a');
+      a.href=url;a.download=`pulsa-${D.tk}-${new Date().toISOString().split('T')[0]}.png`;
+      document.body.appendChild(a);a.click();
+      document.body.removeChild(a);
+      setTimeout(()=>URL.revokeObjectURL(url),1000);
+      toast('이미지 다운로드됨');
+    },'image/png');
+  }catch(e){
+    toast('공유 실패: '+e.message);
+  }
+}
+
 function saveEventAlerts(){try{localStorage.setItem('ea1',JSON.stringify(EVENT_ALERTS));}catch(e){}}
 function loadEventAlerts(){try{const s=localStorage.getItem('ea1');if(s)EVENT_ALERTS=JSON.parse(s);}catch(e){}}
 
@@ -2124,6 +2606,9 @@ async function go(){
     const ls=[...d.sig].reverse().find(v=>v!=null);
     D={...d,lr,lm,ls};
     loadSupportLines(d.tk);
+    loadDrawings(d.tk);
+    ZOOM_RANGE=null;  // 새 종목 시 줌 초기화
+    setChartTool('none');  // 도구 기본값
 
     // 데이터 소스: Finnhub (메트릭/프로필/ETF) + Twelve Data + FMP (목표가/profile) + 자체 ETF API + Yahoo (차트)
     let recommend=null, finProfile=null, finMetric=null, twelveTarget=null, twelveStats=null, fmpProfile=null, fmpTarget=null, fmpEtf=null, ourEtf=null;
@@ -2535,10 +3020,16 @@ function drawPrice(){
       ...slDatasets
     ]},options:{responsive:true,maintainAspectRatio:false,animation:false,
       plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.dataset.label+': $'+f2(c.parsed.y)},backgroundColor:'rgba(10,22,40,0.95)'}},
-      scales:{x:{grid:{display:false},ticks:{maxTicksLimit:8,font:{size:10,family:'JetBrains Mono'},color:txt2,autoSkip:true}},
+      scales:{x:{grid:{display:false},ticks:{maxTicksLimit:8,font:{size:10,family:'JetBrains Mono'},color:txt2,autoSkip:true},min:ZOOM_RANGE?ZOOM_RANGE.min:undefined,max:ZOOM_RANGE?ZOOM_RANGE.max:undefined},
       y:{grid:{color:'rgba(150,150,170,.08)'},ticks:{font:{size:10,family:'JetBrains Mono'},color:txt2,callback:v=>'$'+f2(v)}}}}});
   }
   renderSupportList();
+  // 차트 도구 설정 (이벤트 핸들러 + 그림 레이어 복원)
+  setTimeout(()=>{
+    setupChartClickHandler();
+    setupChartZoom();
+    setupDrawLayer();
+  },100);
 }
 
 function drawSigs(){
