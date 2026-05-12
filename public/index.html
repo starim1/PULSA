@@ -739,7 +739,7 @@ body::before{
 }
 .cal-view-toggle button.on{background:var(--accent);color:#fff;border-color:var(--accent);}
 .cal-month-header{
-  display:flex;align-items:center;gap:8px;margin-bottom:10px;
+  display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap;
 }
 .cal-grid{
   display:grid;grid-template-columns:repeat(7,1fr);gap:3px;
@@ -774,8 +774,27 @@ body::before{
 .cal-cell-event.watch{background:rgba(38,215,130,0.15);color:#26d782;}
 .cal-cell-more{font-size:9px;color:var(--text3);font-weight:600;}
 @media (max-width:600px){
-  .cal-cell{min-height:46px;font-size:10px;}
-  .cal-day-num{font-size:11px;}
+  .cal-grid{padding:4px;gap:2px;}
+  .cal-cell{
+    min-height:42px;padding:3px 2px;font-size:9px;
+    overflow:hidden;
+  }
+  .cal-day-num{font-size:10.5px;line-height:1.2;}
+  .cal-cell-event{
+    font-size:0;line-height:0;padding:0;height:4px;border-radius:2px;
+  }
+  .cal-cell-event.econ{background:#4a9eff;}
+  .cal-cell-event.earn{background:#f5b53d;}
+  .cal-cell-event.holiday{background:#ff5b6e;}
+  .cal-cell-event.watch{background:#26d782;}
+  .cal-cell-events{
+    flex-direction:row;flex-wrap:wrap;gap:2px;align-items:flex-start;
+  }
+  .cal-cell-more{font-size:8.5px;color:var(--text3);font-weight:600;width:100%;text-align:left;line-height:1;margin-top:2px;}
+  .cal-dow{font-size:9.5px;padding:3px 0;}
+}
+@media (max-width:380px){
+  .cal-cell{min-height:38px;}
 }
 .cal-filter button{
   padding:6px 12px;font-size:11px;cursor:pointer;border-radius:7px;
@@ -1076,9 +1095,9 @@ body::before{
               <!-- 차트 도구 패널 -->
               <div class="chart-tools">
                 <div class="ct-group">
-                  <button class="ct-btn on" data-tool="none" onclick="setChartTool('none')" title="기본 (클릭 시 지지/저항선)">
+                  <button class="ct-btn on" data-tool="none" onclick="setChartTool('none')" title="차트 클릭 시 지지/저항선 추가">
                     <span data-icon="pin" data-icon-size="13" class="ico"></span>
-                    <span class="ct-label">선 그리기</span>
+                    <span class="ct-label">가격선</span>
                   </button>
                   <button class="ct-btn" data-tool="pen" onclick="setChartTool('pen')" title="자유 그리기">
                     <span data-icon="pen" data-icon-size="13" class="ico"></span>
@@ -1111,6 +1130,7 @@ body::before{
                 </div>
               </div>
 
+              <div id="chart-tool-hint" style="font-size:10.5px;color:var(--text2);margin-bottom:8px;text-align:center"></div>
               <div class="cw chart-wrap" style="height:300px;position:relative">
                 <canvas id="pc"></canvas>
                 <canvas id="pc-draw" class="chart-draw-layer"></canvas>
@@ -1658,6 +1678,24 @@ function setChartTool(tool){
   wrap.classList.remove('drawing','tool-eraser');
   if(tool!=='none')wrap.classList.add('drawing');
   if(tool==='eraser')wrap.classList.add('tool-eraser');
+  // 차트 캔버스 커서
+  const pc=$('pc');
+  if(pc){
+    if(tool==='none')pc.style.cursor='crosshair';
+    else pc.style.cursor='';
+  }
+  // 안내 텍스트
+  const hint=$('chart-tool-hint');
+  if(hint){
+    const hints={
+      'none':'💡 차트 위 원하는 가격을 클릭하면 지지선/저항선이 추가됩니다',
+      'pen':'✏️ 차트 위에 자유롭게 그릴 수 있습니다',
+      'line':'📏 두 점을 클릭&드래그하면 직선이 그어집니다',
+      'rect':'⬛ 드래그하면 사각형 영역이 표시됩니다',
+      'eraser':'🧹 지우고 싶은 그림 가까이 클릭하세요',
+    };
+    hint.textContent=hints[tool]||'';
+  }
 }
 
 function setDrawColor(color,el){
@@ -1849,25 +1887,25 @@ function setupChartClickHandler(){
   canvas._clickSetup=true;
   canvas.addEventListener('click',(e)=>{
     if(CHART_TOOL!=='none')return;
-    if(!CH.price||!D)return;
+    if(!CH.p||!D)return;  // CH.price → CH.p (실제 키)
     const rect=canvas.getBoundingClientRect();
     const y=e.clientY-rect.top;
     // Chart.js에서 y 좌표 → 가격 변환
-    const chartArea=CH.price.chartArea;
+    const chartArea=CH.p.chartArea;
     if(!chartArea||y<chartArea.top||y>chartArea.bottom)return;
-    const yScale=CH.price.scales.y;
+    const yScale=CH.p.scales.y;
     if(!yScale)return;
     const price=yScale.getValueForPixel(y);
     if(!price||isNaN(price))return;
     const currentPrice=D.cp;
     const type=price>currentPrice?'resistance':'support';
     const typeLabel=type==='resistance'?'저항':'지지';
-    if(!confirm(`${typeLabel}선을 ${price.toFixed(2)}에 추가할까요?`))return;
+    if(!confirm(`${typeLabel}선을 ${fu(price)}에 추가할까요?`))return;
     SUPPORT_LINES.push({price:+price.toFixed(2),type});
     saveSupportLines();
     drawPrice();
     renderSupportList();
-    toast(`${typeLabel}선 추가됨: ${fu(price)}`);
+    toast(`${typeLabel}선 추가: ${fu(price)}`);
   });
 }
 
@@ -1883,7 +1921,7 @@ function setupChartZoom(){
   // 마우스 휠로 줌
   canvas.addEventListener('wheel',(e)=>{
     if(CHART_TOOL!=='none')return;
-    if(!CH.price||!D||!D.cl)return;
+    if(!CH.p||!D||!D.cl)return;
     e.preventDefault();
     const len=D.cl.length;
     if(!ZOOM_RANGE)ZOOM_RANGE={min:0,max:len-1};
@@ -3029,6 +3067,14 @@ function drawPrice(){
     setupChartClickHandler();
     setupChartZoom();
     setupDrawLayer();
+    // 초기 hint 표시
+    const hint=$('chart-tool-hint');
+    if(hint&&!hint.textContent){
+      hint.textContent='💡 차트 위 원하는 가격을 클릭하면 지지선/저항선이 추가됩니다';
+    }
+    // 차트 캔버스 cursor crosshair
+    const pc=$('pc');
+    if(pc&&CHART_TOOL==='none')pc.style.cursor='crosshair';
   },100);
 }
 
@@ -4027,13 +4073,29 @@ async function loadGuruPortfolio(idx){
     </div>
     <div class="ltxt" style="text-align:left">🤖 AI가 최신 13F 공시 데이터를 검색 중... (15~30초)</div>
   </div>`;
-  // 24시간 캐시
+  // 분기 자동 인식 캐시 (13F는 분기별 공시)
+  // 현재 분기 계산: 1-3월=Q4 전(올해 Q1 발표는 45일 후), 4-6월=Q1, 7-9월=Q2, 10-12월=Q3
+  const now=new Date();
+  const month=now.getMonth();  // 0-11
+  const year=now.getFullYear();
+  // 13F는 분기 끝 후 45일 이내 공시 → 사용 가능한 가장 최신 분기
+  let availQuarter;
+  if(month<=1)availQuarter=`${year-1}Q3`;       // 1-2월 → 작년 Q3 (Q4는 2월 15일 마감)
+  else if(month===2)availQuarter=`${year-1}Q4`; // 3월 → 작년 Q4
+  else if(month<=4)availQuarter=`${year-1}Q4`;  // 4-5월 → 작년 Q4 (Q1은 5월 15일 마감)
+  else if(month===5)availQuarter=`${year}Q1`;   // 6월 → 올해 Q1
+  else if(month<=7)availQuarter=`${year}Q1`;    // 7-8월 → 올해 Q1 (Q2는 8월 15일 마감)
+  else if(month===8)availQuarter=`${year}Q2`;   // 9월 → 올해 Q2
+  else if(month<=10)availQuarter=`${year}Q2`;   // 10-11월 → 올해 Q2 (Q3는 11월 15일 마감)
+  else availQuarter=`${year}Q3`;                // 12월 → 올해 Q3
+
   const cacheKey=`guru_${idx}`;
   try{
     const cached=localStorage.getItem(cacheKey);
     if(cached){
-      const {data,time}=JSON.parse(cached);
-      if(Date.now()-time<24*60*60*1000){
+      const {data,time,quarter:cachedQ}=JSON.parse(cached);
+      // 같은 분기면 30일 캐시, 분기 바뀌면 강제 무효화
+      if(cachedQ===availQuarter&&Date.now()-time<30*24*60*60*1000){
         renderGuruResult(g,data);
         return;
       }
@@ -4077,7 +4139,7 @@ WhaleWisdom, Stockcircle, SEC EDGAR 공식 13F 등을 검색해 정확한 최신
       out.innerHTML=`<div class="card"><div class="ltxt">JSON 파싱 실패</div></div>`;
       return;
     }
-    try{localStorage.setItem(cacheKey,JSON.stringify({data,time:Date.now()}));}catch(e){}
+    try{localStorage.setItem(cacheKey,JSON.stringify({data,time:Date.now(),quarter:availQuarter}));}catch(e){}
     renderGuruResult(g,data);
   }catch(e){
     out.innerHTML=`<div class="card"><div class="ltxt">로드 실패: ${e.message}</div></div>`;
@@ -6117,6 +6179,39 @@ function getKoreanPreOpenTime(){
 
 loadPF();loadAl();loadWatchlist();loadEventAlerts();loadAlertInbox();loadSearchHistory();loadWatchGroups();applyStoredTheme();
 autoCleanupAlerts();  // 7일 지난 알림 자동 삭제
+checkQuarterChange();  // 분기 변경 감지 (거장 포트폴리오 갱신 안내)
+
+// 분기 변경 감지 → 거장 포트폴리오 캐시 무효화 + 알림
+function checkQuarterChange(){
+  const now=new Date();
+  const month=now.getMonth();
+  const year=now.getFullYear();
+  // 13F 가용 분기 계산
+  let availQ;
+  if(month<=1)availQ=`${year-1}Q3`;
+  else if(month===2)availQ=`${year-1}Q4`;
+  else if(month<=4)availQ=`${year-1}Q4`;
+  else if(month===5)availQ=`${year}Q1`;
+  else if(month<=7)availQ=`${year}Q1`;
+  else if(month===8)availQ=`${year}Q2`;
+  else if(month<=10)availQ=`${year}Q2`;
+  else availQ=`${year}Q3`;
+  let lastQ;
+  try{lastQ=localStorage.getItem('last_seen_quarter');}catch(e){}
+  if(lastQ&&lastQ!==availQ){
+    // 분기 변경됨 - 모든 거장 캐시 무효화
+    try{
+      for(let i=0;i<20;i++){localStorage.removeItem(`guru_${i}`);}
+    }catch(e){}
+    // 알림 함에 추가
+    addToInbox({
+      type:'quarter',
+      title:`📊 새 분기 13F 공시 시작 (${availQ})`,
+      body:`거장 포트폴리오가 새 분기 데이터로 갱신됩니다. 추천 → 거장 포트폴리오에서 확인하세요.`,
+    });
+  }
+  try{localStorage.setItem('last_seen_quarter',availQ);}catch(e){}
+}
 renderPF();renderAlerts();renderWatchlist();renderAlertInbox();updateAlertBadge();applyAutoAlertsUI();
 fetchKRW();
 
