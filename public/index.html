@@ -6777,45 +6777,113 @@ function updateClock(){const d=new Date();$('tb-time').textContent=d.toLocaleTim
 // US 시장 상태 감지 (NY 시간 기준)
 function updateMarketStatus(){
   const now=new Date();
-  // NY 시간 추출 (서머타임 자동 반영)
+
+  // ─── NY 시간 (서머타임 자동 반영) ───
   const nyStr=now.toLocaleString('en-US',{timeZone:'America/New_York',hour12:false});
   const nyParts=nyStr.match(/(\d+)\/(\d+)\/(\d+),?\s*(\d+):(\d+):(\d+)/);
-  if(!nyParts){return;}
-  const nyHour=parseInt(nyParts[4]);
+  if(!nyParts)return;
+  let nyHour=parseInt(nyParts[4]);
+  if(nyHour===24)nyHour=0;  // 24시 보정
   const nyMin=parseInt(nyParts[5]);
   const nyDate=new Date(now.toLocaleString('en-US',{timeZone:'America/New_York'}));
-  const dow=nyDate.getDay();
-  const totalMin=nyHour*60+nyMin;
+  const nyDow=nyDate.getDay();
+  const nyTotalMin=nyHour*60+nyMin;
 
-  // 한국 시간 (서머타임 자동 적용)
-  const krStr=now.toLocaleString('ko-KR',{timeZone:'Asia/Seoul',hour:'2-digit',minute:'2-digit',hour12:false});
+  // ─── 한국 시간 (서머타임 없음, UTC+9 고정) ───
+  const krStr=now.toLocaleString('ko-KR',{timeZone:'Asia/Seoul',hour12:false});
+  const krParts=krStr.match(/(\d+):(\d+)/);
+  const krHour=krParts?parseInt(krParts[1])%24:0;
+  const krMin=krParts?parseInt(krParts[2]):0;
+  const krDate=new Date(now.toLocaleString('en-US',{timeZone:'Asia/Seoul'}));
+  const krDow=krDate.getDay();
+  const krTotalMin=krHour*60+krMin;
+  const krTimeStr=`${String(krHour).padStart(2,'0')}:${String(krMin).padStart(2,'0')}`;
 
-  const el=$('mkt-status');if(!el)return;
-  let cls='ms-closed',txt='휴장',tip='';
-
-  if(dow===0||dow===6){
-    cls='ms-closed';txt='주말 휴장';
-    tip='미국장은 주말에 열리지 않습니다 (한국 ' + krStr + ')';
-  }else if(totalMin>=240&&totalMin<570){
-    cls='ms-pre';txt='프리장';
-    // 정규장까지 남은 시간 (570분 = 9:30 NY)
-    const left=570-totalMin;
-    const h=Math.floor(left/60),m=left%60;
-    tip=`프리마켓 진행 중 · 정규장까지 ${h>0?h+'시간 ':''}${m}분 (한국 ${krStr})`;
-  }else if(totalMin>=570&&totalMin<960){
-    cls='ms-open';txt='정규장';
-    const left=960-totalMin;
-    const h=Math.floor(left/60),m=left%60;
-    tip=`정규장 진행 중 · 마감까지 ${h>0?h+'시간 ':''}${m}분 (한국 ${krStr})`;
-  }else if(totalMin>=960&&totalMin<1200){
-    cls='ms-after';txt='애프터장';
-    const left=1200-totalMin;
-    const h=Math.floor(left/60),m=left%60;
-    tip=`애프터마켓 진행 중 · 종료까지 ${h>0?h+'시간 ':''}${m}분 (한국 ${krStr})`;
-  }else{
-    cls='ms-closed';txt='장 마감';
-    tip=`미국장 마감 (한국 ${krStr}) · 프리장은 한국 ${getKoreanPreOpenTime()}`;
+  // ─── 미국장 상태 판정 (NY 기준) ───
+  // 프리: 4:00~9:30 (240~570분) / 정규: 9:30~16:00 (570~960분) / 애프터: 16:00~20:00 (960~1200분)
+  // ─── 미국장 상태 판정 (NY 시간 기준, NYSE/Nasdaq 공식) ───
+  // 프리마켓: NY 04:00 ~ 09:30 (240~570분)
+  // 정규장: NY 09:30 ~ 16:00 (570~960분)
+  // 애프터마켓: NY 16:00 ~ 20:00 (960~1200분) - NYSE/Nasdaq 공식
+  // 데이마켓 (Blue Ocean ATS, 대체거래소): NY 전날 20:00 ~ 당일 04:00 (한국 09:00~17:00 서머)
+  // ※ 증권사별 데이마켓 운영 시간은 09:00~16:00 ~ 09:00~18:00 등 다름
+  function getUSStatus(){
+    if(nyDow===6){
+      return {cls:'closed',label:'미국장 주말 휴장'};
+    }
+    if(nyDow===0){
+      // 일요일 NY 20:00부터 월요일 데이마켓 시작
+      if(nyTotalMin>=1200){
+        const leftToPre=(24*60-nyTotalMin)+240;
+        return {cls:'after',label:'미국 데이마켓',left:leftToPre};
+      }
+      return {cls:'closed',label:'미국장 주말 휴장'};
+    }
+    // 평일
+    if(nyTotalMin>=240&&nyTotalMin<570){
+      const left=570-nyTotalMin;
+      return {cls:'pre',label:'미국 프리장',left};
+    }
+    if(nyTotalMin>=570&&nyTotalMin<960){
+      const left=960-nyTotalMin;
+      return {cls:'open',label:'미국 정규장',left};
+    }
+    if(nyTotalMin>=960&&nyTotalMin<1200){
+      const left=1200-nyTotalMin;
+      return {cls:'after',label:'미국 애프터장',left};
+    }
+    // NY 20:00 이후는 데이마켓 (Blue Ocean ATS)
+    // 금요일 20:00 이후는 토요일이라 데이마켓 없음 (블루오션은 평일만)
+    if(nyDow===5&&nyTotalMin>=1200){
+      return {cls:'closed',label:'미국장 주말 휴장'};
+    }
+    let leftToPre;
+    if(nyTotalMin>=1200)leftToPre=(24*60-nyTotalMin)+240;
+    else leftToPre=240-nyTotalMin;
+    return {cls:'after',label:'미국 데이마켓',left:leftToPre};
   }
+
+  // ─── 한국장 상태 판정 (KR 기준) ───
+  // 정규: 9:00~15:30 (540~930분)
+  // 동시호가: 8:30~9:00 / 15:20~15:30 (정규장에 포함 처리)
+  function getKRStatus(){
+    if(krDow===0||krDow===6)return {cls:'closed',label:'한국장 주말 휴장'};
+    if(krTotalMin>=540&&krTotalMin<930){
+      const left=930-krTotalMin;
+      return {cls:'open',label:'한국 정규장',left};
+    }
+    if(krTotalMin>=510&&krTotalMin<540){
+      // 8:30~9:00 동시호가
+      return {cls:'pre',label:'한국 동시호가',left:540-krTotalMin};
+    }
+    return {cls:'closed',label:'한국장 마감'};
+  }
+
+  const us=getUSStatus();
+  const kr=getKRStatus();
+
+  // ─── 우선순위: 둘 다 열렸으면 미국 > 한국 (사용자가 미국 주식 위주)
+  //              열린 게 하나면 그것, 둘 다 마감이면 미국장 마감 표시
+  const prefer=(us.cls!=='closed')?us:(kr.cls!=='closed'?kr:us);
+
+  // CSS class 매핑
+  let cls='ms-closed';
+  if(prefer.cls==='open')cls='ms-open';
+  else if(prefer.cls==='pre')cls='ms-pre';
+  else if(prefer.cls==='after')cls='ms-after';
+
+  // 표시 텍스트
+  let txt=prefer.label;
+  if(prefer.left!==undefined){
+    const h=Math.floor(prefer.left/60),m=prefer.left%60;
+    txt+=` (${h>0?h+'h ':''}${m}m)`;
+  }
+
+  // 툴팁: 두 장 상태 모두 표시
+  const tip=`🇺🇸 ${us.label}${us.left?` · 남은 ${Math.floor(us.left/60)}h ${us.left%60}m`:''}\n🇰🇷 ${kr.label}${kr.left?` · 남은 ${Math.floor(kr.left/60)}h ${kr.left%60}m`:''}\n현재 한국 ${krTimeStr}`;
+
+  const el=$('mkt-status');
+  if(!el)return;
   el.className='mkt-status '+cls;
   el.textContent=txt;
   el.title=tip;
