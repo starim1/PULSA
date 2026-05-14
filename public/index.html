@@ -219,8 +219,12 @@ body::before{
   .ct-btn{padding:6px 8px;}
 }
 .mkt-status{
-  font-size:10px;padding:3px 9px;border-radius:6px;font-weight:700;letter-spacing:0.04em;
+  font-size:10px;padding:5px 11px;border-radius:6px;font-weight:700;letter-spacing:0.04em;
   text-transform:uppercase;display:inline-flex;align-items:center;gap:4px;
+  transition:transform .12s,filter .12s;user-select:none;
+}
+.mkt-status:hover,.mkt-status:active{
+  filter:brightness(1.12);transform:translateY(-1px);
 }
 .mkt-status::before{
   content:'';width:6px;height:6px;border-radius:50%;background:currentColor;
@@ -6862,8 +6866,7 @@ function updateMarketStatus(){
   const us=getUSStatus();
   const kr=getKRStatus();
 
-  // ─── 우선순위: 둘 다 열렸으면 미국 > 한국 (사용자가 미국 주식 위주)
-  //              열린 게 하나면 그것, 둘 다 마감이면 미국장 마감 표시
+  // ─── 우선순위: 미국 > 한국 (미국 주식 위주)
   const prefer=(us.cls!=='closed')?us:(kr.cls!=='closed'?kr:us);
 
   // CSS class 매핑
@@ -6872,21 +6875,163 @@ function updateMarketStatus(){
   else if(prefer.cls==='pre')cls='ms-pre';
   else if(prefer.cls==='after')cls='ms-after';
 
-  // 표시 텍스트
-  let txt=prefer.label;
-  if(prefer.left!==undefined){
-    const h=Math.floor(prefer.left/60),m=prefer.left%60;
-    txt+=` (${h>0?h+'h ':''}${m}m)`;
-  }
+  // 짧은 라벨 추출: "미국 데이마켓" → "데이마켓"
+  let shortLabel=prefer.label
+    .replace(/^미국\s+/,'')
+    .replace(/^한국\s+/,'한국 ');
+  if(prefer.label.includes('휴장'))shortLabel='장 마감';
+  if(prefer.label.includes('휴식'))shortLabel='휴식';
 
-  // 툴팁: 두 장 상태 모두 표시
-  const tip=`🇺🇸 ${us.label}${us.left?` · 남은 ${Math.floor(us.left/60)}h ${us.left%60}m`:''}\n🇰🇷 ${kr.label}${kr.left?` · 남은 ${Math.floor(kr.left/60)}h ${kr.left%60}m`:''}\n현재 한국 ${krTimeStr}`;
+  // 상태 데이터를 전역에 저장 (모달에서 사용)
+  window._marketStatus={us,kr,nyTotalMin,krTotalMin,krTimeStr,nyDow,krDow,prefer};
 
+  // 짧은 표시
   const el=$('mkt-status');
   if(!el)return;
   el.className='mkt-status '+cls;
-  el.textContent=txt;
-  el.title=tip;
+  el.textContent=shortLabel;
+  el.style.cursor='pointer';
+  el.onclick=showMarketDetailModal;
+  el.title='탭하면 상세 정보';
+}
+
+// ═══════════════════════════════════════════════════════════
+// 시장 상태 상세 모달
+// ═══════════════════════════════════════════════════════════
+function showMarketDetailModal(){
+  const s=window._marketStatus;
+  if(!s)return;
+  let modal=$('market-detail-modal');
+  if(!modal){
+    modal=document.createElement('div');
+    modal.id='market-detail-modal';
+    modal.className='modal-overlay';
+    modal.onclick=(e)=>{if(e.target===modal)closeMarketDetailModal();};
+    document.body.appendChild(modal);
+  }
+
+  // 미국 세션 정보 (NY 기준 → 한국 시간으로 변환된 표시)
+  // 현재 NY와 한국 시간 차이 계산 (서머타임 자동 반영)
+  const now=new Date();
+  const nyOff=getTZOffsetHours(now,'America/New_York');
+  const krOff=9;  // 한국 UTC+9 고정
+  const diff=krOff-nyOff;  // 보통 13 (서머) 또는 14 (표준)
+
+  function nyToKr(nyHour,nyMin){
+    let h=nyHour+diff;
+    let m=nyMin;
+    if(h>=24)h-=24;
+    if(h<0)h+=24;
+    return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+  }
+
+  const usSessions=[
+    {key:'data',name:'데이마켓',ny:'20:00~04:00',kr:`${nyToKr(20,0)}~${nyToKr(4,0)}`,note:'대체거래소 (Blue Ocean ATS)'},
+    {key:'pre',name:'프리마켓',ny:'04:00~09:30',kr:`${nyToKr(4,0)}~${nyToKr(9,30)}`,note:'장 시작 전 시간외 거래'},
+    {key:'open',name:'정규장',ny:'09:30~16:00',kr:`${nyToKr(9,30)}~${nyToKr(16,0)}`,note:'NYSE / Nasdaq 공식'},
+    {key:'after',name:'애프터마켓',ny:'16:00~20:00',kr:`${nyToKr(16,0)}~${nyToKr(20,0)}`,note:'장 마감 후 시간외 거래'},
+  ];
+
+  // 현재 활성 세션
+  function isActive(key){
+    if(s.us.cls==='closed')return false;
+    if(key==='data'&&s.us.label==='미국 데이마켓')return true;
+    if(key==='pre'&&s.us.label==='미국 프리장')return true;
+    if(key==='open'&&s.us.label==='미국 정규장')return true;
+    if(key==='after'&&s.us.label==='미국 애프터장')return true;
+    return false;
+  }
+
+  function leftTime(left){
+    if(!left)return '';
+    const h=Math.floor(left/60),m=left%60;
+    return `남은 ${h>0?h+'시간 ':''}${m}분`;
+  }
+
+  // 한국 정규장 상태
+  const krActive=s.kr.cls==='open';
+  const krPre=s.kr.cls==='pre';
+
+  modal.innerHTML=`
+    <div class="modal-content" style="max-width:480px">
+      <div class="modal-head">
+        <div>
+          <div class="modal-title">시장 거래 시간</div>
+          <div class="modal-sub">한국 시간 기준 (서머타임 자동 반영)</div>
+        </div>
+        <button class="modal-close" data-icon="x" data-icon-size="16" onclick="closeMarketDetailModal()"><span class="ico"></span></button>
+      </div>
+      <div style="padding:18px;max-height:70vh;overflow-y:auto">
+        <!-- 미국장 -->
+        <div style="margin-bottom:16px">
+          <div style="font-size:11px;font-weight:700;color:var(--text2);letter-spacing:0.5px;margin-bottom:8px">🇺🇸 미국 주식</div>
+          ${usSessions.map(sess=>{
+            const active=isActive(sess.key);
+            return `<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;margin-bottom:6px;border-radius:8px;background:${active?'var(--accent-soft)':'var(--bg3)'};border:1px solid ${active?'var(--accent)':'var(--border)'}">
+              <div style="flex:1;min-width:0">
+                <div style="font-weight:${active?'700':'600'};font-size:13px;color:${active?'var(--accent)':'var(--text)'};display:flex;align-items:center;gap:6px">
+                  ${active?'●':''} ${sess.name}
+                  ${active&&s.us.left?`<span style="font-size:10px;color:var(--text2);font-weight:500">· ${leftTime(s.us.left)}</span>`:''}
+                </div>
+                <div style="font-size:11px;color:var(--text2);margin-top:3px;font-family:'JetBrains Mono',monospace">한국 ${sess.kr}</div>
+                <div style="font-size:10px;color:var(--text3);margin-top:2px">NY ${sess.ny} · ${sess.note}</div>
+              </div>
+            </div>`;
+          }).join('')}
+        </div>
+
+        <!-- 한국장 -->
+        <div>
+          <div style="font-size:11px;font-weight:700;color:var(--text2);letter-spacing:0.5px;margin-bottom:8px">🇰🇷 한국 주식</div>
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;margin-bottom:6px;border-radius:8px;background:${krPre?'var(--accent-soft)':'var(--bg3)'};border:1px solid ${krPre?'var(--accent)':'var(--border)'}">
+            <div style="flex:1">
+              <div style="font-weight:${krPre?'700':'600'};font-size:13px;color:${krPre?'var(--accent)':'var(--text)'};display:flex;align-items:center;gap:6px">${krPre?'●':''} 동시호가</div>
+              <div style="font-size:11px;color:var(--text2);margin-top:3px;font-family:'JetBrains Mono',monospace">08:30 ~ 09:00</div>
+            </div>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border-radius:8px;background:${krActive?'var(--accent-soft)':'var(--bg3)'};border:1px solid ${krActive?'var(--accent)':'var(--border)'}">
+            <div style="flex:1">
+              <div style="font-weight:${krActive?'700':'600'};font-size:13px;color:${krActive?'var(--accent)':'var(--text)'};display:flex;align-items:center;gap:6px">
+                ${krActive?'●':''} 정규장
+                ${krActive&&s.kr.left?`<span style="font-size:10px;color:var(--text2);font-weight:500">· ${leftTime(s.kr.left)}</span>`:''}
+              </div>
+              <div style="font-size:11px;color:var(--text2);margin-top:3px;font-family:'JetBrains Mono',monospace">09:00 ~ 15:30</div>
+              <div style="font-size:10px;color:var(--text3);margin-top:2px">KOSPI / KOSDAQ</div>
+            </div>
+          </div>
+        </div>
+
+        <div style="font-size:11px;color:var(--text2);margin-top:14px;padding:10px;background:var(--bg3);border-radius:8px;text-align:center">
+          현재 한국 시간 <strong style="color:var(--text);font-family:'JetBrains Mono',monospace">${s.krTimeStr}</strong>
+        </div>
+      </div>
+    </div>
+  `;
+  modal.classList.add('on');
+}
+
+function closeMarketDetailModal(){
+  const m=$('market-detail-modal');
+  if(m)m.classList.remove('on');
+}
+
+// 특정 시점의 타임존 오프셋(시간 단위) 가져오기
+function getTZOffsetHours(date,tz){
+  // 해당 타임존의 현지 시각을 ISO 식으로 가져옴
+  const fmt=new Intl.DateTimeFormat('en-US',{
+    timeZone:tz,year:'numeric',month:'2-digit',day:'2-digit',
+    hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false,
+  });
+  const parts=fmt.formatToParts(date);
+  const p={};parts.forEach(x=>{p[x.type]=x.value;});
+  // 24시 보정
+  let hour=parseInt(p.hour);if(hour===24)hour=0;
+  const tzDate=new Date(Date.UTC(
+    parseInt(p.year),parseInt(p.month)-1,parseInt(p.day),
+    hour,parseInt(p.minute),parseInt(p.second),
+  ));
+  // UTC와의 차이 = 타임존 오프셋
+  return (tzDate-date)/(1000*60*60);
 }
 
 // 한국 기준 프리장 시작 시간 안내 (서머타임에 따라 17:00 또는 18:00)
