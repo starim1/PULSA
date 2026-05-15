@@ -553,6 +553,14 @@ body::before{
 .al-item[onclick]:hover{background:var(--border);transform:translateY(-1px);}
 .al-item.read{opacity:0.55;}
 .al-item.read strong{font-weight:500;}
+.al-x{
+  position:absolute;top:8px;right:8px;
+  width:22px;height:22px;border-radius:6px;
+  background:transparent;border:none;cursor:pointer;
+  color:var(--text3);display:inline-flex;align-items:center;justify-content:center;
+  transition:background .12s,color .12s;padding:0;
+}
+.al-x:hover{background:var(--down-bg);color:var(--down);}
 
 /* News cards */
 .news-card{
@@ -1006,6 +1014,7 @@ body::before{
       </div>
       <div style="padding:14px 18px 18px;max-height:60vh;overflow-y:auto">
         <div style="display:flex;justify-content:flex-end;margin-bottom:10px;gap:6px">
+          <button class="btn btn-sm" onclick="markAllReadAndRender()">모두 읽음</button>
           <button class="btn btn-sm" onclick="clearOldAlerts()">오래된 알림 삭제</button>
           <button class="btn btn-sm" onclick="clearAlertInbox()">전체 삭제</button>
         </div>
@@ -1354,7 +1363,10 @@ body::before{
             <!-- 알림 인박스 -->
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
               <span style="font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px"><span data-icon="bell" data-icon-size="14" style="display:inline-flex"></span>알림 함 <span id="alert-inbox-count" style="background:var(--down);color:#fff;font-size:10px;padding:2px 7px;border-radius:10px;display:none">0</span></span>
-              <button class="btn btn-sm" onclick="clearAlertInbox()">전체 삭제</button>
+              <div style="display:flex;gap:6px">
+                <button class="btn btn-sm" onclick="markAllReadAndRender()">모두 읽음</button>
+                <button class="btn btn-sm" onclick="clearAlertInbox()">전체 삭제</button>
+              </div>
             </div>
             <div id="alert-inbox" style="margin-bottom:18px"><div class="ltxt">받은 알림 없음</div></div>
 
@@ -5097,8 +5109,9 @@ function renderAlertInbox(){
     let timeAgo=min<60?min+'분 전':min<1440?Math.floor(min/60)+'시간 전':Math.floor(min/1440)+'일 전';
     const typeColor=n.type==='price'?'var(--accent)':n.type==='pct5'?'var(--up)':n.type==='earnings'?'var(--blue)':n.type==='breaking'?'var(--down)':'var(--text2)';
     const clickable=!!(n.link||n.ticker||n.url||n.type==='quarter'||n.type==='breaking');
-    return `<div class="al-item ${n.read?'read':''}" style="flex-direction:column;align-items:flex-start;gap:4px;border-left:3px solid ${typeColor};cursor:${clickable?'pointer':'default'}" ${clickable?`onclick="handleAlertClick('${n.id}')"`:''}>
-      <div style="display:flex;justify-content:space-between;width:100%;align-items:center">
+    return `<div class="al-item ${n.read?'read':''}" style="flex-direction:column;align-items:flex-start;gap:4px;border-left:3px solid ${typeColor};cursor:${clickable?'pointer':'default'};position:relative" ${clickable?`onclick="handleAlertClick('${n.id}')"`:''}>
+      <button class="al-x" onclick="event.stopPropagation();deleteAlert('${n.id}')" title="삭제">${ic('x',12)}</button>
+      <div style="display:flex;justify-content:space-between;width:100%;align-items:center;padding-right:22px">
         <strong style="font-size:12.5px">${n.title}</strong>
         <span style="font-size:10px;color:var(--text2)">${timeAgo}</span>
       </div>
@@ -5139,6 +5152,29 @@ function markAllRead(){
   ALERT_INBOX.forEach(n=>n.read=true);saveAlertInbox();updateAlertBadge();
 }
 
+// 모두 읽음 + 화면 갱신 (버튼에서 호출)
+function markAllReadAndRender(){
+  if(!ALERT_INBOX.length){toast('알림 없음');return;}
+  const unreadCount=ALERT_INBOX.filter(n=>!n.read).length;
+  ALERT_INBOX.forEach(n=>n.read=true);
+  saveAlertInbox();
+  renderAlertInbox();
+  renderInboxModal();
+  updateAlertBadge();
+  toast(unreadCount>0?`${unreadCount}개 알림을 읽음 처리했어요`:'이미 모두 읽음 상태');
+}
+
+// 개별 알림 삭제
+function deleteAlert(id){
+  const idx=ALERT_INBOX.findIndex(n=>n.id===id);
+  if(idx<0)return;
+  ALERT_INBOX.splice(idx,1);
+  saveAlertInbox();
+  renderAlertInbox();
+  renderInboxModal();
+  updateAlertBadge();
+}
+
 // 상단 알림 함 모달
 function openInboxModal(){
   $('inbox-modal').classList.add('on');
@@ -5168,8 +5204,9 @@ function renderInboxModal(){
     let timeAgo=min<60?min+'분 전':min<1440?Math.floor(min/60)+'시간 전':Math.floor(min/1440)+'일 전';
     const typeColor=n.type==='price'?'var(--accent)':n.type==='pct5'?'var(--up)':n.type==='earnings'?'var(--blue)':n.type==='breaking'?'var(--down)':'var(--text2)';
     const clickable=!!(n.link||n.ticker||n.url||n.type==='quarter'||n.type==='breaking');
-    return `<div class="al-item ${n.read?'read':''}" style="flex-direction:column;align-items:flex-start;gap:4px;border-left:3px solid ${typeColor};cursor:${clickable?'pointer':'default'}" ${clickable?`onclick="handleAlertClick('${n.id}')"`:''}>
-      <div style="display:flex;justify-content:space-between;width:100%;align-items:center">
+    return `<div class="al-item ${n.read?'read':''}" style="flex-direction:column;align-items:flex-start;gap:4px;border-left:3px solid ${typeColor};cursor:${clickable?'pointer':'default'};position:relative" ${clickable?`onclick="handleAlertClick('${n.id}')"`:''}>
+      <button class="al-x" onclick="event.stopPropagation();deleteAlert('${n.id}')" title="삭제">${ic('x',12)}</button>
+      <div style="display:flex;justify-content:space-between;width:100%;align-items:center;padding-right:22px">
         <strong style="font-size:12.5px">${n.title}</strong>
         <span style="font-size:10px;color:var(--text2)">${timeAgo}</span>
       </div>
