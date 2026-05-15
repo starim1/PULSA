@@ -549,7 +549,10 @@ body::before{
 .cr:last-child{border:none;}
 .cr span:last-child{color:var(--text);font-weight:600;font-family:'JetBrains Mono',monospace;}
 
-.al-item{background:var(--bg3);border:1px solid var(--border);border-radius:9px;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;font-size:12px;margin-bottom:7px;}
+.al-item{background:var(--bg3);border:1px solid var(--border);border-radius:9px;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;font-size:12px;margin-bottom:7px;transition:background .12s,transform .12s;}
+.al-item[onclick]:hover{background:var(--border);transform:translateY(-1px);}
+.al-item.read{opacity:0.55;}
+.al-item.read strong{font-weight:500;}
 
 /* News cards */
 .news-card{
@@ -584,6 +587,8 @@ body::before{
 .news-card.pos{border-left:3px solid var(--up);}
 .news-card.neg{border-left:3px solid var(--down);}
 .news-card.breaking{border-left:3px solid var(--down);background:rgba(255,77,109,0.04);}
+.news-card.read{opacity:0.5;}
+.news-card.read .news-card-title{font-weight:500;}
 
 /* 뉴스 카테고리 필터 */
 .news-cat-filter{
@@ -1694,6 +1699,16 @@ let ALERT_INBOX=[];
 let AUTO_ALERTS={pct5:false,earnings:false};
 let WATCH_DAILY_BASE={};  // {tk: {price, date}}
 const $=id=>document.getElementById(id);
+
+// 로컬 시간 기준으로 YYYY-MM-DD 만들기 (UTC 시차 버그 방지)
+// toISOString()은 UTC 변환하므로 한국이면 9시간 차이 → 전날로 잘못 표시됨
+function localDateStr(date){
+  const d=date instanceof Date?date:new Date(date);
+  const y=d.getFullYear();
+  const m=String(d.getMonth()+1).padStart(2,'0');
+  const day=String(d.getDate()).padStart(2,'0');
+  return `${y}-${m}-${day}`;
+}
 const f2=n=>n==null||isNaN(n)?'—':n.toFixed(2);
 
 // ── ICON SYSTEM ─────────────────────────────────────
@@ -2185,7 +2200,7 @@ async function shareAnalysis(){
       // 폴백: 다운로드
       const url=URL.createObjectURL(blob);
       const a=document.createElement('a');
-      a.href=url;a.download=`pulsa-${D.tk}-${new Date().toISOString().split('T')[0]}.png`;
+      a.href=url;a.download=`pulsa-${D.tk}-${localDateStr(new Date())}.png`;
       document.body.appendChild(a);a.click();
       document.body.removeChild(a);
       setTimeout(()=>URL.revokeObjectURL(url),1000);
@@ -4181,7 +4196,7 @@ async function runAISimulator(){
       const ts=D.ts[i];
       const close=D.cl[i];
       if(close!=null&&ts){
-        const date=new Date(ts).toISOString().split('T')[0];
+        const date=localDateStr(new Date(ts));
         sampledData.push({date,close});
       }
     }
@@ -4189,7 +4204,7 @@ async function runAISimulator(){
     const lastTs=D.ts[len-1];
     const lastCl=D.cl[len-1];
     if(lastTs&&lastCl!=null&&sampledData[sampledData.length-1]?.close!==lastCl){
-      sampledData.push({date:new Date(lastTs).toISOString().split('T')[0],close:lastCl});
+      sampledData.push({date:localDateStr(new Date(lastTs)),close:lastCl});
     }
   }
 
@@ -4657,7 +4672,7 @@ function renderAssets(){
 
 // 매일 1회 자산 스냅샷 기록 (localStorage)
 function recordAssetSnapshot(totMkt,totCost){
-  const today=new Date().toISOString().split('T')[0];
+  const today=localDateStr(new Date());
   let history=[];
   try{history=JSON.parse(localStorage.getItem('asset_history')||'[]');}catch(e){}
   // 오늘 이미 기록 있으면 덮어쓰기
@@ -5023,7 +5038,7 @@ async function checkAlerts(){
       if(hit){
         a.triggered=true;changed=true;
         const msg=`${tk}: $${price.toFixed(2)} → $${a.val} ${a.type==='above'?'이상':'이하'}!`;
-        addToInbox({type:'price',tk,title:`📈 ${tk} 가격 알림`,body:msg});
+        addToInbox({type:'price',ticker:tk,title:`📈 ${tk} 가격 알림`,body:msg});
         toast(msg,6000);
         if('Notification'in window&&Notification.permission==='granted')new Notification('📈 알림',{body:msg});
       }
@@ -5044,17 +5059,45 @@ function saveAlertInbox(){
   try{localStorage.setItem('al_inbox',JSON.stringify(ALERT_INBOX));}catch(e){}
 }
 function addToInbox(notif){
-  ALERT_INBOX.unshift({...notif,time:Date.now(),read:false});
+  // notif에 link(URL) 또는 ticker(분석 종목) 옵션 가능
+  ALERT_INBOX.unshift({...notif,time:Date.now(),read:false,id:Date.now()+'_'+Math.random().toString(36).slice(2,8)});
   saveAlertInbox();renderAlertInbox();updateAlertBadge();
 }
+
+// 알림 클릭 시 액션
+function handleAlertClick(id){
+  const item=ALERT_INBOX.find(n=>n.id===id);
+  if(!item)return;
+  // 읽음 처리
+  item.read=true;
+  saveAlertInbox();renderAlertInbox();renderInboxModal();updateAlertBadge();
+  // 액션 분기
+  if(item.link){
+    // URL 링크 (속보 뉴스 등)
+    window.open(item.link,'_blank','noopener');
+  }else if(item.ticker){
+    // 종목 분석 (가격 알림, 5% 변동 등)
+    closeInboxModal();
+    $('ti').value=item.ticker;
+    navTo('analysis');stab('chart');go();
+  }else if(item.type==='quarter'){
+    // 분기 갱신 알림 → 추천 → 거장
+    closeInboxModal();navTo('picks');
+  }else if(item.type==='breaking'&&item.url){
+    // 속보
+    window.open(item.url,'_blank','noopener');
+  }
+}
+
 function renderAlertInbox(){
   const box=$('alert-inbox');if(!box)return;
   if(!ALERT_INBOX.length){box.innerHTML='<div class="ltxt">받은 알림 없음</div>';return;}
   box.innerHTML=ALERT_INBOX.slice(0,30).map(n=>{
     const min=Math.floor((Date.now()-n.time)/60000);
     let timeAgo=min<60?min+'분 전':min<1440?Math.floor(min/60)+'시간 전':Math.floor(min/1440)+'일 전';
-    const typeColor=n.type==='price'?'var(--accent)':n.type==='pct5'?'var(--up)':n.type==='earnings'?'var(--blue)':'var(--text2)';
-    return `<div class="al-item" style="flex-direction:column;align-items:flex-start;gap:4px;border-left:3px solid ${typeColor};${n.read?'opacity:0.6':''}">
+    const typeColor=n.type==='price'?'var(--accent)':n.type==='pct5'?'var(--up)':n.type==='earnings'?'var(--blue)':n.type==='breaking'?'var(--down)':'var(--text2)';
+    const clickable=!!(n.link||n.ticker||n.url||n.type==='quarter'||n.type==='breaking');
+    return `<div class="al-item ${n.read?'read':''}" style="flex-direction:column;align-items:flex-start;gap:4px;border-left:3px solid ${typeColor};cursor:${clickable?'pointer':'default'}" ${clickable?`onclick="handleAlertClick('${n.id}')"`:''}>
       <div style="display:flex;justify-content:space-between;width:100%;align-items:center">
         <strong style="font-size:12.5px">${n.title}</strong>
         <span style="font-size:10px;color:var(--text2)">${timeAgo}</span>
@@ -5100,8 +5143,13 @@ function markAllRead(){
 function openInboxModal(){
   $('inbox-modal').classList.add('on');
   renderInboxModal();
-  // 모달 열면 모두 읽음
-  markAllRead();
+  // 상단바 배지만 비우고, 개별 알림 읽음 상태는 클릭할 때만 변경
+  updateBadgeAfterOpen();
+}
+// 배지만 0으로 (실제 read 상태는 유지)
+function updateBadgeAfterOpen(){
+  const tbBadge=$('tb-inbox-badge');
+  if(tbBadge)tbBadge.style.display='none';
 }
 function closeInboxModal(){
   $('inbox-modal').classList.remove('on');
@@ -5118,8 +5166,9 @@ function renderInboxModal(){
   list.innerHTML=ALERT_INBOX.map(n=>{
     const min=Math.floor((Date.now()-n.time)/60000);
     let timeAgo=min<60?min+'분 전':min<1440?Math.floor(min/60)+'시간 전':Math.floor(min/1440)+'일 전';
-    const typeColor=n.type==='price'?'var(--accent)':n.type==='pct5'?'var(--up)':n.type==='earnings'?'var(--blue)':'var(--text2)';
-    return `<div class="al-item" style="flex-direction:column;align-items:flex-start;gap:4px;border-left:3px solid ${typeColor};${n.read?'opacity:0.65':''}">
+    const typeColor=n.type==='price'?'var(--accent)':n.type==='pct5'?'var(--up)':n.type==='earnings'?'var(--blue)':n.type==='breaking'?'var(--down)':'var(--text2)';
+    const clickable=!!(n.link||n.ticker||n.url||n.type==='quarter'||n.type==='breaking');
+    return `<div class="al-item ${n.read?'read':''}" style="flex-direction:column;align-items:flex-start;gap:4px;border-left:3px solid ${typeColor};cursor:${clickable?'pointer':'default'}" ${clickable?`onclick="handleAlertClick('${n.id}')"`:''}>
       <div style="display:flex;justify-content:space-between;width:100%;align-items:center">
         <strong style="font-size:12.5px">${n.title}</strong>
         <span style="font-size:10px;color:var(--text2)">${timeAgo}</span>
@@ -5177,7 +5226,7 @@ function applyAutoAlertsUI(){
 }
 async function checkAutoAlerts(){
   if(!AUTO_ALERTS.pct5)return;
-  const today=new Date().toISOString().split('T')[0];
+  const today=localDateStr(new Date());
   const tickers=[...new Set([...watchlist.map(w=>w.tk),...portfolio.map(p=>p.tk)])];
   for(const tk of tickers){
     try{
@@ -5198,7 +5247,7 @@ async function checkAutoAlerts(){
         const dir=pct>=0?'상승':'하락';
         const emoji=pct>=0?'🚀':'📉';
         const msg=`${tk} ${dir} ${pct.toFixed(2)}% (오늘 시작가 $${base.price.toFixed(2)} → 현재 $${price.toFixed(2)})`;
-        addToInbox({type:'pct5',tk,title:`${emoji} ${tk} ${dir} ${level*5}%+`,body:msg});
+        addToInbox({type:'pct5',ticker:tk,title:`${emoji} ${tk} ${dir} ${level*5}%+`,body:msg});
         if('Notification'in window&&Notification.permission==='granted')new Notification(`${emoji} ${tk}`,{body:msg});
       }
     }catch(e){}
@@ -5299,7 +5348,7 @@ async function loadMorningBrief(){
   // 아침 7시 ~ 오후 9시 사이만 (밤엔 의미 없음)
   if(hour<7){wrap.style.display='none';return;}
 
-  const today=krNow.toISOString().split('T')[0];
+  const today=localDateStr(krNow);
   const cacheKey='morning_brief';
 
   // 오늘 이미 본 캐시
@@ -5350,10 +5399,10 @@ async function loadMorningBrief(){
     let holidayInfo=null;
     try{
       const holidays=typeof getMarketHolidays==='function'?getMarketHolidays():[];
-      const yestStr=nyYesterday.toISOString().split('T')[0];
+      const yestStr=localDateStr(nyYesterday);
       const found=holidays.find(h=>{
         const hd=new Date(h.date);hd.setHours(0,0,0,0);
-        return hd.toISOString().split('T')[0]===yestStr;
+        return localDateStr(hd)===yestStr;
       });
       if(found)holidayInfo=found;
     }catch(e){}
@@ -5375,10 +5424,10 @@ async function loadMorningBrief(){
           let isClosed=false;
           try{
             const holidays=typeof getMarketHolidays==='function'?getMarketHolidays():[];
-            const dayStr=lastTradingDay.toISOString().split('T')[0];
+            const dayStr=localDateStr(lastTradingDay);
             isClosed=holidays.some(h=>{
               const hd=new Date(h.date);hd.setHours(0,0,0,0);
-              return hd.toISOString().split('T')[0]===dayStr&&!h.meta.includes('조기');
+              return localDateStr(hd)===dayStr&&!h.meta.includes('조기');
             });
           }catch(e){}
           if(!isClosed)break;
@@ -5807,6 +5856,9 @@ function newsCardHTML(n,cls=''){
   const url=n.url||'#';
   const img=n.image||'';
   const dt=n.date;
+  // 읽음 상태 체크
+  const readSet=getReadNewsSet();
+  const isRead=readSet.has(url);
   let timeAgo='';
   if(dt){
     const min=Math.floor((Date.now()-dt)/60000);
@@ -5820,7 +5872,7 @@ function newsCardHTML(n,cls=''){
   };
   const cat=n.cat||'other';
   const catLabel=catLabels[cat]||'기타';
-  return `<a class="news-card ${cls}" href="${url}" target="_blank" rel="noopener">
+  return `<a class="news-card ${cls}${isRead?' read':''}" href="${url}" target="_blank" rel="noopener" onclick="markNewsRead('${(url||'').replace(/'/g,'&#39;')}')">
     <div class="news-card-img">${img?`<img src="${img}" alt="" referrerpolicy="no-referrer" loading="lazy" onerror="newsImgError(this)">`:ic('newspaper',32)}</div>
     <div class="news-card-body">
       <div>
@@ -5836,6 +5888,24 @@ function newsCardHTML(n,cls=''){
       </div>
     </div>
   </a>`;
+}
+
+// 읽은 뉴스 관리
+function getReadNewsSet(){
+  try{
+    const arr=JSON.parse(localStorage.getItem('news_read_urls')||'[]');
+    return new Set(arr);
+  }catch(e){return new Set();}
+}
+function markNewsRead(url){
+  try{
+    const arr=JSON.parse(localStorage.getItem('news_read_urls')||'[]');
+    if(!arr.includes(url)){
+      arr.unshift(url);
+      // 최대 200개만 유지
+      localStorage.setItem('news_read_urls',JSON.stringify(arr.slice(0,200)));
+    }
+  }catch(e){}
 }
 
 function setNewsCat(cat){
@@ -5871,6 +5941,7 @@ function checkBreakingNewsAlert(newsArr){
       type:'breaking',
       title:`🔥 속보: ${(ttl||'').slice(0,60)}`,
       body:`${n.site||''} · ${new Date(n.date).toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'})}\n\n${(n.summary||'').slice(0,200)}`,
+      url:n.url||'',  // 클릭 시 원문 이동
     });
     if('Notification'in window&&Notification.permission==='granted'){
       try{new Notification('🔥 PULSA 속보',{body:ttl,tag:'pulsa-breaking',icon:'/icon.svg'});}catch(e){}
@@ -6166,9 +6237,9 @@ async function loadCalendar(){
 
   // FMP earnings calendar - 향후 60일
   try{
-    const from=today.toISOString().split('T')[0];
+    const from=localDateStr(today);
     const toDate=new Date(today);toDate.setDate(toDate.getDate()+60);
-    const to=toDate.toISOString().split('T')[0];
+    const to=localDateStr(toDate);
     const earnings=await tryFetch(`/api/fmp?type=earnings_cal&from=${from}&to=${to}`).catch(()=>null);
     if(Array.isArray(earnings)){
       const watchTickers=watchlist.map(w=>w.tk);
@@ -6496,7 +6567,7 @@ function renderCalendarMonth(){
   const daysInMonth=lastDay.getDate();
 
   const today=new Date();today.setHours(0,0,0,0);
-  const todayStr=today.toISOString().split('T')[0];
+  const todayStr=localDateStr(today);
 
   // 필터 적용
   let filtered=CAL_DATA;
@@ -6508,7 +6579,7 @@ function renderCalendarMonth(){
   // 날짜별 이벤트 그룹화
   const eventsByDate={};
   filtered.forEach(e=>{
-    const ds=new Date(e.date).toISOString().split('T')[0];
+    const ds=localDateStr(new Date(e.date));
     if(!eventsByDate[ds])eventsByDate[ds]=[];
     eventsByDate[ds].push(e);
   });
@@ -6521,7 +6592,7 @@ function renderCalendarMonth(){
   // 날짜 셀
   for(let d=1;d<=daysInMonth;d++){
     const dt=new Date(year,month,d);
-    const dtStr=dt.toISOString().split('T')[0];
+    const dtStr=localDateStr(dt);
     const dow=dt.getDay();
     const dayEvents=eventsByDate[dtStr]||[];
     const hasHoliday=dayEvents.some(e=>e.type==='holiday');
@@ -6563,7 +6634,7 @@ function selectCalDay(dateStr){
 function showDayDetail(dateStr){
   const detail=$('cal-day-detail');
   if(!detail)return;
-  const dayEvents=CAL_DATA.filter(e=>new Date(e.date).toISOString().split('T')[0]===dateStr);
+  const dayEvents=CAL_DATA.filter(e=>localDateStr(new Date(e.date))===dateStr);
   // 필터 적용
   let filtered=dayEvents;
   if(CAL_FILTER==='econ')filtered=dayEvents.filter(e=>e.type==='econ');
