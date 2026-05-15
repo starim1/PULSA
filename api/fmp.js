@@ -35,6 +35,9 @@ export default async function handler(req, res) {
     earnings_history: `/stable/historical-earnings?symbol=${symbol}&limit=8`,
     grades: `/stable/grades-consensus?symbol=${symbol}`,
     earnings_cal: `/stable/earnings-calendar${from?`?from=${from}&to=${to}`:''}`,
+    income_quarterly: `/stable/income-statement?symbol=${symbol}&period=quarter&limit=20`,
+    ratios_quarterly: `/stable/ratios?symbol=${symbol}&period=quarter&limit=20`,
+    cashflow_quarterly: `/stable/cash-flow-statement?symbol=${symbol}&period=quarter&limit=20`,
   };
 
   const path = endpoints[type] || endpoints.target;
