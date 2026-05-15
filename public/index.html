@@ -3261,10 +3261,6 @@ function drawPrice(){
             color:{up:'#26d782',down:'#ff4d6d',unchanged:'#7a8499'},
             borderColor:{up:'#26d782',down:'#ff4d6d',unchanged:'#7a8499'},
           },
-          {type:'line',label:'SMA20',data:lineDataFromArr(d.s20),borderColor:'#BA7517',borderWidth:1.2,pointRadius:0,fill:false,tension:.2},
-          {type:'line',label:'SMA50',data:lineDataFromArr(d.s50),borderColor:'#D85A30',borderWidth:1.2,pointRadius:0,fill:false,tension:.2},
-          {type:'line',label:'BB상단',data:lineDataFromArr(d.bnd.U),borderColor:'rgba(150,150,170,.4)',borderWidth:1,pointRadius:0,borderDash:[4,4],fill:false},
-          {type:'line',label:'BB하단',data:lineDataFromArr(d.bnd.L),borderColor:'rgba(150,150,170,.4)',borderWidth:1,pointRadius:0,borderDash:[4,4],fill:false},
           ...slDatasets.map(s=>({...s,type:'line',data:s.data.map((v,i)=>({x:d.ts[i],y:v}))})),
         ]},
         options:{responsive:true,maintainAspectRatio:false,animation:false,
@@ -3312,10 +3308,6 @@ function drawPrice(){
     const sp=d.la.map((_,i)=>(!d.s20[i]||!d.s50[i]||i===0)?null:(d.s20[i]<d.s50[i]&&d.s20[i-1]>=d.s50[i-1])?d.cl[i]:null);
     CH.p=new Chart(newCanvas,{type:'line',data:{labels:d.la,datasets:[
       {label:'주가',data:d.cl,borderColor:'#4a9eff',borderWidth:2,pointRadius:0,fill:false,tension:.2,order:2},
-      {label:'SMA20',data:d.s20,borderColor:'#BA7517',borderWidth:1.2,pointRadius:0,fill:false,tension:.2,order:3},
-      {label:'SMA50',data:d.s50,borderColor:'#D85A30',borderWidth:1.2,pointRadius:0,fill:false,tension:.2,order:4},
-      {label:'BB상단',data:d.bnd.U,borderColor:'rgba(150,150,170,.4)',borderWidth:1,pointRadius:0,borderDash:[4,4],fill:false,order:5},
-      {label:'BB하단',data:d.bnd.L,borderColor:'rgba(150,150,170,.4)',borderWidth:1,pointRadius:0,borderDash:[4,4],fill:false,order:5},
       {label:'매수',data:bp,borderColor:'#26d782',backgroundColor:'#26d782',pointRadius:8,pointStyle:'triangle',showLine:false,order:1},
       {label:'매도',data:sp,borderColor:'#ff4d6d',backgroundColor:'#ff4d6d',pointRadius:8,pointStyle:'triangle',rotation:180,showLine:false,order:1},
       ...slDatasets
@@ -3483,13 +3475,22 @@ function renderIndicatorPanels(){
   }
 }
 
-// 가격 차트에 오버레이 추가 (SMA, EMA, BB 등)
+// 가격 차트에 오버레이 추가 (SMA, EMA, BB 등) - 캔들/라인 모드 모두 대응
 function applyOverlaysToPrice(overlayIds){
   if(!CH.p||!D)return;
   try{
     const d=D;
     const prices=(d.cl||[]).map(v=>v==null?null:v);
     if(!prices.length)return;
+
+    // 차트 모드 감지 (candlestick이면 {x,y} 형식 필요)
+    const isCandle=CURRENT_CHART_MODE==='candle';
+    const toData=(arr)=>{
+      if(isCandle&&d.ts){
+        return arr.map((v,i)=>({x:d.ts[i],y:v}));
+      }
+      return arr;
+    };
 
     // 기존 오버레이 데이터셋 제거 (가격/캔들 외)
     CH.p.data.datasets=CH.p.data.datasets.filter(ds=>!ds._isOverlay);
@@ -3498,38 +3499,38 @@ function applyOverlaysToPrice(overlayIds){
       if(id==='sma20'){
         const ma=calcSMA(prices,20);
         CH.p.data.datasets.push({
-          label:'SMA 20',data:ma,borderColor:INDICATOR_CATALOG.sma20.color,
-          borderWidth:1.2,pointRadius:0,fill:false,_isOverlay:true,
+          type:'line',label:'SMA 20',data:toData(ma),borderColor:INDICATOR_CATALOG.sma20.color,
+          borderWidth:1.2,pointRadius:0,fill:false,tension:.2,_isOverlay:true,order:3,
         });
       }else if(id==='sma50'){
         const ma=calcSMA(prices,50);
         CH.p.data.datasets.push({
-          label:'SMA 50',data:ma,borderColor:INDICATOR_CATALOG.sma50.color,
-          borderWidth:1.2,pointRadius:0,fill:false,_isOverlay:true,
+          type:'line',label:'SMA 50',data:toData(ma),borderColor:INDICATOR_CATALOG.sma50.color,
+          borderWidth:1.2,pointRadius:0,fill:false,tension:.2,_isOverlay:true,order:4,
         });
       }else if(id==='sma200'){
         const ma=calcSMA(prices,200);
         CH.p.data.datasets.push({
-          label:'SMA 200',data:ma,borderColor:INDICATOR_CATALOG.sma200.color,
-          borderWidth:1.2,pointRadius:0,fill:false,_isOverlay:true,
+          type:'line',label:'SMA 200',data:toData(ma),borderColor:INDICATOR_CATALOG.sma200.color,
+          borderWidth:1.5,pointRadius:0,fill:false,tension:.2,_isOverlay:true,order:5,
         });
       }else if(id==='ema20'){
         const ema=calcEMA(prices,20);
         CH.p.data.datasets.push({
-          label:'EMA 20',data:ema,borderColor:INDICATOR_CATALOG.ema20.color,
-          borderWidth:1.2,pointRadius:0,fill:false,_isOverlay:true,
+          type:'line',label:'EMA 20',data:toData(ema),borderColor:INDICATOR_CATALOG.ema20.color,
+          borderWidth:1.2,pointRadius:0,fill:false,tension:.2,_isOverlay:true,order:3,
         });
       }else if(id==='ema50'){
         const ema=calcEMA(prices,50);
         CH.p.data.datasets.push({
-          label:'EMA 50',data:ema,borderColor:INDICATOR_CATALOG.ema50.color,
-          borderWidth:1.2,pointRadius:0,fill:false,_isOverlay:true,
+          type:'line',label:'EMA 50',data:toData(ema),borderColor:INDICATOR_CATALOG.ema50.color,
+          borderWidth:1.2,pointRadius:0,fill:false,tension:.2,_isOverlay:true,order:4,
         });
       }else if(id==='bb'){
         const bb=calcBollinger(prices,20,2);
-        CH.p.data.datasets.push({label:'BB Upper',data:bb.upper,borderColor:'rgba(122,132,153,0.6)',borderWidth:1,pointRadius:0,fill:false,borderDash:[3,3],_isOverlay:true});
-        CH.p.data.datasets.push({label:'BB Mid',data:bb.mid,borderColor:'rgba(122,132,153,0.8)',borderWidth:1,pointRadius:0,fill:false,_isOverlay:true});
-        CH.p.data.datasets.push({label:'BB Lower',data:bb.lower,borderColor:'rgba(122,132,153,0.6)',borderWidth:1,pointRadius:0,fill:false,borderDash:[3,3],_isOverlay:true});
+        CH.p.data.datasets.push({type:'line',label:'BB Upper',data:toData(bb.upper),borderColor:'rgba(122,132,153,0.6)',borderWidth:1,pointRadius:0,fill:false,borderDash:[3,3],_isOverlay:true,order:6});
+        CH.p.data.datasets.push({type:'line',label:'BB Mid',data:toData(bb.mid),borderColor:'rgba(122,132,153,0.8)',borderWidth:1,pointRadius:0,fill:false,_isOverlay:true,order:6});
+        CH.p.data.datasets.push({type:'line',label:'BB Lower',data:toData(bb.lower),borderColor:'rgba(122,132,153,0.6)',borderWidth:1,pointRadius:0,fill:false,borderDash:[3,3],_isOverlay:true,order:6});
       }
     }
     CH.p.update('none');
