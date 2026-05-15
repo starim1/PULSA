@@ -32,6 +32,13 @@ export default async function handler(req, res) {
     forex_news: `/news?category=forex`,
     crypto_news: `/news?category=crypto`,
     merger_news: `/news?category=merger`,
+    // 펀더멘털 추이용 (basic_financials의 series 필드에 시계열 포함)
+    basic_financials: `/stock/metric?symbol=${symbol}&metric=all`,
+    // 분기 income statement
+    financials_quarterly: `/stock/financials-reported?symbol=${symbol}&freq=quarterly`,
+    financials_annual: `/stock/financials-reported?symbol=${symbol}&freq=annual`,
+    // 분기 실적 (EPS actual/estimate)
+    earnings: `/stock/earnings?symbol=${symbol}&limit=20`,
   };
 
   const path = endpoints[type] || endpoints.recommend;
