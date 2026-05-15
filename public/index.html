@@ -3486,51 +3486,56 @@ function renderIndicatorPanels(){
 // 가격 차트에 오버레이 추가 (SMA, EMA, BB 등)
 function applyOverlaysToPrice(overlayIds){
   if(!CH.p||!D)return;
-  const d=D;
-  const prices=d.cl||[];
+  try{
+    const d=D;
+    const prices=(d.cl||[]).map(v=>v==null?null:v);
+    if(!prices.length)return;
 
-  // 기존 오버레이 데이터셋 제거 (가격/캔들 외)
-  CH.p.data.datasets=CH.p.data.datasets.filter(ds=>!ds._isOverlay);
+    // 기존 오버레이 데이터셋 제거 (가격/캔들 외)
+    CH.p.data.datasets=CH.p.data.datasets.filter(ds=>!ds._isOverlay);
 
-  for(const id of overlayIds){
-    if(id==='sma20'){
-      const ma=calcSMA(prices,20);
-      CH.p.data.datasets.push({
-        label:'SMA 20',data:ma,borderColor:INDICATOR_CATALOG.sma20.color,
-        borderWidth:1.2,pointRadius:0,fill:false,_isOverlay:true,
-      });
-    }else if(id==='sma50'){
-      const ma=calcSMA(prices,50);
-      CH.p.data.datasets.push({
-        label:'SMA 50',data:ma,borderColor:INDICATOR_CATALOG.sma50.color,
-        borderWidth:1.2,pointRadius:0,fill:false,_isOverlay:true,
-      });
-    }else if(id==='sma200'){
-      const ma=calcSMA(prices,200);
-      CH.p.data.datasets.push({
-        label:'SMA 200',data:ma,borderColor:INDICATOR_CATALOG.sma200.color,
-        borderWidth:1.2,pointRadius:0,fill:false,_isOverlay:true,
-      });
-    }else if(id==='ema20'){
-      const ema=calcEMA(prices,20);
-      CH.p.data.datasets.push({
-        label:'EMA 20',data:ema,borderColor:INDICATOR_CATALOG.ema20.color,
-        borderWidth:1.2,pointRadius:0,fill:false,_isOverlay:true,
-      });
-    }else if(id==='ema50'){
-      const ema=calcEMA(prices,50);
-      CH.p.data.datasets.push({
-        label:'EMA 50',data:ema,borderColor:INDICATOR_CATALOG.ema50.color,
-        borderWidth:1.2,pointRadius:0,fill:false,_isOverlay:true,
-      });
-    }else if(id==='bb'){
-      const bb=calcBollinger(prices,20,2);
-      CH.p.data.datasets.push({label:'BB Upper',data:bb.upper,borderColor:'rgba(122,132,153,0.6)',borderWidth:1,pointRadius:0,fill:false,borderDash:[3,3],_isOverlay:true});
-      CH.p.data.datasets.push({label:'BB Mid',data:bb.mid,borderColor:'rgba(122,132,153,0.8)',borderWidth:1,pointRadius:0,fill:false,_isOverlay:true});
-      CH.p.data.datasets.push({label:'BB Lower',data:bb.lower,borderColor:'rgba(122,132,153,0.6)',borderWidth:1,pointRadius:0,fill:false,borderDash:[3,3],_isOverlay:true});
+    for(const id of overlayIds){
+      if(id==='sma20'){
+        const ma=calcSMA(prices,20);
+        CH.p.data.datasets.push({
+          label:'SMA 20',data:ma,borderColor:INDICATOR_CATALOG.sma20.color,
+          borderWidth:1.2,pointRadius:0,fill:false,_isOverlay:true,
+        });
+      }else if(id==='sma50'){
+        const ma=calcSMA(prices,50);
+        CH.p.data.datasets.push({
+          label:'SMA 50',data:ma,borderColor:INDICATOR_CATALOG.sma50.color,
+          borderWidth:1.2,pointRadius:0,fill:false,_isOverlay:true,
+        });
+      }else if(id==='sma200'){
+        const ma=calcSMA(prices,200);
+        CH.p.data.datasets.push({
+          label:'SMA 200',data:ma,borderColor:INDICATOR_CATALOG.sma200.color,
+          borderWidth:1.2,pointRadius:0,fill:false,_isOverlay:true,
+        });
+      }else if(id==='ema20'){
+        const ema=calcEMA(prices,20);
+        CH.p.data.datasets.push({
+          label:'EMA 20',data:ema,borderColor:INDICATOR_CATALOG.ema20.color,
+          borderWidth:1.2,pointRadius:0,fill:false,_isOverlay:true,
+        });
+      }else if(id==='ema50'){
+        const ema=calcEMA(prices,50);
+        CH.p.data.datasets.push({
+          label:'EMA 50',data:ema,borderColor:INDICATOR_CATALOG.ema50.color,
+          borderWidth:1.2,pointRadius:0,fill:false,_isOverlay:true,
+        });
+      }else if(id==='bb'){
+        const bb=calcBollinger(prices,20,2);
+        CH.p.data.datasets.push({label:'BB Upper',data:bb.upper,borderColor:'rgba(122,132,153,0.6)',borderWidth:1,pointRadius:0,fill:false,borderDash:[3,3],_isOverlay:true});
+        CH.p.data.datasets.push({label:'BB Mid',data:bb.mid,borderColor:'rgba(122,132,153,0.8)',borderWidth:1,pointRadius:0,fill:false,_isOverlay:true});
+        CH.p.data.datasets.push({label:'BB Lower',data:bb.lower,borderColor:'rgba(122,132,153,0.6)',borderWidth:1,pointRadius:0,fill:false,borderDash:[3,3],_isOverlay:true});
+      }
     }
+    CH.p.update('none');
+  }catch(e){
+    console.warn('[Pulsa] 오버레이 적용 실패:',e);
   }
-  try{CH.p.update('none');}catch(e){}
 }
 
 // 단일 sub 지표 패널 그리기
@@ -3538,9 +3543,24 @@ function drawIndicatorPanel(id){
   const info=INDICATOR_CATALOG[id];
   if(!info||!D)return;
   const canvas=$('ind-canvas-'+id);
-  if(!canvas)return;
+  if(!canvas){
+    console.warn(`[Pulsa] 캔버스 없음: ind-canvas-${id}`);
+    return;
+  }
   const txt2=getComputedStyle(document.documentElement).getPropertyValue('--text2');
   const d=D;
+  // 데이터 필드 정규화 (parseYahoo는 highs/lows/vols 사용)
+  // null/undefined 값은 0으로 (계산 안전)
+  const hi=(d.highs||d.hi||[]).map(v=>v==null?0:v);
+  const lo=(d.lows||d.lo||[]).map(v=>v==null?0:v);
+  const cl=(d.cl||[]).map(v=>v==null?0:v);
+  const vol=(d.vols||d.vol||[]).map(v=>v==null?0:v);
+
+  // 데이터 자체가 없으면 에러 메시지
+  if(!cl.length){
+    console.warn(`[Pulsa] ${id}: 가격 데이터 없음`);
+    return;
+  }
 
   // 펀더멘털 지표는 별도 데이터 fetch
   if(info.cat==='fundamental'){
@@ -3562,7 +3582,7 @@ function drawIndicatorPanel(id){
       {type:'bar',label:'히스토그램',data:d.hist||[],backgroundColor:(d.hist||[]).map(v=>v>=0?'rgba(38,215,130,.5)':'rgba(255,77,109,.5)')},
     ]},options:{responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{display:false}},scales:{x:{display:false},y:{grid:{color:'rgba(150,150,170,.08)'},ticks:{font:{size:10},color:txt2}}}}};
   }else if(id==='stoch'){
-    const stoch=calcStochastic(d.hi||[],d.lo||[],d.cl||[],14,3);
+    const stoch=calcStochastic(hi,lo,cl,14,3);
     chartConfig={type:'line',data:{labels:d.la,datasets:[
       {label:'%K',data:stoch.k,borderColor:'#4a9eff',borderWidth:1.5,pointRadius:0,fill:false},
       {label:'%D',data:stoch.d,borderColor:'#f5b53d',borderWidth:1.5,pointRadius:0,fill:false},
@@ -3570,43 +3590,42 @@ function drawIndicatorPanel(id){
       {label:'20',data:new Array((d.la||[]).length).fill(20),borderColor:'rgba(38,215,130,.4)',borderWidth:1,borderDash:[3,3],pointRadius:0,fill:false},
     ]},options:{responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{display:false}},scales:{x:{display:false},y:{min:0,max:100,grid:{color:'rgba(150,150,170,.08)'},ticks:{font:{size:10},color:txt2}}}}};
   }else if(id==='cci'){
-    const cci=calcCCI(d.hi||[],d.lo||[],d.cl||[],20);
+    const cci=calcCCI(hi,lo,cl,20);
     chartConfig={type:'line',data:{labels:d.la,datasets:[
       {label:'CCI',data:cci,borderColor:'#bf72ff',borderWidth:1.5,pointRadius:0,fill:false},
       {label:'100',data:new Array((d.la||[]).length).fill(100),borderColor:'rgba(255,77,109,.4)',borderWidth:1,borderDash:[3,3],pointRadius:0,fill:false},
       {label:'-100',data:new Array((d.la||[]).length).fill(-100),borderColor:'rgba(38,215,130,.4)',borderWidth:1,borderDash:[3,3],pointRadius:0,fill:false},
     ]},options:{responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{display:false}},scales:{x:{display:false},y:{grid:{color:'rgba(150,150,170,.08)'},ticks:{font:{size:10},color:txt2}}}}};
   }else if(id==='williams'){
-    const w=calcWilliamsR(d.hi||[],d.lo||[],d.cl||[],14);
+    const w=calcWilliamsR(hi,lo,cl,14);
     chartConfig={type:'line',data:{labels:d.la,datasets:[
       {label:'%R',data:w,borderColor:'#22e8a8',borderWidth:1.5,pointRadius:0,fill:false},
       {label:'-20',data:new Array((d.la||[]).length).fill(-20),borderColor:'rgba(255,77,109,.4)',borderWidth:1,borderDash:[3,3],pointRadius:0,fill:false},
       {label:'-80',data:new Array((d.la||[]).length).fill(-80),borderColor:'rgba(38,215,130,.4)',borderWidth:1,borderDash:[3,3],pointRadius:0,fill:false},
     ]},options:{responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{display:false}},scales:{x:{display:false},y:{min:-100,max:0,grid:{color:'rgba(150,150,170,.08)'},ticks:{font:{size:10},color:txt2}}}}};
   }else if(id==='volume'){
-    const vols=d.vol||[];
-    const colors=vols.map((v,i)=>{
-      const prev=i>0?(d.cl||[])[i-1]:(d.cl||[])[i];
-      const cur=(d.cl||[])[i];
+    const colors=vol.map((v,i)=>{
+      const prev=i>0?cl[i-1]:cl[i];
+      const cur=cl[i];
       return cur>=prev?'rgba(38,215,130,.55)':'rgba(255,77,109,.55)';
     });
     chartConfig={type:'bar',data:{labels:d.la,datasets:[
-      {label:'거래량',data:vols,backgroundColor:colors,borderWidth:0},
+      {label:'거래량',data:vol,backgroundColor:colors,borderWidth:0},
     ]},options:{responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{display:false}},scales:{x:{display:false},y:{grid:{color:'rgba(150,150,170,.08)'},ticks:{font:{size:10},color:txt2,callback:v=>v>=1e6?(v/1e6).toFixed(1)+'M':v>=1e3?(v/1e3).toFixed(0)+'K':v}}}}};
   }else if(id==='obv'){
-    const obv=calcOBV(d.cl||[],d.vol||[]);
+    const obv=calcOBV(cl,vol);
     chartConfig={type:'line',data:{labels:d.la,datasets:[
       {label:'OBV',data:obv,borderColor:'#10d090',borderWidth:1.5,pointRadius:0,fill:false},
     ]},options:{responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{display:false}},scales:{x:{display:false},y:{grid:{color:'rgba(150,150,170,.08)'},ticks:{font:{size:10},color:txt2,callback:v=>v>=1e9?(v/1e9).toFixed(1)+'B':v>=1e6?(v/1e6).toFixed(0)+'M':v}}}}};
   }else if(id==='mfi'){
-    const mfi=calcMFI(d.hi||[],d.lo||[],d.cl||[],d.vol||[],14);
+    const mfi=calcMFI(hi,lo,cl,vol,14);
     chartConfig={type:'line',data:{labels:d.la,datasets:[
       {label:'MFI',data:mfi,borderColor:'#f5b53d',borderWidth:1.5,pointRadius:0,fill:false},
       {label:'80',data:new Array((d.la||[]).length).fill(80),borderColor:'rgba(255,77,109,.4)',borderWidth:1,borderDash:[3,3],pointRadius:0,fill:false},
       {label:'20',data:new Array((d.la||[]).length).fill(20),borderColor:'rgba(38,215,130,.4)',borderWidth:1,borderDash:[3,3],pointRadius:0,fill:false},
     ]},options:{responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{display:false}},scales:{x:{display:false},y:{min:0,max:100,grid:{color:'rgba(150,150,170,.08)'},ticks:{font:{size:10},color:txt2}}}}};
   }else if(id==='atr'){
-    const atr=calcATR(d.hi||[],d.lo||[],d.cl||[],14);
+    const atr=calcATR(hi,lo,cl,14);
     chartConfig={type:'line',data:{labels:d.la,datasets:[
       {label:'ATR',data:atr,borderColor:'#ff6b7a',borderWidth:1.5,pointRadius:0,fill:false},
     ]},options:{responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{display:false}},scales:{x:{display:false},y:{grid:{color:'rgba(150,150,170,.08)'},ticks:{font:{size:10},color:txt2}}}}};
@@ -3625,33 +3644,58 @@ async function drawFundamentalIndicator(id,canvas){
   const tk=D.tk;
   const txt2=getComputedStyle(document.documentElement).getPropertyValue('--text2');
 
-  // FMP income-statement-quarterly 데이터 fetch
+  // 한국 종목 명시적 차단
+  if(tk.endsWith('.KS')||tk.endsWith('.KQ')){
+    drawErrorOnCanvas(canvas,'한국 종목은 펀더멘털 추이 미지원');
+    return;
+  }
+
   try{
     let data=null;
+    let endpointType='';
     if(['eps','revenue','netincome','margin'].includes(id)){
-      data=await tryFetch(`/api/fmp?symbol=${tk}&type=income_quarterly`).catch(()=>null);
+      endpointType='income_quarterly';
     }else if(['pe','pb','divyield','roe'].includes(id)){
-      data=await tryFetch(`/api/fmp?symbol=${tk}&type=ratios_quarterly`).catch(()=>null);
+      endpointType='ratios_quarterly';
     }else if(id==='fcf'){
-      data=await tryFetch(`/api/fmp?symbol=${tk}&type=cashflow_quarterly`).catch(()=>null);
+      endpointType='cashflow_quarterly';
     }
 
-    if(!Array.isArray(data)||data.length===0){
-      // 데이터 없음
-      const ctx=canvas.getContext('2d');
-      ctx.fillStyle=txt2;ctx.font='11.5px sans-serif';ctx.textAlign='center';
-      ctx.fillText('데이터 없음 (한국 종목은 미지원)',canvas.width/2,canvas.height/2);
+    if(!endpointType){
+      drawErrorOnCanvas(canvas,'지원되지 않는 지표');
       return;
     }
 
-    // 최근 20분기 (5년)
+    data=await tryFetch(`/api/fmp?symbol=${tk}&type=${endpointType}`).catch(e=>{
+      console.warn('[Pulsa] FMP 요청 실패:',e);return null;
+    });
+
+    // 디버깅: 응답 형태 콘솔에
+    if(!Array.isArray(data)){
+      console.warn('[Pulsa] FMP '+endpointType+' 응답 형식 이상:',tk,data);
+    }
+
+    if(!Array.isArray(data)||data.length===0){
+      drawErrorOnCanvas(canvas,'데이터 없음 (API 응답 부족)');
+      return;
+    }
+
+    // 최근 20분기 (5년) — FMP는 보통 최신순
     const recent=data.slice(0,20).reverse();
-    const labels=recent.map(r=>r.date||r.period||'');
+    // 라벨: date (YYYY-MM-DD) → YYYY Qx
+    const labels=recent.map(r=>{
+      const dt=r.date||r.fillingDate||r.acceptedDate||r.period||'';
+      if(!dt)return '';
+      const d=new Date(dt);
+      if(isNaN(d))return dt.substring(0,7);
+      const q=Math.floor(d.getMonth()/3)+1;
+      return `${d.getFullYear()} Q${q}`;
+    });
 
     let values=[],label='',color='#10d090',formatter=v=>v;
     if(id==='eps'){
-      values=recent.map(r=>r.eps||r.epsdiluted||0);
-      label='EPS ($)';color='#10d090';formatter=v=>'$'+v.toFixed(2);
+      values=recent.map(r=>r.eps??r.epsdiluted??r.epsBasic??0);
+      label='EPS ($)';color='#10d090';formatter=v=>'$'+(v||0).toFixed(2);
     }else if(id==='revenue'){
       values=recent.map(r=>(r.revenue||0)/1e9);
       label='매출 (10억$)';color='#4a9eff';formatter=v=>v.toFixed(1)+'B';
@@ -3660,16 +3704,18 @@ async function drawFundamentalIndicator(id,canvas){
       label='순이익 (10억$)';color='#22e8a8';formatter=v=>v.toFixed(1)+'B';
     }else if(id==='margin'){
       values=recent.map(r=>{
-        if(r.operatingIncome&&r.revenue)return (r.operatingIncome/r.revenue)*100;
-        return r.operatingIncomeRatio?r.operatingIncomeRatio*100:0;
+        const oi=r.operatingIncome||0;
+        const rev=r.revenue||0;
+        if(rev===0)return 0;
+        return (oi/rev)*100;
       });
       label='영업이익률 (%)';color='#f5b53d';formatter=v=>v.toFixed(1)+'%';
     }else if(id==='pe'){
-      values=recent.map(r=>r.priceEarningsRatio||r.peRatio||0);
-      label='PER';color='#bf72ff';formatter=v=>v.toFixed(1);
+      values=recent.map(r=>r.priceEarningsRatio??r.peRatio??r.priceToEarningsRatio??0);
+      label='PER';color='#bf72ff';formatter=v=>(v||0).toFixed(1);
     }else if(id==='pb'){
-      values=recent.map(r=>r.priceToBookRatio||r.pbRatio||0);
-      label='PBR';color='#ff6b7a';formatter=v=>v.toFixed(2);
+      values=recent.map(r=>r.priceToBookRatio??r.pbRatio??r.priceBookValueRatio??0);
+      label='PBR';color='#ff6b7a';formatter=v=>(v||0).toFixed(2);
     }else if(id==='roe'){
       values=recent.map(r=>(r.returnOnEquity||0)*100);
       label='ROE (%)';color='#22e8a8';formatter=v=>v.toFixed(1)+'%';
@@ -3681,18 +3727,42 @@ async function drawFundamentalIndicator(id,canvas){
       label='배당수익률 (%)';color='#f5b53d';formatter=v=>v.toFixed(2)+'%';
     }
 
+    // 모두 0이면 데이터 없음 표시
+    const nonZeroCount=values.filter(v=>v!==0&&v!=null).length;
+    if(nonZeroCount===0){
+      drawErrorOnCanvas(canvas,'데이터 없음');
+      return;
+    }
+
     const cfg={type:'bar',data:{labels,datasets:[
       {label,data:values,backgroundColor:color+'aa',borderColor:color,borderWidth:1},
     ]},options:{responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>label+': '+formatter(c.parsed.y)}}},scales:{x:{ticks:{font:{size:9},color:txt2,maxRotation:0,autoSkip:true,maxTicksLimit:6}},y:{grid:{color:'rgba(150,150,170,.08)'},ticks:{font:{size:10},color:txt2}}}}};
 
     try{
       CH.indicators[id]=new Chart(canvas,cfg);
-    }catch(e){console.warn('펀더멘털 지표 실패:',e);}
+    }catch(e){
+      console.warn('[Pulsa] 펀더멘털 차트 생성 실패:',e);
+      drawErrorOnCanvas(canvas,'차트 생성 실패');
+    }
   }catch(e){
-    const ctx=canvas.getContext('2d');
-    ctx.fillStyle=txt2;ctx.font='11.5px sans-serif';ctx.textAlign='center';
-    ctx.fillText('데이터 로드 실패',canvas.width/2,canvas.height/2);
+    console.warn('[Pulsa] '+id+' 처리 실패:',e);
+    drawErrorOnCanvas(canvas,'로드 실패: '+e.message);
   }
+}
+
+// 캔버스에 에러 메시지 그리기 (캔버스 크기에 맞게)
+function drawErrorOnCanvas(canvas,msg){
+  // 캔버스 크기 보정
+  const rect=canvas.getBoundingClientRect();
+  canvas.width=rect.width;canvas.height=rect.height;
+  const ctx=canvas.getContext('2d');
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  const txt2=getComputedStyle(document.documentElement).getPropertyValue('--text2');
+  ctx.fillStyle=txt2;
+  ctx.font='11.5px sans-serif';
+  ctx.textAlign='center';
+  ctx.textBaseline='middle';
+  ctx.fillText(msg,canvas.width/2,canvas.height/2);
 }
 
 // ─── 지표 계산 함수들 ───
