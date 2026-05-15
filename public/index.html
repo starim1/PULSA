@@ -7295,7 +7295,7 @@ function showDayDetail(dateStr){
   if(!detail)return;
   const dayEvents=CAL_DATA.filter(e=>localDateStr(new Date(e.date))===dateStr);
   // 필터 적용
-  const filtered=applyCalFilter(dayEvents);
+  let filtered=applyCalFilter(dayEvents);
 
   const dt=new Date(dateStr);
   const dateLabel=dt.toLocaleDateString('ko-KR',{year:'numeric',month:'long',day:'numeric',weekday:'long'});
