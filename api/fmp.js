@@ -38,6 +38,9 @@ export default async function handler(req, res) {
     income_quarterly: `/stable/income-statement?symbol=${symbol}&period=quarter&limit=20`,
     ratios_quarterly: `/stable/ratios?symbol=${symbol}&period=quarter&limit=20`,
     cashflow_quarterly: `/stable/cash-flow-statement?symbol=${symbol}&period=quarter&limit=20`,
+    income_annual: `/stable/income-statement?symbol=${symbol}&period=annual&limit=10`,
+    ratios_annual: `/stable/ratios?symbol=${symbol}&period=annual&limit=10`,
+    cashflow_annual: `/stable/cash-flow-statement?symbol=${symbol}&period=annual&limit=10`,
   };
 
   const path = endpoints[type] || endpoints.target;
