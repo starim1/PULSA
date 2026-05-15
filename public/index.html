@@ -155,7 +155,6 @@ body::before{
 /* App container */
 .app{
   position:relative;z-index:1;min-height:100vh;
-  padding-top:calc(var(--safe-top));
   padding-bottom:calc(72px + var(--safe-bottom));
 }
 
@@ -164,8 +163,17 @@ body::before{
   background:var(--bg-glass);backdrop-filter:blur(20px) saturate(180%);
   -webkit-backdrop-filter:blur(20px) saturate(180%);
   border-bottom:1px solid var(--border);
-  padding:14px 20px;display:flex;align-items:center;justify-content:space-between;
-  position:sticky;top:0;z-index:50;gap:12px;
+  padding:14px 20px;
+  padding-top:max(14px,env(safe-area-inset-top));
+  padding-left:max(20px,env(safe-area-inset-left));
+  padding-right:max(20px,env(safe-area-inset-right));
+  display:flex;align-items:center;justify-content:space-between;
+  position:sticky;top:0;z-index:100;gap:12px;
+  width:100%;
+}
+@supports (-webkit-touch-callout:none){
+  /* iOS Safari 전용: sticky 보강 */
+  .topbar{position:-webkit-sticky;position:sticky;}
 }
 .tb-title{display:flex;align-items:center;gap:10px;font-weight:700;font-size:17px;letter-spacing:-0.02em;}
 .tb-mark{
@@ -656,6 +664,27 @@ body::before{
   background:var(--bg3);border-color:var(--accent);transform:translateY(-2px);
   box-shadow:0 4px 12px rgba(16,208,144,0.15);
 }
+
+/* 차트 동적 지표 패널 */
+.indicator-panel{
+  background:var(--bg-card);border:1px solid var(--border);
+  border-radius:10px;padding:10px 12px;margin-bottom:10px;
+}
+.indicator-head{
+  display:flex;justify-content:space-between;align-items:center;
+  margin-bottom:8px;
+}
+.indicator-name{
+  font-size:11.5px;font-weight:600;color:var(--text2);
+}
+.indicator-x{
+  width:22px;height:22px;border-radius:5px;
+  background:transparent;border:none;cursor:pointer;
+  color:var(--text3);font-size:13px;font-weight:600;
+  display:inline-flex;align-items:center;justify-content:center;
+  padding:0;transition:background .12s,color .12s;
+}
+.indicator-x:hover{background:var(--down-bg);color:var(--down);}
 
 /* Insider trading row */
 .insider-row{
@@ -1217,10 +1246,15 @@ body::before{
                 <canvas id="pc"></canvas>
                 <canvas id="pc-draw" class="chart-draw-layer"></canvas>
               </div>
-              <div class="sl" style="margin-top:18px">RSI (14) · 70↑ 과매수 / 30↓ 과매도</div>
-              <div class="cw" style="height:130px;margin-bottom:14px"><canvas id="rc"></canvas></div>
-              <div class="sl">MACD (12, 26, 9)</div>
-              <div class="cw" style="height:130px"><canvas id="mc3"></canvas></div>
+
+              <!-- 지표 추가 버튼 -->
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px;margin-bottom:6px">
+                <span style="font-size:11.5px;color:var(--text2);font-weight:600">차트 지표</span>
+                <button class="btn btn-sm" onclick="openIndicatorModal()" style="font-size:11.5px">+ 지표 추가</button>
+              </div>
+
+              <!-- 동적 지표 패널 컨테이너 -->
+              <div id="indicator-panels"></div>
             </div>
           </div>
 
@@ -3320,32 +3354,545 @@ function drawSigs(){
   $('sigs').innerHTML=sgs.map(s=>`<span class="sig ${s.c}">${s.t}</span>`).join('');
 }
 
+// ═══════════════════════════════════════════════════════════
+// 동적 지표 패널 시스템
+// ═══════════════════════════════════════════════════════════
+// 활성 지표 (localStorage에 종목별 / 전역 기본 저장)
+let ACTIVE_INDICATORS=[];
+
+// 지표 카탈로그 정의
+const INDICATOR_CATALOG={
+  // Momentum
+  rsi:{name:'RSI (14)',cat:'momentum',type:'sub',desc:'상대강도지수, 70↑ 과매수 / 30↓ 과매도'},
+  macd:{name:'MACD (12,26,9)',cat:'momentum',type:'sub',desc:'추세 + 모멘텀'},
+  stoch:{name:'스토캐스틱 (14,3)',cat:'momentum',type:'sub',desc:'%K + %D'},
+  cci:{name:'CCI (20)',cat:'momentum',type:'sub',desc:'Commodity Channel Index'},
+  williams:{name:'윌리엄스 %R (14)',cat:'momentum',type:'sub',desc:'단기 과매수/과매도'},
+  // Trend (overlay on price)
+  sma20:{name:'SMA 20일',cat:'trend',type:'overlay',color:'#4a9eff',desc:'단기 이동평균'},
+  sma50:{name:'SMA 50일',cat:'trend',type:'overlay',color:'#f5b53d',desc:'중기 이동평균'},
+  sma200:{name:'SMA 200일',cat:'trend',type:'overlay',color:'#ff6b7a',desc:'장기 이동평균'},
+  ema20:{name:'EMA 20일',cat:'trend',type:'overlay',color:'#22e8a8',desc:'지수 이동평균 (단기)'},
+  ema50:{name:'EMA 50일',cat:'trend',type:'overlay',color:'#bf72ff',desc:'지수 이동평균 (중기)'},
+  bb:{name:'볼린저 밴드 (20,2)',cat:'trend',type:'overlay',color:'#7a8499',desc:'평균 ±2σ'},
+  // Volume
+  volume:{name:'거래량',cat:'volume',type:'sub',desc:'일일 거래량'},
+  obv:{name:'OBV',cat:'volume',type:'sub',desc:'On-Balance Volume'},
+  mfi:{name:'MFI (14)',cat:'volume',type:'sub',desc:'Money Flow Index'},
+  // Volatility
+  atr:{name:'ATR (14)',cat:'volatility',type:'sub',desc:'평균 진폭 (변동성)'},
+  // Fundamental (분기/연간 시계열)
+  eps:{name:'EPS 추이',cat:'fundamental',type:'sub',desc:'분기별 주당순이익'},
+  pe:{name:'PER 추이',cat:'fundamental',type:'sub',desc:'주가수익비율'},
+  pb:{name:'PBR 추이',cat:'fundamental',type:'sub',desc:'주가순자산비율'},
+  revenue:{name:'매출 추이',cat:'fundamental',type:'sub',desc:'분기별 매출'},
+  netincome:{name:'순이익 추이',cat:'fundamental',type:'sub',desc:'분기별 순이익'},
+  margin:{name:'영업이익률 추이',cat:'fundamental',type:'sub',desc:'분기별 영업이익률'},
+  roe:{name:'ROE 추이',cat:'fundamental',type:'sub',desc:'자기자본이익률'},
+  fcf:{name:'FCF 추이',cat:'fundamental',type:'sub',desc:'자유현금흐름'},
+  divyield:{name:'배당수익률 추이',cat:'fundamental',type:'sub',desc:'분기별 배당수익률'},
+};
+
+const INDICATOR_CATS={
+  trend:'추세 (오버레이)',
+  momentum:'모멘텀',
+  volume:'거래량',
+  volatility:'변동성',
+  fundamental:'펀더멘털 추이',
+};
+
+// localStorage 키
+function indicatorStorageKey(tk){return `chart_indicators_${tk}`;}
+
+function loadActiveIndicators(tk){
+  try{
+    // 종목별 설정 우선
+    const perTk=localStorage.getItem(indicatorStorageKey(tk));
+    if(perTk){
+      const arr=JSON.parse(perTk);
+      if(Array.isArray(arr))return arr;
+    }
+    // 전역 기본
+    const def=localStorage.getItem('chart_indicators_default');
+    if(def){
+      const arr=JSON.parse(def);
+      if(Array.isArray(arr))return arr;
+    }
+  }catch(e){}
+  // 기본값
+  return ['rsi','macd','volume'];
+}
+function saveActiveIndicators(tk,arr){
+  try{
+    localStorage.setItem(indicatorStorageKey(tk),JSON.stringify(arr));
+  }catch(e){}
+}
+function saveDefaultIndicators(arr){
+  try{
+    localStorage.setItem('chart_indicators_default',JSON.stringify(arr));
+  }catch(e){}
+}
+
+// 메인 진입점: 활성 지표 다시 그리기
 function drawIndicators(){
+  if(!D)return;
+  const tk=D.tk;
+  ACTIVE_INDICATORS=loadActiveIndicators(tk);
+  renderIndicatorPanels();
+}
+
+function renderIndicatorPanels(){
+  const container=$('indicator-panels');
+  if(!container)return;
+  // 기존 차트 인스턴스 정리
+  if(CH.indicators){
+    for(const id of Object.keys(CH.indicators)){
+      try{CH.indicators[id]?.destroy();}catch(e){}
+    }
+  }
+  CH.indicators={};
+
+  if(!ACTIVE_INDICATORS.length){
+    container.innerHTML='<div class="ltxt" style="text-align:center;padding:20px 0;font-size:11.5px">+ 지표 추가 버튼을 눌러 차트에 지표를 추가하세요</div>';
+    return;
+  }
+
+  // overlay 지표는 가격 차트에 그려야 하므로 별도 처리
+  const overlays=ACTIVE_INDICATORS.filter(id=>INDICATOR_CATALOG[id]?.type==='overlay');
+  const subs=ACTIVE_INDICATORS.filter(id=>INDICATOR_CATALOG[id]?.type==='sub');
+
+  // overlay 처리: 가격 차트(CH.p)에 데이터셋 추가
+  applyOverlaysToPrice(overlays);
+
+  // sub 패널들 렌더
+  container.innerHTML=subs.map(id=>{
+    const info=INDICATOR_CATALOG[id];
+    if(!info)return '';
+    return `<div class="indicator-panel" data-ind="${id}">
+      <div class="indicator-head">
+        <span class="indicator-name">${info.name}</span>
+        <button class="indicator-x" onclick="removeIndicator('${id}')" title="제거">✕</button>
+      </div>
+      <div class="cw" style="height:130px"><canvas id="ind-canvas-${id}"></canvas></div>
+    </div>`;
+  }).join('');
+
+  // 각 sub 지표 그리기
+  for(const id of subs){
+    drawIndicatorPanel(id);
+  }
+}
+
+// 가격 차트에 오버레이 추가 (SMA, EMA, BB 등)
+function applyOverlaysToPrice(overlayIds){
+  if(!CH.p||!D)return;
   const d=D;
-  if(CH.rsi){try{CH.rsi.destroy();}catch(e){}CH.rsi=null;}
-  if(CH.mc){try{CH.mc.destroy();}catch(e){}CH.mc=null;}
+  const prices=d.cl||[];
 
-  // RSI 캔버스 새로 만들기
-  const oldRc=$('rc'),rcParent=oldRc.parentNode;
-  const newRc=document.createElement('canvas');newRc.id='rc';
-  rcParent.replaceChild(newRc,oldRc);
+  // 기존 오버레이 데이터셋 제거 (가격/캔들 외)
+  CH.p.data.datasets=CH.p.data.datasets.filter(ds=>!ds._isOverlay);
 
-  // MACD 캔버스 새로 만들기
-  const oldMc=$('mc3'),mcParent=oldMc.parentNode;
-  const newMc=document.createElement('canvas');newMc.id='mc3';
-  mcParent.replaceChild(newMc,oldMc);
+  for(const id of overlayIds){
+    if(id==='sma20'){
+      const ma=calcSMA(prices,20);
+      CH.p.data.datasets.push({
+        label:'SMA 20',data:ma,borderColor:INDICATOR_CATALOG.sma20.color,
+        borderWidth:1.2,pointRadius:0,fill:false,_isOverlay:true,
+      });
+    }else if(id==='sma50'){
+      const ma=calcSMA(prices,50);
+      CH.p.data.datasets.push({
+        label:'SMA 50',data:ma,borderColor:INDICATOR_CATALOG.sma50.color,
+        borderWidth:1.2,pointRadius:0,fill:false,_isOverlay:true,
+      });
+    }else if(id==='sma200'){
+      const ma=calcSMA(prices,200);
+      CH.p.data.datasets.push({
+        label:'SMA 200',data:ma,borderColor:INDICATOR_CATALOG.sma200.color,
+        borderWidth:1.2,pointRadius:0,fill:false,_isOverlay:true,
+      });
+    }else if(id==='ema20'){
+      const ema=calcEMA(prices,20);
+      CH.p.data.datasets.push({
+        label:'EMA 20',data:ema,borderColor:INDICATOR_CATALOG.ema20.color,
+        borderWidth:1.2,pointRadius:0,fill:false,_isOverlay:true,
+      });
+    }else if(id==='ema50'){
+      const ema=calcEMA(prices,50);
+      CH.p.data.datasets.push({
+        label:'EMA 50',data:ema,borderColor:INDICATOR_CATALOG.ema50.color,
+        borderWidth:1.2,pointRadius:0,fill:false,_isOverlay:true,
+      });
+    }else if(id==='bb'){
+      const bb=calcBollinger(prices,20,2);
+      CH.p.data.datasets.push({label:'BB Upper',data:bb.upper,borderColor:'rgba(122,132,153,0.6)',borderWidth:1,pointRadius:0,fill:false,borderDash:[3,3],_isOverlay:true});
+      CH.p.data.datasets.push({label:'BB Mid',data:bb.mid,borderColor:'rgba(122,132,153,0.8)',borderWidth:1,pointRadius:0,fill:false,_isOverlay:true});
+      CH.p.data.datasets.push({label:'BB Lower',data:bb.lower,borderColor:'rgba(122,132,153,0.6)',borderWidth:1,pointRadius:0,fill:false,borderDash:[3,3],_isOverlay:true});
+    }
+  }
+  try{CH.p.update('none');}catch(e){}
+}
 
+// 단일 sub 지표 패널 그리기
+function drawIndicatorPanel(id){
+  const info=INDICATOR_CATALOG[id];
+  if(!info||!D)return;
+  const canvas=$('ind-canvas-'+id);
+  if(!canvas)return;
   const txt2=getComputedStyle(document.documentElement).getPropertyValue('--text2');
-  CH.rsi=new Chart(newRc,{type:'line',data:{labels:d.la,datasets:[
-    {label:'RSI',data:d.ri,borderColor:'#7F77DD',borderWidth:1.5,pointRadius:0,fill:false},
-    {label:'70',data:new Array(d.la.length).fill(70),borderColor:'rgba(255,77,109,.5)',borderWidth:1,borderDash:[4,4],pointRadius:0,fill:false},
-    {label:'30',data:new Array(d.la.length).fill(30),borderColor:'rgba(38,215,130,.5)',borderWidth:1,borderDash:[4,4],pointRadius:0,fill:false}
-  ]},options:{responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{display:false}},scales:{x:{display:false},y:{min:0,max:100,grid:{color:'rgba(150,150,170,.08)'},ticks:{font:{size:10},color:txt2}}}}});
-  CH.mc=new Chart(newMc,{type:'bar',data:{labels:d.la,datasets:[
-    {type:'line',label:'MACD',data:d.m,borderColor:'#4a9eff',borderWidth:1.5,pointRadius:0,fill:false},
-    {type:'line',label:'신호',data:d.sig,borderColor:'#D85A30',borderWidth:1.5,pointRadius:0,fill:false},
-    {type:'bar',label:'히스토그램',data:d.hist,backgroundColor:d.hist.map(v=>v>=0?'rgba(38,215,130,.5)':'rgba(255,77,109,.5)')}
-  ]},options:{responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{display:false}},scales:{x:{display:false},y:{grid:{color:'rgba(150,150,170,.08)'},ticks:{font:{size:10},color:txt2}}}}});
+  const d=D;
+
+  // 펀더멘털 지표는 별도 데이터 fetch
+  if(info.cat==='fundamental'){
+    drawFundamentalIndicator(id,canvas);
+    return;
+  }
+
+  let chartConfig=null;
+  if(id==='rsi'){
+    chartConfig={type:'line',data:{labels:d.la,datasets:[
+      {label:'RSI',data:d.ri||[],borderColor:'#7F77DD',borderWidth:1.5,pointRadius:0,fill:false},
+      {label:'70',data:new Array((d.la||[]).length).fill(70),borderColor:'rgba(255,77,109,.5)',borderWidth:1,borderDash:[4,4],pointRadius:0,fill:false},
+      {label:'30',data:new Array((d.la||[]).length).fill(30),borderColor:'rgba(38,215,130,.5)',borderWidth:1,borderDash:[4,4],pointRadius:0,fill:false},
+    ]},options:{responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{display:false}},scales:{x:{display:false},y:{min:0,max:100,grid:{color:'rgba(150,150,170,.08)'},ticks:{font:{size:10},color:txt2}}}}};
+  }else if(id==='macd'){
+    chartConfig={type:'bar',data:{labels:d.la,datasets:[
+      {type:'line',label:'MACD',data:d.m||[],borderColor:'#4a9eff',borderWidth:1.5,pointRadius:0,fill:false},
+      {type:'line',label:'신호',data:d.sig||[],borderColor:'#D85A30',borderWidth:1.5,pointRadius:0,fill:false},
+      {type:'bar',label:'히스토그램',data:d.hist||[],backgroundColor:(d.hist||[]).map(v=>v>=0?'rgba(38,215,130,.5)':'rgba(255,77,109,.5)')},
+    ]},options:{responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{display:false}},scales:{x:{display:false},y:{grid:{color:'rgba(150,150,170,.08)'},ticks:{font:{size:10},color:txt2}}}}};
+  }else if(id==='stoch'){
+    const stoch=calcStochastic(d.hi||[],d.lo||[],d.cl||[],14,3);
+    chartConfig={type:'line',data:{labels:d.la,datasets:[
+      {label:'%K',data:stoch.k,borderColor:'#4a9eff',borderWidth:1.5,pointRadius:0,fill:false},
+      {label:'%D',data:stoch.d,borderColor:'#f5b53d',borderWidth:1.5,pointRadius:0,fill:false},
+      {label:'80',data:new Array((d.la||[]).length).fill(80),borderColor:'rgba(255,77,109,.4)',borderWidth:1,borderDash:[3,3],pointRadius:0,fill:false},
+      {label:'20',data:new Array((d.la||[]).length).fill(20),borderColor:'rgba(38,215,130,.4)',borderWidth:1,borderDash:[3,3],pointRadius:0,fill:false},
+    ]},options:{responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{display:false}},scales:{x:{display:false},y:{min:0,max:100,grid:{color:'rgba(150,150,170,.08)'},ticks:{font:{size:10},color:txt2}}}}};
+  }else if(id==='cci'){
+    const cci=calcCCI(d.hi||[],d.lo||[],d.cl||[],20);
+    chartConfig={type:'line',data:{labels:d.la,datasets:[
+      {label:'CCI',data:cci,borderColor:'#bf72ff',borderWidth:1.5,pointRadius:0,fill:false},
+      {label:'100',data:new Array((d.la||[]).length).fill(100),borderColor:'rgba(255,77,109,.4)',borderWidth:1,borderDash:[3,3],pointRadius:0,fill:false},
+      {label:'-100',data:new Array((d.la||[]).length).fill(-100),borderColor:'rgba(38,215,130,.4)',borderWidth:1,borderDash:[3,3],pointRadius:0,fill:false},
+    ]},options:{responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{display:false}},scales:{x:{display:false},y:{grid:{color:'rgba(150,150,170,.08)'},ticks:{font:{size:10},color:txt2}}}}};
+  }else if(id==='williams'){
+    const w=calcWilliamsR(d.hi||[],d.lo||[],d.cl||[],14);
+    chartConfig={type:'line',data:{labels:d.la,datasets:[
+      {label:'%R',data:w,borderColor:'#22e8a8',borderWidth:1.5,pointRadius:0,fill:false},
+      {label:'-20',data:new Array((d.la||[]).length).fill(-20),borderColor:'rgba(255,77,109,.4)',borderWidth:1,borderDash:[3,3],pointRadius:0,fill:false},
+      {label:'-80',data:new Array((d.la||[]).length).fill(-80),borderColor:'rgba(38,215,130,.4)',borderWidth:1,borderDash:[3,3],pointRadius:0,fill:false},
+    ]},options:{responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{display:false}},scales:{x:{display:false},y:{min:-100,max:0,grid:{color:'rgba(150,150,170,.08)'},ticks:{font:{size:10},color:txt2}}}}};
+  }else if(id==='volume'){
+    const vols=d.vol||[];
+    const colors=vols.map((v,i)=>{
+      const prev=i>0?(d.cl||[])[i-1]:(d.cl||[])[i];
+      const cur=(d.cl||[])[i];
+      return cur>=prev?'rgba(38,215,130,.55)':'rgba(255,77,109,.55)';
+    });
+    chartConfig={type:'bar',data:{labels:d.la,datasets:[
+      {label:'거래량',data:vols,backgroundColor:colors,borderWidth:0},
+    ]},options:{responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{display:false}},scales:{x:{display:false},y:{grid:{color:'rgba(150,150,170,.08)'},ticks:{font:{size:10},color:txt2,callback:v=>v>=1e6?(v/1e6).toFixed(1)+'M':v>=1e3?(v/1e3).toFixed(0)+'K':v}}}}};
+  }else if(id==='obv'){
+    const obv=calcOBV(d.cl||[],d.vol||[]);
+    chartConfig={type:'line',data:{labels:d.la,datasets:[
+      {label:'OBV',data:obv,borderColor:'#10d090',borderWidth:1.5,pointRadius:0,fill:false},
+    ]},options:{responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{display:false}},scales:{x:{display:false},y:{grid:{color:'rgba(150,150,170,.08)'},ticks:{font:{size:10},color:txt2,callback:v=>v>=1e9?(v/1e9).toFixed(1)+'B':v>=1e6?(v/1e6).toFixed(0)+'M':v}}}}};
+  }else if(id==='mfi'){
+    const mfi=calcMFI(d.hi||[],d.lo||[],d.cl||[],d.vol||[],14);
+    chartConfig={type:'line',data:{labels:d.la,datasets:[
+      {label:'MFI',data:mfi,borderColor:'#f5b53d',borderWidth:1.5,pointRadius:0,fill:false},
+      {label:'80',data:new Array((d.la||[]).length).fill(80),borderColor:'rgba(255,77,109,.4)',borderWidth:1,borderDash:[3,3],pointRadius:0,fill:false},
+      {label:'20',data:new Array((d.la||[]).length).fill(20),borderColor:'rgba(38,215,130,.4)',borderWidth:1,borderDash:[3,3],pointRadius:0,fill:false},
+    ]},options:{responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{display:false}},scales:{x:{display:false},y:{min:0,max:100,grid:{color:'rgba(150,150,170,.08)'},ticks:{font:{size:10},color:txt2}}}}};
+  }else if(id==='atr'){
+    const atr=calcATR(d.hi||[],d.lo||[],d.cl||[],14);
+    chartConfig={type:'line',data:{labels:d.la,datasets:[
+      {label:'ATR',data:atr,borderColor:'#ff6b7a',borderWidth:1.5,pointRadius:0,fill:false},
+    ]},options:{responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{display:false}},scales:{x:{display:false},y:{grid:{color:'rgba(150,150,170,.08)'},ticks:{font:{size:10},color:txt2}}}}};
+  }
+
+  if(chartConfig){
+    try{
+      CH.indicators[id]=new Chart(canvas,chartConfig);
+    }catch(e){console.warn('지표 '+id+' 그리기 실패:',e);}
+  }
+}
+
+// 펀더멘털 지표 (분기/연간 시계열)
+async function drawFundamentalIndicator(id,canvas){
+  if(!D||!canvas)return;
+  const tk=D.tk;
+  const txt2=getComputedStyle(document.documentElement).getPropertyValue('--text2');
+
+  // FMP income-statement-quarterly 데이터 fetch
+  try{
+    let data=null;
+    if(['eps','revenue','netincome','margin'].includes(id)){
+      data=await tryFetch(`/api/fmp?symbol=${tk}&type=income_quarterly`).catch(()=>null);
+    }else if(['pe','pb','divyield','roe'].includes(id)){
+      data=await tryFetch(`/api/fmp?symbol=${tk}&type=ratios_quarterly`).catch(()=>null);
+    }else if(id==='fcf'){
+      data=await tryFetch(`/api/fmp?symbol=${tk}&type=cashflow_quarterly`).catch(()=>null);
+    }
+
+    if(!Array.isArray(data)||data.length===0){
+      // 데이터 없음
+      const ctx=canvas.getContext('2d');
+      ctx.fillStyle=txt2;ctx.font='11.5px sans-serif';ctx.textAlign='center';
+      ctx.fillText('데이터 없음 (한국 종목은 미지원)',canvas.width/2,canvas.height/2);
+      return;
+    }
+
+    // 최근 20분기 (5년)
+    const recent=data.slice(0,20).reverse();
+    const labels=recent.map(r=>r.date||r.period||'');
+
+    let values=[],label='',color='#10d090',formatter=v=>v;
+    if(id==='eps'){
+      values=recent.map(r=>r.eps||r.epsdiluted||0);
+      label='EPS ($)';color='#10d090';formatter=v=>'$'+v.toFixed(2);
+    }else if(id==='revenue'){
+      values=recent.map(r=>(r.revenue||0)/1e9);
+      label='매출 (10억$)';color='#4a9eff';formatter=v=>v.toFixed(1)+'B';
+    }else if(id==='netincome'){
+      values=recent.map(r=>(r.netIncome||0)/1e9);
+      label='순이익 (10억$)';color='#22e8a8';formatter=v=>v.toFixed(1)+'B';
+    }else if(id==='margin'){
+      values=recent.map(r=>{
+        if(r.operatingIncome&&r.revenue)return (r.operatingIncome/r.revenue)*100;
+        return r.operatingIncomeRatio?r.operatingIncomeRatio*100:0;
+      });
+      label='영업이익률 (%)';color='#f5b53d';formatter=v=>v.toFixed(1)+'%';
+    }else if(id==='pe'){
+      values=recent.map(r=>r.priceEarningsRatio||r.peRatio||0);
+      label='PER';color='#bf72ff';formatter=v=>v.toFixed(1);
+    }else if(id==='pb'){
+      values=recent.map(r=>r.priceToBookRatio||r.pbRatio||0);
+      label='PBR';color='#ff6b7a';formatter=v=>v.toFixed(2);
+    }else if(id==='roe'){
+      values=recent.map(r=>(r.returnOnEquity||0)*100);
+      label='ROE (%)';color='#22e8a8';formatter=v=>v.toFixed(1)+'%';
+    }else if(id==='fcf'){
+      values=recent.map(r=>(r.freeCashFlow||0)/1e9);
+      label='FCF (10억$)';color='#10d090';formatter=v=>v.toFixed(1)+'B';
+    }else if(id==='divyield'){
+      values=recent.map(r=>(r.dividendYield||0)*100);
+      label='배당수익률 (%)';color='#f5b53d';formatter=v=>v.toFixed(2)+'%';
+    }
+
+    const cfg={type:'bar',data:{labels,datasets:[
+      {label,data:values,backgroundColor:color+'aa',borderColor:color,borderWidth:1},
+    ]},options:{responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>label+': '+formatter(c.parsed.y)}}},scales:{x:{ticks:{font:{size:9},color:txt2,maxRotation:0,autoSkip:true,maxTicksLimit:6}},y:{grid:{color:'rgba(150,150,170,.08)'},ticks:{font:{size:10},color:txt2}}}}};
+
+    try{
+      CH.indicators[id]=new Chart(canvas,cfg);
+    }catch(e){console.warn('펀더멘털 지표 실패:',e);}
+  }catch(e){
+    const ctx=canvas.getContext('2d');
+    ctx.fillStyle=txt2;ctx.font='11.5px sans-serif';ctx.textAlign='center';
+    ctx.fillText('데이터 로드 실패',canvas.width/2,canvas.height/2);
+  }
+}
+
+// ─── 지표 계산 함수들 ───
+function calcSMA(arr,period){
+  const out=[];
+  for(let i=0;i<arr.length;i++){
+    if(i<period-1){out.push(null);continue;}
+    let sum=0;for(let j=0;j<period;j++)sum+=arr[i-j];
+    out.push(sum/period);
+  }
+  return out;
+}
+function calcEMA(arr,period){
+  const out=[];
+  const k=2/(period+1);
+  let ema=arr[0];
+  for(let i=0;i<arr.length;i++){
+    if(i===0){ema=arr[0];}
+    else{ema=arr[i]*k+ema*(1-k);}
+    out.push(i<period-1?null:ema);
+  }
+  return out;
+}
+function calcBollinger(arr,period,stdMul){
+  const upper=[],mid=[],lower=[];
+  for(let i=0;i<arr.length;i++){
+    if(i<period-1){upper.push(null);mid.push(null);lower.push(null);continue;}
+    let sum=0;for(let j=0;j<period;j++)sum+=arr[i-j];
+    const avg=sum/period;
+    let varSum=0;for(let j=0;j<period;j++)varSum+=Math.pow(arr[i-j]-avg,2);
+    const std=Math.sqrt(varSum/period);
+    upper.push(avg+std*stdMul);
+    mid.push(avg);
+    lower.push(avg-std*stdMul);
+  }
+  return {upper,mid,lower};
+}
+function calcStochastic(hi,lo,cl,period,smooth){
+  const k=[],d=[];
+  for(let i=0;i<cl.length;i++){
+    if(i<period-1){k.push(null);d.push(null);continue;}
+    let h=-Infinity,l=Infinity;
+    for(let j=0;j<period;j++){
+      if(hi[i-j]>h)h=hi[i-j];
+      if(lo[i-j]<l)l=lo[i-j];
+    }
+    const kv=h===l?50:((cl[i]-l)/(h-l))*100;
+    k.push(kv);
+  }
+  // %D는 %K의 SMA
+  for(let i=0;i<k.length;i++){
+    if(k[i]===null||i<period-1+smooth-1){d.push(null);continue;}
+    let sum=0,cnt=0;
+    for(let j=0;j<smooth;j++){
+      if(k[i-j]!==null){sum+=k[i-j];cnt++;}
+    }
+    d.push(cnt?sum/cnt:null);
+  }
+  return {k,d};
+}
+function calcCCI(hi,lo,cl,period){
+  const out=[];
+  const tp=hi.map((h,i)=>(h+lo[i]+cl[i])/3);
+  for(let i=0;i<tp.length;i++){
+    if(i<period-1){out.push(null);continue;}
+    let sum=0;for(let j=0;j<period;j++)sum+=tp[i-j];
+    const avg=sum/period;
+    let mdSum=0;for(let j=0;j<period;j++)mdSum+=Math.abs(tp[i-j]-avg);
+    const md=mdSum/period;
+    out.push(md===0?0:(tp[i]-avg)/(0.015*md));
+  }
+  return out;
+}
+function calcWilliamsR(hi,lo,cl,period){
+  const out=[];
+  for(let i=0;i<cl.length;i++){
+    if(i<period-1){out.push(null);continue;}
+    let h=-Infinity,l=Infinity;
+    for(let j=0;j<period;j++){
+      if(hi[i-j]>h)h=hi[i-j];
+      if(lo[i-j]<l)l=lo[i-j];
+    }
+    out.push(h===l?0:((h-cl[i])/(h-l))*-100);
+  }
+  return out;
+}
+function calcOBV(cl,vol){
+  const out=[];
+  let obv=0;
+  for(let i=0;i<cl.length;i++){
+    if(i===0){out.push(0);continue;}
+    if(cl[i]>cl[i-1])obv+=vol[i];
+    else if(cl[i]<cl[i-1])obv-=vol[i];
+    out.push(obv);
+  }
+  return out;
+}
+function calcMFI(hi,lo,cl,vol,period){
+  const out=[];
+  const tp=hi.map((h,i)=>(h+lo[i]+cl[i])/3);
+  const mf=tp.map((t,i)=>t*vol[i]);
+  for(let i=0;i<cl.length;i++){
+    if(i<period){out.push(null);continue;}
+    let pos=0,neg=0;
+    for(let j=0;j<period;j++){
+      const idx=i-j;
+      if(idx>0&&tp[idx]>tp[idx-1])pos+=mf[idx];
+      else if(idx>0&&tp[idx]<tp[idx-1])neg+=mf[idx];
+    }
+    const mr=neg===0?100:pos/neg;
+    out.push(100-100/(1+mr));
+  }
+  return out;
+}
+function calcATR(hi,lo,cl,period){
+  const out=[];
+  const tr=[];
+  for(let i=0;i<cl.length;i++){
+    if(i===0){tr.push(hi[i]-lo[i]);continue;}
+    const t1=hi[i]-lo[i];
+    const t2=Math.abs(hi[i]-cl[i-1]);
+    const t3=Math.abs(lo[i]-cl[i-1]);
+    tr.push(Math.max(t1,t2,t3));
+  }
+  for(let i=0;i<tr.length;i++){
+    if(i<period-1){out.push(null);continue;}
+    let sum=0;for(let j=0;j<period;j++)sum+=tr[i-j];
+    out.push(sum/period);
+  }
+  return out;
+}
+
+// ─── 지표 추가/제거 ───
+function addIndicator(id){
+  if(!D)return;
+  if(ACTIVE_INDICATORS.includes(id)){
+    closeIndicatorModal();
+    return;
+  }
+  ACTIVE_INDICATORS.push(id);
+  saveActiveIndicators(D.tk,ACTIVE_INDICATORS);
+  saveDefaultIndicators(ACTIVE_INDICATORS);  // 전역 기본으로도
+  renderIndicatorPanels();
+  closeIndicatorModal();
+}
+function removeIndicator(id){
+  ACTIVE_INDICATORS=ACTIVE_INDICATORS.filter(x=>x!==id);
+  if(D)saveActiveIndicators(D.tk,ACTIVE_INDICATORS);
+  saveDefaultIndicators(ACTIVE_INDICATORS);
+  renderIndicatorPanels();
+}
+
+// ─── 지표 추가 모달 ───
+function openIndicatorModal(){
+  if(!D){toast('종목을 먼저 검색해주세요');return;}
+  let modal=$('indicator-modal');
+  if(!modal){
+    modal=document.createElement('div');
+    modal.id='indicator-modal';
+    modal.className='modal-overlay';
+    modal.onclick=(e)=>{if(e.target===modal)closeIndicatorModal();};
+    document.body.appendChild(modal);
+  }
+  // 카테고리별 그룹
+  const groups={};
+  for(const [id,info] of Object.entries(INDICATOR_CATALOG)){
+    if(!groups[info.cat])groups[info.cat]=[];
+    groups[info.cat].push({id,...info});
+  }
+  modal.innerHTML=`<div class="modal-content" style="max-width:520px">
+    <div class="modal-head">
+      <div>
+        <div class="modal-title">지표 추가</div>
+        <div class="modal-sub">차트에 추가할 지표를 선택하세요</div>
+      </div>
+      <button class="modal-close" onclick="closeIndicatorModal()">✕</button>
+    </div>
+    <div style="padding:14px 18px;max-height:70vh;overflow-y:auto">
+      ${Object.entries(groups).map(([cat,items])=>`
+        <div style="margin-bottom:18px">
+          <div style="font-size:11px;font-weight:700;color:var(--text2);letter-spacing:0.5px;margin-bottom:8px">${INDICATOR_CATS[cat]||cat}</div>
+          ${items.map(it=>{
+            const added=ACTIVE_INDICATORS.includes(it.id);
+            return `<div onclick="${added?`removeIndicator('${it.id}');closeIndicatorModal();`:`addIndicator('${it.id}')`}" style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;margin-bottom:5px;border-radius:8px;background:${added?'var(--accent-soft)':'var(--bg3)'};border:1px solid ${added?'var(--accent)':'var(--border)'};cursor:pointer">
+              <div style="flex:1">
+                <div style="font-weight:600;font-size:13px;color:${added?'var(--accent)':'var(--text)'}">${added?'✓ ':''}${it.name}</div>
+                <div style="font-size:10.5px;color:var(--text2);margin-top:2px">${it.desc||''}</div>
+              </div>
+              <div style="font-size:11px;color:var(--text3);font-weight:600">${added?'제거':'추가'}</div>
+            </div>`;
+          }).join('')}
+        </div>
+      `).join('')}
+    </div>
+  </div>`;
+  modal.classList.add('on');
+}
+function closeIndicatorModal(){
+  const m=$('indicator-modal');
+  if(m)m.classList.remove('on');
 }
 
 // ── Analyst ───────────────────────────────────────────
@@ -3963,8 +4510,128 @@ async function fetchAssetExtras(tk){
   // 섹터 (Finnhub profile)
   try{
     const profile=await tryFetch(`/api/finnhub?symbol=${tk}&type=profile`);
-    if(profile?.finnhubIndustry)portfolio[idx].sector=profile.finnhubIndustry;
-  }catch(e){}
+    if(profile?.finnhubIndustry){
+      portfolio[idx].sector=profile.finnhubIndustry;
+    }else{
+      // Finnhub에 industry 없음 = ETF/펀드 가능성. ETF 섹터 매핑 적용
+      const etfSec=getETFSector(tk);
+      if(etfSec)portfolio[idx].sector=etfSec;
+    }
+  }catch(e){
+    // 실패 시에도 ETF 매핑은 시도
+    const etfSec=getETFSector(tk);
+    if(etfSec)portfolio[idx].sector=etfSec;
+  }
+}
+
+// 주요 ETF의 기초자산 섹터 매핑
+// 구조: 카테고리 단위로 묶음 (광범위 지수 / 섹터 / 테마 / 채권 / 원자재 / 국제 / 한국)
+function getETFSector(tk){
+  const t=(tk||'').toUpperCase();
+
+  // ─── 광범위 미국 지수 ETF ───
+  const broadUS={
+    'SPY':'광범위 지수','VOO':'광범위 지수','IVV':'광범위 지수','SPLG':'광범위 지수',
+    'QQQ':'기술 (Nasdaq100)','QQQM':'기술 (Nasdaq100)','TQQQ':'기술 (3X 레버리지)',
+    'DIA':'광범위 지수 (다우)','IWM':'소형주 (러셀2000)','IWB':'대형주',
+    'VTI':'광범위 지수 (전체)','VT':'전세계 주식','VEA':'선진국','VWO':'신흥국',
+    'IEFA':'선진국 (미국 제외)','IEMG':'신흥국','EFA':'선진국','EEM':'신흥국',
+    'MTUM':'모멘텀','QUAL':'퀄리티','VLUE':'가치주','SIZE':'중형주',
+    'USMV':'저변동성','SPYV':'가치주 (S&P500)','SPYG':'성장주 (S&P500)',
+    'VUG':'성장주','VTV':'가치주','SCHD':'배당주','VYM':'고배당',
+    'DGRO':'배당성장','NOBL':'배당귀족','HDV':'고배당',
+    'JEPI':'커버드콜 배당','JEPQ':'커버드콜 배당 (Nasdaq)',
+  };
+  if(broadUS[t])return `ETF · ${broadUS[t]}`;
+
+  // ─── 미국 섹터 ETF ───
+  const sectorETF={
+    'XLK':'기술','VGT':'기술','SMH':'반도체','SOXX':'반도체','SOXL':'반도체 (레버리지)',
+    'XLF':'금융','VFH':'금융','KRE':'은행','KBE':'은행','IAI':'증권사',
+    'XLV':'헬스케어','VHT':'헬스케어','IBB':'바이오테크','XBI':'바이오테크','ARKG':'유전공학',
+    'XLE':'에너지','VDE':'에너지','XOP':'에너지 (탐사)','OIH':'유전 서비스','URA':'우라늄',
+    'XLI':'산업','VIS':'산업','ITA':'방산','XAR':'방산',
+    'XLY':'경기소비재','VCR':'경기소비재','XRT':'소매','XHB':'주택건설',
+    'XLP':'필수소비재','VDC':'필수소비재',
+    'XLU':'유틸리티','VPU':'유틸리티',
+    'XLC':'통신서비스','VOX':'통신서비스',
+    'XLB':'소재','VAW':'소재','GDX':'금광주','GDXJ':'주니어 금광',
+    'XLRE':'리츠','VNQ':'리츠','SCHH':'리츠','REET':'글로벌 리츠','IYR':'리츠',
+  };
+  if(sectorETF[t])return `ETF · ${sectorETF[t]}`;
+
+  // ─── 테마 ETF ───
+  const themeETF={
+    'ARKK':'테마 · 혁신','ARKQ':'테마 · 자동화/로봇','ARKW':'테마 · 인터넷','ARKF':'테마 · 핀테크','ARKX':'테마 · 우주',
+    'BOTZ':'테마 · 로봇/AI','ROBO':'테마 · 로봇','AIQ':'테마 · AI','CHAT':'테마 · AI 챗봇',
+    'ICLN':'테마 · 친환경','TAN':'테마 · 태양광','LIT':'테마 · 리튬/배터리','DRIV':'테마 · 전기차',
+    'BLOK':'테마 · 블록체인','BITO':'테마 · 비트코인 선물','IBIT':'테마 · 비트코인','FBTC':'테마 · 비트코인','ETHA':'테마 · 이더리움',
+    'JETS':'테마 · 항공','HACK':'테마 · 사이버보안','CIBR':'테마 · 사이버보안',
+    'CLOU':'테마 · 클라우드','SKYY':'테마 · 클라우드',
+    'IPO':'테마 · IPO','PAVE':'테마 · 인프라',
+  };
+  if(themeETF[t])return `ETF · ${themeETF[t]}`;
+
+  // ─── 채권 ETF ───
+  const bondETF={
+    'TLT':'채권 · 미국 장기국채','IEF':'채권 · 중기국채','SHY':'채권 · 단기국채',
+    'AGG':'채권 · 종합','BND':'채권 · 종합','LQD':'채권 · 투자등급 회사채',
+    'HYG':'채권 · 하이일드','JNK':'채권 · 하이일드','EMB':'채권 · 신흥국',
+    'TIP':'채권 · 물가연동',
+    'TLTW':'채권 · 장기국채 커버드콜','TMF':'채권 · 장기국채 3X',
+  };
+  if(bondETF[t])return `ETF · ${bondETF[t]}`;
+
+  // ─── 원자재·통화 ETF ───
+  const commodityETF={
+    'GLD':'원자재 · 금','IAU':'원자재 · 금','GLDM':'원자재 · 금',
+    'SLV':'원자재 · 은','PPLT':'원자재 · 백금','PALL':'원자재 · 팔라듐',
+    'USO':'원자재 · 원유','BNO':'원자재 · 브렌트유','UNG':'원자재 · 천연가스',
+    'DBA':'원자재 · 농산물','DBC':'원자재 · 종합','CORN':'원자재 · 옥수수','WEAT':'원자재 · 밀',
+    'UUP':'통화 · USD 강세','UDN':'통화 · USD 약세','FXY':'통화 · 엔','FXE':'통화 · 유로',
+  };
+  if(commodityETF[t])return `ETF · ${commodityETF[t]}`;
+
+  // ─── 국제·지역 ETF ───
+  const internationalETF={
+    'FXI':'국제 · 중국 대형주','MCHI':'국제 · 중국','KWEB':'국제 · 중국 인터넷','YINN':'국제 · 중국 3X',
+    'EWJ':'국제 · 일본','EWY':'국제 · 한국','INDA':'국제 · 인도','EWZ':'국제 · 브라질',
+    'EWG':'국제 · 독일','EWU':'국제 · 영국','EWC':'국제 · 캐나다','EWA':'국제 · 호주',
+    'EWT':'국제 · 대만','EWH':'국제 · 홍콩','EWS':'국제 · 싱가포르',
+    'VGK':'국제 · 유럽','VWO':'국제 · 신흥국','VPL':'국제 · 아태평양',
+  };
+  if(internationalETF[t])return `ETF · ${internationalETF[t]}`;
+
+  // ─── 한국 ETF (.KS) ───
+  if(t.endsWith('.KS')||t.endsWith('.KQ')){
+    // 한국 ETF는 코드로 매핑 어려우니 이름 기반 추정 필요 (생략, 일단 ETF로 묶음)
+    // 주요 한국 ETF만 명시
+    const krETF={
+      '069500.KS':'ETF · 한국 KOSPI200',
+      '232080.KS':'ETF · 한국 KOSDAQ150',
+      '102110.KS':'ETF · 한국 KOSPI200',
+      '278530.KS':'ETF · 한국 KOSPI200 TR',
+      '305720.KS':'ETF · 한국 2차전지',
+      '364980.KS':'ETF · 한국 인버스',
+      '252670.KS':'ETF · 한국 인버스2X',
+      '233740.KS':'ETF · 한국 레버리지',
+      '122630.KS':'ETF · 한국 레버리지',
+      '114800.KS':'ETF · 한국 인버스',
+      '195930.KS':'ETF · 한국 TIGER 미국S&P500',
+      '360750.KS':'ETF · 한국 TIGER 미국S&P500',
+      '143850.KS':'ETF · 한국 TIGER 미국S&P500',
+      '381180.KS':'ETF · 한국 TIGER 미국필라델피아반도체',
+      '371460.KS':'ETF · 한국 TIGER 차이나전기차',
+      '305540.KS':'ETF · 한국 TIGER 2차전지',
+      '364690.KS':'ETF · 한국 TIGER 메타버스',
+    };
+    if(krETF[t])return krETF[t];
+  }
+
+  // 일반 ETF 패턴 감지 (티커가 ETF처럼 보이면 일반 'ETF'로 처리)
+  // 매우 짧은 티커는 보통 주식, 4글자 이상 + 특정 패턴은 ETF 가능성 ↑
+  // 정확한 판단은 어려우니 보수적으로 null 리턴 (Finnhub에서 industry 받으면 사용)
+  return null;
 }
 
 function removeAsset(i){
