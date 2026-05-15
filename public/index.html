@@ -235,6 +235,14 @@ body::before{
 .ms-pre{background:rgba(74,158,255,0.15);color:var(--blue);}
 .ms-after{background:rgba(255,180,50,0.15);color:#ffb432;}
 .ms-closed{background:var(--bg3);color:var(--text2);}
+.kr-mini{
+  display:inline-flex;align-items:center;justify-content:center;
+  margin-left:4px;font-size:13px;line-height:1;cursor:pointer;
+  transition:transform .12s,filter .12s;user-select:none;
+  filter:saturate(1) drop-shadow(0 0 4px rgba(38,215,130,0.5));
+}
+.kr-mini:hover,.kr-mini:active{transform:translateY(-1px) scale(1.1);}
+.kr-mini.dim{filter:grayscale(1) opacity(0.35);}
 
 /* Bottom navigation */
 .bottomnav{
@@ -967,7 +975,7 @@ body::before{
         </svg>
       </div>
       <span class="brand-text" onclick="navTo('home')" style="cursor:pointer">PULSA</span>
-      <span class="mkt-status" id="mkt-status">—</span>
+      <span class="mkt-status" id="mkt-status">—</span><span class="kr-mini" id="kr-mini" title="한국장" onclick="showMarketDetailModal()" style="display:none">🇰🇷</span>
     </div>
     <div style="display:flex;align-items:center;gap:8px">
       <button class="tb-action-btn" onclick="openInboxModal()" title="알림 함" style="position:relative">
@@ -6783,23 +6791,31 @@ function updateMarketStatus(){
   const now=new Date();
 
   // ─── NY 시간 (서머타임 자동 반영) ───
-  const nyStr=now.toLocaleString('en-US',{timeZone:'America/New_York',hour12:false});
-  const nyParts=nyStr.match(/(\d+)\/(\d+)\/(\d+),?\s*(\d+):(\d+):(\d+)/);
-  if(!nyParts)return;
-  let nyHour=parseInt(nyParts[4]);
-  if(nyHour===24)nyHour=0;  // 24시 보정
-  const nyMin=parseInt(nyParts[5]);
-  const nyDate=new Date(now.toLocaleString('en-US',{timeZone:'America/New_York'}));
-  const nyDow=nyDate.getDay();
+  // formatToParts로 안전하게 추출
+  const nyFmt=new Intl.DateTimeFormat('en-US',{
+    timeZone:'America/New_York',hour:'2-digit',minute:'2-digit',
+    weekday:'short',hour12:false,
+  });
+  const nyPartsArr=nyFmt.formatToParts(now);
+  const nyP={};nyPartsArr.forEach(x=>{nyP[x.type]=x.value;});
+  let nyHour=parseInt(nyP.hour||'0');if(nyHour===24)nyHour=0;
+  const nyMin=parseInt(nyP.minute||'0');
+  const nyDowMap={Sun:0,Mon:1,Tue:2,Wed:3,Thu:4,Fri:5,Sat:6};
+  const nyDow=nyDowMap[nyP.weekday]||0;
   const nyTotalMin=nyHour*60+nyMin;
 
   // ─── 한국 시간 (서머타임 없음, UTC+9 고정) ───
-  const krStr=now.toLocaleString('ko-KR',{timeZone:'Asia/Seoul',hour12:false});
-  const krParts=krStr.match(/(\d+):(\d+)/);
-  const krHour=krParts?parseInt(krParts[1])%24:0;
-  const krMin=krParts?parseInt(krParts[2]):0;
-  const krDate=new Date(now.toLocaleString('en-US',{timeZone:'Asia/Seoul'}));
-  const krDow=krDate.getDay();
+  // formatToParts로 안전하게 시/분 추출 (로케일 텍스트 의존 X)
+  const krFmt=new Intl.DateTimeFormat('en-US',{
+    timeZone:'Asia/Seoul',hour:'2-digit',minute:'2-digit',
+    weekday:'short',hour12:false,
+  });
+  const krPartsArr=krFmt.formatToParts(now);
+  const krP={};krPartsArr.forEach(x=>{krP[x.type]=x.value;});
+  let krHour=parseInt(krP.hour||'0');if(krHour===24)krHour=0;
+  const krMin=parseInt(krP.minute||'0');
+  const krDowMap={Sun:0,Mon:1,Tue:2,Wed:3,Thu:4,Fri:5,Sat:6};
+  const krDow=krDowMap[krP.weekday]||0;
   const krTotalMin=krHour*60+krMin;
   const krTimeStr=`${String(krHour).padStart(2,'0')}:${String(krMin).padStart(2,'0')}`;
 
@@ -6893,6 +6909,23 @@ function updateMarketStatus(){
   el.style.cursor='pointer';
   el.onclick=showMarketDetailModal;
   el.title='탭하면 상세 정보';
+
+  // 한국장 인디케이터: 열려있을 때만 컬러로, 마감/주말이면 회색으로 표시 (평일에만)
+  const krMini=$('kr-mini');
+  if(krMini){
+    if(kr.cls==='open'||kr.cls==='pre'){
+      krMini.style.display='inline-flex';
+      krMini.classList.remove('dim');
+      krMini.title=`한국장 ${kr.label.replace('한국 ','')}${kr.left?` (남은 ${Math.floor(kr.left/60)}h ${kr.left%60}m)`:''}`;
+    }else if(krDow>=1&&krDow<=5&&krTotalMin>=480&&krTotalMin<960){
+      // 평일 한국 시간 08:00~16:00 사이엔 회색으로 표시 (직전 또는 직후)
+      krMini.style.display='inline-flex';
+      krMini.classList.add('dim');
+      krMini.title='한국장 마감';
+    }else{
+      krMini.style.display='none';
+    }
+  }
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -6918,10 +6951,11 @@ function showMarketDetailModal(){
   const diff=krOff-nyOff;  // 보통 13 (서머) 또는 14 (표준)
 
   function nyToKr(nyHour,nyMin){
-    let h=nyHour+diff;
-    let m=nyMin;
-    if(h>=24)h-=24;
-    if(h<0)h+=24;
+    let totalMin=nyHour*60+nyMin+diff*60;
+    // 24시간 wraparound
+    totalMin=((totalMin%(24*60))+24*60)%(24*60);
+    const h=Math.floor(totalMin/60);
+    const m=totalMin%60;
     return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
   }
 
@@ -7015,23 +7049,21 @@ function closeMarketDetailModal(){
   if(m)m.classList.remove('on');
 }
 
-// 특정 시점의 타임존 오프셋(시간 단위) 가져오기
+// 특정 시점의 타임존 오프셋(시간 단위, 정수로 반올림) 가져오기
 function getTZOffsetHours(date,tz){
-  // 해당 타임존의 현지 시각을 ISO 식으로 가져옴
   const fmt=new Intl.DateTimeFormat('en-US',{
     timeZone:tz,year:'numeric',month:'2-digit',day:'2-digit',
     hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false,
   });
   const parts=fmt.formatToParts(date);
   const p={};parts.forEach(x=>{p[x.type]=x.value;});
-  // 24시 보정
   let hour=parseInt(p.hour);if(hour===24)hour=0;
   const tzDate=new Date(Date.UTC(
     parseInt(p.year),parseInt(p.month)-1,parseInt(p.day),
     hour,parseInt(p.minute),parseInt(p.second),
   ));
-  // UTC와의 차이 = 타임존 오프셋
-  return (tzDate-date)/(1000*60*60);
+  // 정수 시간 단위로 반올림 (분/초 단위 오차 제거)
+  return Math.round((tzDate-date)/(1000*60*60));
 }
 
 // 한국 기준 프리장 시작 시간 안내 (서머타임에 따라 17:00 또는 18:00)
