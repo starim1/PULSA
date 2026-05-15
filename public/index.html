@@ -6400,6 +6400,7 @@ function getStaticEvents(){
   for(let yOff=-1;yOff<=2;yOff++){
     const y=curYr+yOff;
     addYearlyEvents(events,y);
+    addAnnualSpecial(events,y);
   }
 
   // ─── 메이저 기업 컨퍼런스 (매년 비슷한 시기) ───
@@ -6953,6 +6954,8 @@ function addKoreanHolidays(events,year){
   }
 }
 
+// 잭슨홀 + 러셀 리밸런싱 등 추가 연간 이벤트
+function addAnnualSpecial(events,year){
   // ─── 잭슨홀 심포지엄 - 매년 8월 마지막 주 목~토 ───
   const jhStart=lastWeekdayOfMonth(year,8,4);
   events.push({
