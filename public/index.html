@@ -787,7 +787,11 @@ body::before{
 .target-labels{display:flex;justify-content:space-between;font-size:10px;color:var(--text2);margin-top:6px;font-family:'JetBrains Mono',monospace;}
 
 /* Calendar */
-.cal-filter{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;}
+.cal-filter{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;overflow-x:auto;-webkit-overflow-scrolling:touch;}
+@media (max-width:600px){
+  .cal-filter{flex-wrap:nowrap;padding-bottom:4px;}
+  .cal-filter button{white-space:nowrap;flex-shrink:0;}
+}
 .cal-view-toggle{
   display:flex;gap:6px;margin-bottom:10px;
 }
@@ -1635,8 +1639,11 @@ body::before{
       <div class="cal-filter">
         <button class="on" data-cal="all" onclick="setCalFilter('all')">전체</button>
         <button data-cal="econ" onclick="setCalFilter('econ')">경제 지표</button>
+        <button data-cal="fomc" onclick="setCalFilter('fomc')">중앙은행</button>
         <button data-cal="earn" onclick="setCalFilter('earn')">실적</button>
+        <button data-cal="conf" onclick="setCalFilter('conf')">기업 행사</button>
         <button data-cal="holiday" onclick="setCalFilter('holiday')">휴장일</button>
+        <button data-cal="kr" onclick="setCalFilter('kr')">한국</button>
         <button data-cal="watch" onclick="setCalFilter('watch')">관심·보유</button>
       </div>
 
@@ -6310,283 +6317,899 @@ async function loadCalendar(){
   else renderCalendar();
 }
 
-// 알고리즘 기반 경제 지표 일정 (12개월치)
+// ═══════════════════════════════════════════════════════════
+// 캘린더 이벤트 시스템 (정확한 시간 + 한국 시간 자동 변환 + 링크)
+// ═══════════════════════════════════════════════════════════
+// NY 시간(미국 동부)을 한국 시간 Date 객체로 변환
+// 미국 ET 14:00 → 한국 새벽 03~04시(다음날)로 자동 처리됨
+function nyEventDate(year,month,day,nyHour=8,nyMin=30){
+  // year, month(1~12), day, nyHour(0~23, ET 24시간), nyMin
+  // ET에서 해당 시각을 UTC로 변환 → 한국 시간(KST) Date 객체 생성
+  // 서머타임 자동 처리: 3월 둘째 일요일~11월 첫째 일요일은 EDT(UTC-4), 그 외는 EST(UTC-5)
+  const isDST=isUSDaylightSaving(year,month,day);
+  const utcOffset=isDST?4:5;  // ET에서 UTC로 더해야 할 시간
+  // UTC 기준 Date 생성: ET 시각 + offset
+  const utc=Date.UTC(year,month-1,day,nyHour+utcOffset,nyMin,0);
+  // 한국 시간 = UTC + 9 (Date 객체는 자동으로 사용자 로컬로 표시되지만 우리는 한국 기준 캘린더 셀에 매칭)
+  // 핵심: 이 시각이 한국에서 몇 월 며칠인지 정확히 잡힘
+  return new Date(utc);
+}
+
+function isUSDaylightSaving(year,month,day){
+  // 3월 둘째 일요일 02:00 시작 ~ 11월 첫째 일요일 02:00 종료
+  // 간단히 날짜 비교
+  function nthSunday(y,m,n){
+    let d=new Date(Date.UTC(y,m-1,1));
+    while(d.getUTCDay()!==0)d.setUTCDate(d.getUTCDate()+1);
+    d.setUTCDate(d.getUTCDate()+(n-1)*7);
+    return d.getUTCDate();
+  }
+  const dstStart=nthSunday(year,3,2);   // 3월 둘째 일요일
+  const dstEnd=nthSunday(year,11,1);    // 11월 첫째 일요일
+  if(month<3||month>11)return false;
+  if(month>3&&month<11)return true;
+  if(month===3)return day>=dstStart;
+  if(month===11)return day<dstEnd;
+  return false;
+}
+
+// 한국 자정 기준 이벤트 (시간 무관, 캘린더 셀 매칭용)
+function krEventDate(year,month,day){
+  return new Date(year,month-1,day);  // 로컬 자정 → 한국 사용자에겐 한국 자정
+}
+
+// ═══════════════════════════════════════════════════════════
+// 정적 일정 데이터 (정확한 공식 자료 + 알고리즘)
+// 매일 1회 자동 최신화 (캘린더 로드 시 24시간 캐시)
+// ═══════════════════════════════════════════════════════════
 function getStaticEvents(){
   const events=[];
   const now=new Date();
-  const yr=now.getFullYear(),mo=now.getMonth();
+  const curYr=now.getFullYear();
 
-  // 향후 12개월 자동 생성
-  for(let i=-1;i<12;i++){
-    const m=mo+i;
-    const baseDate=new Date(yr,m,1);
-    const y=baseDate.getFullYear(),mm=baseDate.getMonth();
-
-    // 매월 첫째 금요일: 비농업 고용 (NFP)
-    let nfp=new Date(y,mm,1);
-    while(nfp.getDay()!==5)nfp.setDate(nfp.getDate()+1);
-    events.push({date:new Date(nfp),title:'미국 비농업 고용 (NFP)',type:'econ',meta:'BLS · 21:30 KST',imp:3});
-
-    // CPI - 매월 둘째 주 (10-15일경, 평일)
-    let cpi=new Date(y,mm,12);
-    if(cpi.getDay()===0)cpi.setDate(cpi.getDate()+1);
-    else if(cpi.getDay()===6)cpi.setDate(cpi.getDate()+2);
-    events.push({date:cpi,title:'미국 CPI (소비자물가지수)',type:'econ',meta:'BLS · 21:30 KST',imp:3});
-
-    // PPI - CPI 다음날 (또는 비슷한 시기)
-    let ppi=new Date(cpi);ppi.setDate(ppi.getDate()+1);
-    if(ppi.getDay()===0)ppi.setDate(ppi.getDate()+1);
-    else if(ppi.getDay()===6)ppi.setDate(ppi.getDate()+2);
-    events.push({date:ppi,title:'미국 PPI (생산자물가지수)',type:'econ',meta:'BLS · 21:30 KST',imp:2});
-
-    // 소매판매 - 월 중순
-    let retail=new Date(y,mm,15);
-    if(retail.getDay()===0)retail.setDate(retail.getDate()+1);
-    else if(retail.getDay()===6)retail.setDate(retail.getDate()+2);
-    events.push({date:retail,title:'미국 소매판매',type:'econ',meta:'Census · 21:30 KST',imp:2});
-
-    // 산업생산 - 월 중순
-    let indProd=new Date(y,mm,17);
-    if(indProd.getDay()===0)indProd.setDate(indProd.getDate()+1);
-    else if(indProd.getDay()===6)indProd.setDate(indProd.getDate()+2);
-    events.push({date:indProd,title:'미국 산업생산',type:'econ',meta:'Fed · 22:15 KST',imp:1});
-
-    // PCE - 매월 마지막 영업일 근처 (28일 + 평일 조정)
-    let pce=new Date(y,mm,28);
-    if(pce.getDay()===0)pce.setDate(pce.getDate()+1);
-    else if(pce.getDay()===6)pce.setDate(pce.getDate()+2);
-    events.push({date:pce,title:'미국 PCE (개인소비지출)',type:'econ',meta:'BEA · 21:30 KST · Fed 핵심 지표',imp:3});
-
-    // GDP - 매 분기 첫 달 마지막 주 (1, 4, 7, 10월의 마지막 주)
-    if([0,3,6,9].includes(mm)){
-      let gdp=new Date(y,mm+1,0);  // 해당 월 마지막 날
-      while(gdp.getDay()===0||gdp.getDay()===6)gdp.setDate(gdp.getDate()-1);
-      events.push({date:gdp,title:`미국 GDP ${['1','2','3','4'][Math.floor(mm/3)]}분기`,type:'econ',meta:'BEA · 21:30 KST',imp:3});
-    }
-
-    // 매주 목요일 신규 실업수당 청구
-    let firstThu=new Date(y,mm,1);
-    while(firstThu.getDay()!==4)firstThu.setDate(firstThu.getDate()+1);
-    for(let w=0;w<5;w++){
-      const thu=new Date(firstThu);thu.setDate(thu.getDate()+w*7);
-      if(thu.getMonth()===mm){
-        events.push({date:thu,title:'신규 실업수당 청구',type:'econ',meta:'노동부 · 21:30 KST',imp:1});
-      }
-    }
-
-    // 미시간 소비자심리지수 - 매월 둘째 금요일 + 마지막 금요일
-    let firstFri=new Date(y,mm,1);
-    while(firstFri.getDay()!==5)firstFri.setDate(firstFri.getDate()+1);
-    const secondFri=new Date(firstFri);secondFri.setDate(secondFri.getDate()+7);
-    events.push({date:secondFri,title:'미시간대 소비자심리지수 (예비)',type:'econ',meta:'UMich · 23:00 KST',imp:2});
-    let lastFri=new Date(y,mm+1,0);
-    while(lastFri.getDay()!==5)lastFri.setDate(lastFri.getDate()-1);
-    events.push({date:lastFri,title:'미시간대 소비자심리지수 (확정)',type:'econ',meta:'UMich · 23:00 KST',imp:2});
-
-    // ISM 제조업 PMI - 매월 첫째 영업일
-    let isMfg=new Date(y,mm,1);
-    while(isMfg.getDay()===0||isMfg.getDay()===6)isMfg.setDate(isMfg.getDate()+1);
-    events.push({date:isMfg,title:'ISM 제조업 PMI',type:'econ',meta:'ISM · 23:00 KST',imp:2});
-
-    // ISM 서비스 PMI - 첫째 영업일 + 2일
-    let isSvc=new Date(isMfg);isSvc.setDate(isSvc.getDate()+2);
-    if(isSvc.getDay()===6)isSvc.setDate(isSvc.getDate()+2);
-    else if(isSvc.getDay()===0)isSvc.setDate(isSvc.getDate()+1);
-    events.push({date:isSvc,title:'ISM 서비스업 PMI',type:'econ',meta:'ISM · 23:00 KST',imp:2});
-
-    // ADP 민간 고용 - 비농업 2일 전 (수요일)
-    let adp=new Date(nfp);adp.setDate(adp.getDate()-2);
-    events.push({date:adp,title:'ADP 민간 고용',type:'econ',meta:'ADP · 21:15 KST',imp:2});
-  }
-
-  // FOMC 회의 (연 8회, 알고리즘: 1, 3, 4-5, 6, 7, 9, 10-11, 12월)
-  // 각 연도별로 SEC 발표 일정 패턴: 매월 셋째 또는 넷째 수요일
-  function addFOMC(year){
-    const fomcMonths=[
-      {m:0,week:4},   // 1월 말
-      {m:2,week:3},   // 3월 중하순
-      {m:4,week:1},   // 4말~5초
-      {m:5,week:3},   // 6월 중순
-      {m:6,week:4},   // 7월 말
-      {m:8,week:3},   // 9월 중순
-      {m:10,week:1},  // 11월 초
-      {m:11,week:2},  // 12월 중순
-    ];
-    for(const f of fomcMonths){
-      // 해당 월의 week번째 수요일
-      let d=new Date(year,f.m,1);
-      while(d.getDay()!==3)d.setDate(d.getDate()+1);
-      d.setDate(d.getDate()+(f.week-1)*7);
-      // 금리 결정은 수요일 오후 2시 (한국 새벽 4시)
-      events.push({date:new Date(d),title:`FOMC 금리 결정`,type:'econ',meta:'Fed · 03:00 KST · 파월 기자회견',imp:3});
-    }
-  }
-  addFOMC(yr);
-  addFOMC(yr+1);
-
-  // 잭슨홀 심포지엄 (매년 8월 마지막 주)
-  let jacksonHole=new Date(yr,7,31);  // 8월 31일에서 거꾸로
-  while(jacksonHole.getDay()!==4)jacksonHole.setDate(jacksonHole.getDate()-1);
-  events.push({date:jacksonHole,title:'잭슨홀 심포지엄',type:'econ',meta:'Fed · 캔자스시티 · 글로벌 통화정책',imp:3});
-
-  // ─── 추가 주요 이벤트: 미국 국채 발행 + 시장 영향 큰 발표 ───
-  for(let i=-1;i<12;i++){
-    const m=mo+i;
-    const baseDate=new Date(yr,m,1);
-    const y=baseDate.getFullYear(),mm=baseDate.getMonth();
-
-    // 매주 화/수/목: 10년물·30년물·2년물 국채 입찰 (대략 패턴)
-    // 실제 일정은 변동 있으나 보통 분기 첫 주 + 중순
-    // 2년물 - 매월 마지막 주 월요일
-    let yr2=new Date(y,mm+1,0);
-    while(yr2.getDay()!==1)yr2.setDate(yr2.getDate()-1);
-    events.push({date:new Date(yr2),title:'미국 2년물 국채 입찰',type:'econ',meta:'재무부 · 02:00 KST · 단기금리',imp:2});
-
-    // 10년물 - 매월 둘째 수요일
-    let yr10=new Date(y,mm,1);
-    while(yr10.getDay()!==3)yr10.setDate(yr10.getDate()+1);
-    yr10.setDate(yr10.getDate()+7);
-    events.push({date:new Date(yr10),title:'미국 10년물 국채 입찰',type:'econ',meta:'재무부 · 02:00 KST · 시장 벤치마크',imp:3});
-
-    // 30년물 - 매월 둘째 목요일
-    let yr30=new Date(yr10);yr30.setDate(yr30.getDate()+1);
-    events.push({date:new Date(yr30),title:'미국 30년물 국채 입찰',type:'econ',meta:'재무부 · 02:00 KST · 장기금리',imp:2});
-
-    // 7년물 - 매월 마지막 주 목요일
-    let yr7=new Date(y,mm+1,0);
-    while(yr7.getDay()!==4)yr7.setDate(yr7.getDate()-1);
-    events.push({date:new Date(yr7),title:'미국 7년물 국채 입찰',type:'econ',meta:'재무부 · 02:00 KST',imp:1});
-
-    // 5년물 - 매월 마지막 주 화요일
-    let yr5=new Date(y,mm+1,0);
-    while(yr5.getDay()!==2)yr5.setDate(yr5.getDate()-1);
-    events.push({date:new Date(yr5),title:'미국 5년물 국채 입찰',type:'econ',meta:'재무부 · 02:00 KST',imp:1});
-
-    // FOMC 의사록 - FOMC 3주 후 (대략)
-    // 신규 주택판매 - 매월 25일 근처
-    let newHome=new Date(y,mm,25);
-    if(newHome.getDay()===0)newHome.setDate(newHome.getDate()+1);
-    else if(newHome.getDay()===6)newHome.setDate(newHome.getDate()+2);
-    events.push({date:newHome,title:'미국 신규주택판매',type:'econ',meta:'Census · 23:00 KST',imp:2});
-
-    // 케이스실러 주택가격지수 - 매월 마지막 화요일
-    let csi=new Date(y,mm+1,0);
-    while(csi.getDay()!==2)csi.setDate(csi.getDate()-1);
-    events.push({date:csi,title:'케이스실러 주택가격지수',type:'econ',meta:'S&P · 22:00 KST',imp:2});
-
-    // 컨퍼런스보드 소비자신뢰지수 - 매월 마지막 화요일
-    let ccb=new Date(csi);
-    events.push({date:new Date(ccb),title:'컨퍼런스보드 소비자신뢰지수',type:'econ',meta:'CB · 23:00 KST',imp:2});
-
-    // 시카고 PMI - 매월 마지막 영업일
-    let chgPmi=new Date(y,mm+1,0);
-    while(chgPmi.getDay()===0||chgPmi.getDay()===6)chgPmi.setDate(chgPmi.getDate()-1);
-    events.push({date:chgPmi,title:'시카고 PMI',type:'econ',meta:'ISM · 22:45 KST',imp:1});
-
-    // 건설지출 - 매월 첫째 영업일
-    let constr=new Date(y,mm,1);
-    while(constr.getDay()===0||constr.getDay()===6)constr.setDate(constr.getDate()+1);
-    events.push({date:constr,title:'건설지출',type:'econ',meta:'Census · 23:00 KST',imp:1});
-
-    // 자동차 판매 - 매월 첫째 영업일 근처
-    let autoSale=new Date(constr);autoSale.setDate(autoSale.getDate()+2);
-    if(autoSale.getDay()===0)autoSale.setDate(autoSale.getDate()+1);
-    else if(autoSale.getDay()===6)autoSale.setDate(autoSale.getDate()+2);
-    events.push({date:autoSale,title:'자동차 판매',type:'econ',meta:'Auto · 종일',imp:1});
-
-    // EIA 원유재고 - 매주 수요일
-    let firstWed=new Date(y,mm,1);
-    while(firstWed.getDay()!==3)firstWed.setDate(firstWed.getDate()+1);
-    for(let w=0;w<5;w++){
-      const wed=new Date(firstWed);wed.setDate(wed.getDate()+w*7);
-      if(wed.getMonth()===mm){
-        events.push({date:wed,title:'EIA 원유재고',type:'econ',meta:'EIA · 23:30 KST · 유가 영향',imp:1});
-      }
-    }
-
-    // OPEC+ 회의 (연 8회, 1·3·6·8·10·12월) - 매월 첫째 월요일
-    if([0,2,5,7,9,11].includes(mm)){
-      let opec=new Date(y,mm,1);
-      while(opec.getDay()!==1)opec.setDate(opec.getDate()+1);
-      events.push({date:opec,title:'OPEC+ 회의',type:'econ',meta:'산유국 회의 · 원자재 영향',imp:2});
-    }
-
-    // 미시간대 인플레이션 기대치 - 미시간대 심리지수 발표일과 동일
-    // 베이지북 - FOMC 2주 전 (수요일)
-    // (FOMC 일정 기반으로 간접 계산)
-
-    // CB 경기선행지수 - 매월 20일 근처
-    let lei=new Date(y,mm,20);
-    if(lei.getDay()===0)lei.setDate(lei.getDate()+1);
-    else if(lei.getDay()===6)lei.setDate(lei.getDate()+2);
-    events.push({date:lei,title:'CB 경기선행지수 (LEI)',type:'econ',meta:'CB · 23:00 KST',imp:1});
-
-    // 미국 무역수지 - 매월 중순
-    let trade=new Date(y,mm,8);
-    if(trade.getDay()===0)trade.setDate(trade.getDate()+1);
-    else if(trade.getDay()===6)trade.setDate(trade.getDate()+2);
-    events.push({date:trade,title:'미국 무역수지',type:'econ',meta:'Census/BEA · 21:30 KST',imp:1});
-
-    // 한국 금통위 (매월 둘째 또는 셋째 목요일, 연 8회)
-    if([0,1,3,4,6,7,9,10].includes(mm)){
-      let bok=new Date(y,mm,1);
-      while(bok.getDay()!==4)bok.setDate(bok.getDate()+1);
-      bok.setDate(bok.getDate()+7);  // 둘째 목요일
-      events.push({date:new Date(bok),title:'한국은행 금통위',type:'econ',meta:'BOK · 09:00 KST · 한국 기준금리',imp:2});
-    }
-
-    // ECB 회의 (연 8회) - 매월 첫째 목요일 (대략)
-    if([0,2,3,5,6,8,9,11].includes(mm)){
-      let ecb=new Date(y,mm,1);
-      while(ecb.getDay()!==4)ecb.setDate(ecb.getDate()+1);
-      events.push({date:new Date(ecb),title:'ECB 통화정책 회의',type:'econ',meta:'ECB · 22:15 KST · 유럽금리',imp:2});
-    }
-
-    // BOJ 회의 (연 8회) - 1, 3, 4, 6, 7, 9, 10, 12월 중순
-    if([0,2,3,5,6,8,9,11].includes(mm)){
-      let boj=new Date(y,mm,18);
-      while(boj.getDay()===0||boj.getDay()===6)boj.setDate(boj.getDate()+1);
-      events.push({date:new Date(boj),title:'BOJ 통화정책 회의',type:'econ',meta:'BOJ · 일본 금리·엔화 영향',imp:2});
-    }
-
-    // 옵션 만기일 (트리플 위칭) - 3, 6, 9, 12월 셋째 금요일
-    if([2,5,8,11].includes(mm)){
-      let opex=new Date(y,mm,1);
-      while(opex.getDay()!==5)opex.setDate(opex.getDate()+1);
-      opex.setDate(opex.getDate()+14);
-      events.push({date:new Date(opex),title:'쿼드러플 위칭 (옵션만기)',type:'econ',meta:'NYSE · 변동성 확대',imp:3});
-    }
-    // 매월 셋째 금요일은 일반 옵션 만기
-    else{
-      let opex=new Date(y,mm,1);
-      while(opex.getDay()!==5)opex.setDate(opex.getDate()+1);
-      opex.setDate(opex.getDate()+14);
-      events.push({date:new Date(opex),title:'월간 옵션 만기',type:'econ',meta:'NYSE · 변동성 주의',imp:1});
+  // ─── 정확한 FOMC 일정 (공식 발표) ───
+  // 발표 시각: ET 14:00 → 한국 새벽 03~04시 (다음날)
+  const FOMC_DATES={
+    2025:[
+      {y:2025,m:1,d:29},{y:2025,m:3,d:19},{y:2025,m:5,d:7},{y:2025,m:6,d:18},
+      {y:2025,m:7,d:30},{y:2025,m:9,d:17},{y:2025,m:10,d:29},{y:2025,m:12,d:10},
+    ],
+    2026:[
+      {y:2026,m:1,d:28},{y:2026,m:3,d:18},{y:2026,m:4,d:29},{y:2026,m:6,d:17},
+      {y:2026,m:7,d:29},{y:2026,m:9,d:16},{y:2026,m:10,d:28},{y:2026,m:12,d:9},
+    ],
+    2027:[
+      {y:2027,m:1,d:27},{y:2027,m:3,d:17},{y:2027,m:4,d:28},{y:2027,m:6,d:16},
+      {y:2027,m:7,d:28},{y:2027,m:9,d:22},{y:2027,m:10,d:27},{y:2027,m:12,d:8},
+    ],
+  };
+  for(const yr of Object.keys(FOMC_DATES)){
+    for(const f of FOMC_DATES[yr]){
+      events.push({
+        date:nyEventDate(f.y,f.m,f.d,14,0),  // ET 14:00
+        title:'FOMC 금리 결정',
+        type:'econ',
+        meta:'Fed · 한국 새벽 04:00 발표 · 파월 의장 기자회견',
+        imp:3,
+        url:`https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm`,
+      });
     }
   }
 
-  // 러셀 리밸런싱 - 6월 마지막 금요일
-  let russell=new Date(yr,5,30);
-  while(russell.getDay()!==5)russell.setDate(russell.getDate()-1);
-  events.push({date:russell,title:'러셀지수 리밸런싱',type:'econ',meta:'FTSE Russell · 소형주 변동',imp:2});
+  // ─── 알고리즘: 매년 자동 생성 일정 (현재 연도 ±1년) ───
+  for(let yOff=-1;yOff<=2;yOff++){
+    const y=curYr+yOff;
+    addYearlyEvents(events,y);
+  }
 
-  // S&P 분기 리밸런싱 - 3, 6, 9, 12월 셋째 금요일 (옵션 만기와 동일)
-  // 이미 위에서 처리
-
-  // CES (1월 초)
-  let ces=new Date(yr+(mo>0?1:0),0,7);
-  events.push({date:ces,title:'CES 2026 (Tech 전시회)',type:'econ',meta:'라스베가스 · 기술주 영향',imp:2});
-
-  // WWDC (6월 첫째 월요일)
-  let wwdc=new Date(yr,5,1);
-  while(wwdc.getDay()!==1)wwdc.setDate(wwdc.getDate()+1);
-  events.push({date:wwdc,title:'Apple WWDC',type:'econ',meta:'AAPL · 신제품/iOS',imp:2});
-
-  // GTC (3월 중순) - NVIDIA 주관
-  let gtc=new Date(yr,2,17);
-  events.push({date:gtc,title:'NVIDIA GTC',type:'econ',meta:'NVDA · AI 컨퍼런스',imp:2});
+  // ─── 메이저 기업 컨퍼런스 (매년 비슷한 시기) ───
+  for(let yOff=0;yOff<=1;yOff++){
+    const y=curYr+yOff;
+    addMajorConferences(events,y);
+  }
 
   return events;
+}
+
+// 매년 반복되는 정기 일정 (알고리즘)
+function addYearlyEvents(events,year){
+  // ─── 매월 일정 (CPI/PPI/NFP 등) ───
+  for(let m=1;m<=12;m++){
+    // NFP (비농업 고용) - 매월 첫째 금요일 ET 08:30 = 한국 22:30 (서머)
+    const nfp=nthWeekdayOfMonth(year,m,5,1);  // 5=금
+    events.push({
+      date:nyEventDate(year,m,nfp,8,30),
+      title:'미국 비농업 고용 (NFP)',
+      type:'econ',
+      meta:'BLS · 한국 22:30 발표 · 실업률 동시 발표',
+      imp:3,
+      url:'https://www.bls.gov/news.release/empsit.toc.htm',
+    });
+
+    // ADP 민간 고용 - NFP 이틀 전 수요일 (대략) ET 08:15
+    let adp=new Date(year,m-1,nfp-2);
+    while(adp.getDay()!==3)adp.setDate(adp.getDate()-1);
+    events.push({
+      date:nyEventDate(year,adp.getMonth()+1,adp.getDate(),8,15),
+      title:'ADP 민간 고용',
+      type:'econ',
+      meta:'ADP · 한국 22:15 발표',
+      imp:2,
+      url:'https://www.adpemploymentreport.com/',
+    });
+
+    // CPI - 매월 둘째 주 화요일~목요일 사이 ET 08:30
+    // 대략 10~15일 사이 평일
+    const cpiTarget=findWeekdayInRange(year,m,10,15,[2,3,4]);  // 화/수/목 선호
+    events.push({
+      date:nyEventDate(year,m,cpiTarget,8,30),
+      title:'미국 CPI (소비자물가지수)',
+      type:'econ',
+      meta:'BLS · 한국 22:30 발표 · 인플레이션 핵심 지표',
+      imp:3,
+      url:'https://www.bls.gov/cpi/',
+    });
+
+    // PPI - CPI 다음날 ET 08:30
+    let ppi=new Date(year,m-1,cpiTarget+1);
+    while(ppi.getDay()===0||ppi.getDay()===6)ppi.setDate(ppi.getDate()+1);
+    events.push({
+      date:nyEventDate(year,ppi.getMonth()+1,ppi.getDate(),8,30),
+      title:'미국 PPI (생산자물가지수)',
+      type:'econ',
+      meta:'BLS · 한국 22:30 발표',
+      imp:2,
+      url:'https://www.bls.gov/ppi/',
+    });
+
+    // 소매판매 - 매월 중순 (15~17일) ET 08:30
+    const retail=findWeekdayInRange(year,m,15,17,[1,2,3,4,5]);
+    events.push({
+      date:nyEventDate(year,m,retail,8,30),
+      title:'미국 소매판매',
+      type:'econ',
+      meta:'Census · 한국 22:30 발표',
+      imp:2,
+      url:'https://www.census.gov/retail/index.html',
+    });
+
+    // PCE - 매월 마지막 주 금요일에 가까운 영업일 ET 08:30
+    const pceTarget=findWeekdayInRange(year,m,26,30,[1,2,3,4,5]);
+    events.push({
+      date:nyEventDate(year,m,pceTarget,8,30),
+      title:'미국 PCE (개인소비지출)',
+      type:'econ',
+      meta:'BEA · 한국 22:30 발표 · Fed 핵심 인플레이션 지표',
+      imp:3,
+      url:'https://www.bea.gov/data/personal-consumption-expenditures-price-index',
+    });
+
+    // ISM 제조업 PMI - 매월 첫째 영업일 ET 10:00
+    let ismMfg=nthWeekdayOfMonth(year,m,1,1);  // 첫째 월요일
+    let testD=new Date(year,m-1,1);
+    while(testD.getDay()===0||testD.getDay()===6)testD.setDate(testD.getDate()+1);
+    ismMfg=testD.getDate();
+    events.push({
+      date:nyEventDate(year,m,ismMfg,10,0),
+      title:'ISM 제조업 PMI',
+      type:'econ',
+      meta:'ISM · 한국 00:00 발표',
+      imp:2,
+      url:'https://www.ismworld.org/supply-management-news-and-reports/reports/ism-report-on-business/',
+    });
+
+    // ISM 서비스 PMI - 매월 셋째 영업일 ET 10:00
+    let ismSvcD=new Date(year,m-1,ismMfg+2);
+    while(ismSvcD.getDay()===0||ismSvcD.getDay()===6)ismSvcD.setDate(ismSvcD.getDate()+1);
+    events.push({
+      date:nyEventDate(year,m,ismSvcD.getDate(),10,0),
+      title:'ISM 서비스업 PMI',
+      type:'econ',
+      meta:'ISM · 한국 00:00 발표',
+      imp:2,
+      url:'https://www.ismworld.org/supply-management-news-and-reports/reports/ism-report-on-business/',
+    });
+
+    // 미시간대 소비자심리지수 (예비) - 매월 둘째 금요일 ET 10:00
+    const umichPrelim=nthWeekdayOfMonth(year,m,5,2);
+    events.push({
+      date:nyEventDate(year,m,umichPrelim,10,0),
+      title:'미시간대 소비자심리지수 (예비)',
+      type:'econ',
+      meta:'UMich · 한국 00:00 발표',
+      imp:2,
+      url:'http://www.sca.isr.umich.edu/',
+    });
+
+    // 미시간대 소비자심리지수 (확정) - 매월 마지막 금요일 ET 10:00
+    const umichFinal=lastWeekdayOfMonth(year,m,5);
+    events.push({
+      date:nyEventDate(year,m,umichFinal,10,0),
+      title:'미시간대 소비자심리지수 (확정)',
+      type:'econ',
+      meta:'UMich · 한국 00:00 발표',
+      imp:2,
+      url:'http://www.sca.isr.umich.edu/',
+    });
+
+    // 컨퍼런스보드 소비자신뢰지수 - 매월 마지막 화요일 ET 10:00
+    const ccb=lastWeekdayOfMonth(year,m,2);
+    events.push({
+      date:nyEventDate(year,m,ccb,10,0),
+      title:'컨퍼런스보드 소비자신뢰지수',
+      type:'econ',
+      meta:'Conference Board · 한국 00:00 발표',
+      imp:2,
+      url:'https://www.conference-board.org/topics/consumer-confidence',
+    });
+
+    // CB 경기선행지수 (LEI) - 매월 20일 근처 ET 10:00
+    const lei=findWeekdayInRange(year,m,18,22,[1,2,3,4,5]);
+    events.push({
+      date:nyEventDate(year,m,lei,10,0),
+      title:'CB 경기선행지수 (LEI)',
+      type:'econ',
+      meta:'Conference Board · 한국 00:00 발표',
+      imp:1,
+      url:'https://www.conference-board.org/topics/us-leading-indicators',
+    });
+
+    // 신규주택판매 - 매월 22~26일 ET 10:00
+    const newHome=findWeekdayInRange(year,m,22,26,[1,2,3,4,5]);
+    events.push({
+      date:nyEventDate(year,m,newHome,10,0),
+      title:'미국 신규주택판매',
+      type:'econ',
+      meta:'Census · 한국 00:00 발표',
+      imp:2,
+      url:'https://www.census.gov/construction/nrs/',
+    });
+
+    // 케이스실러 주택가격지수 - 매월 마지막 화요일 ET 09:00
+    const csi=lastWeekdayOfMonth(year,m,2);
+    events.push({
+      date:nyEventDate(year,m,csi,9,0),
+      title:'케이스실러 주택가격지수',
+      type:'econ',
+      meta:'S&P · 한국 23:00 발표 · 2개월 전 데이터',
+      imp:2,
+      url:'https://www.spglobal.com/spdji/en/index-family/indicators/sp-corelogic-case-shiller/',
+    });
+
+    // 시카고 PMI - 매월 마지막 영업일 ET 09:45
+    const chgPmi=lastBusinessDayOfMonth(year,m);
+    events.push({
+      date:nyEventDate(year,m,chgPmi,9,45),
+      title:'시카고 PMI',
+      type:'econ',
+      meta:'ISM 시카고 · 한국 23:45 발표',
+      imp:1,
+      url:'https://www.ismchicago.org/',
+    });
+
+    // 미국 무역수지 - 매월 5~8일 ET 08:30
+    const trade=findWeekdayInRange(year,m,5,9,[1,2,3,4,5]);
+    events.push({
+      date:nyEventDate(year,m,trade,8,30),
+      title:'미국 무역수지',
+      type:'econ',
+      meta:'Census/BEA · 한국 22:30 발표',
+      imp:1,
+      url:'https://www.census.gov/foreign-trade/',
+    });
+
+    // 산업생산 - 매월 15~17일 ET 09:15
+    const indProd=findWeekdayInRange(year,m,15,17,[1,2,3,4,5]);
+    events.push({
+      date:nyEventDate(year,m,indProd,9,15),
+      title:'미국 산업생산',
+      type:'econ',
+      meta:'Fed · 한국 23:15 발표',
+      imp:1,
+      url:'https://www.federalreserve.gov/releases/g17/',
+    });
+
+    // 매주 목요일 신규 실업수당 청구 - ET 08:30
+    let firstThu=nthWeekdayOfMonth(year,m,4,1);
+    for(let w=0;w<5;w++){
+      const day=firstThu+w*7;
+      if(day>daysInMonth(year,m))break;
+      events.push({
+        date:nyEventDate(year,m,day,8,30),
+        title:'신규 실업수당 청구',
+        type:'econ',
+        meta:'노동부 · 한국 22:30 발표 · 매주',
+        imp:1,
+        url:'https://www.dol.gov/ui/data.pdf',
+      });
+    }
+
+    // 매주 수요일 EIA 원유재고 - ET 10:30
+    let firstWed=nthWeekdayOfMonth(year,m,3,1);
+    for(let w=0;w<5;w++){
+      const day=firstWed+w*7;
+      if(day>daysInMonth(year,m))break;
+      events.push({
+        date:nyEventDate(year,m,day,10,30),
+        title:'EIA 원유재고',
+        type:'econ',
+        meta:'EIA · 한국 00:30 발표 · WTI 유가 영향',
+        imp:1,
+        url:'https://www.eia.gov/petroleum/weekly/',
+      });
+    }
+
+    // GDP - 매 분기 첫 달 마지막 주 (1,4,7,10월) ET 08:30
+    if([1,4,7,10].includes(m)){
+      const gdp=findWeekdayInRange(year,m,25,30,[1,2,3,4,5]);
+      const q=Math.ceil(m/3);
+      const qName=['4분기','1분기','2분기','3분기','4분기'][q-1>=0?q-1:3];
+      events.push({
+        date:nyEventDate(year,m,gdp,8,30),
+        title:`미국 GDP ${qName} (속보치)`,
+        type:'econ',
+        meta:'BEA · 한국 22:30 발표',
+        imp:3,
+        url:'https://www.bea.gov/data/gdp/gross-domestic-product',
+      });
+    }
+
+    // ─── 미국 국채 입찰 (대략적 패턴, NY 13:00 = 한국 새벽 03:00) ───
+    // 2년물 - 매월 마지막 주 월요일 ET 13:00
+    const yr2=lastWeekdayOfMonth(year,m,1);
+    events.push({
+      date:nyEventDate(year,m,yr2,13,0),
+      title:'미국 2년물 국채 입찰',
+      type:'econ',
+      meta:'재무부 · 한국 새벽 03:00 · 단기금리 지표',
+      imp:2,
+      url:'https://www.treasurydirect.gov/auctions/upcoming/',
+    });
+    // 5년물 - 마지막 주 화요일
+    const yr5=lastWeekdayOfMonth(year,m,2);
+    events.push({
+      date:nyEventDate(year,m,yr5,13,0),
+      title:'미국 5년물 국채 입찰',
+      type:'econ',
+      meta:'재무부 · 한국 새벽 03:00',
+      imp:1,
+      url:'https://www.treasurydirect.gov/auctions/upcoming/',
+    });
+    // 7년물 - 마지막 주 목요일
+    const yr7=lastWeekdayOfMonth(year,m,4);
+    events.push({
+      date:nyEventDate(year,m,yr7,13,0),
+      title:'미국 7년물 국채 입찰',
+      type:'econ',
+      meta:'재무부 · 한국 새벽 03:00',
+      imp:1,
+      url:'https://www.treasurydirect.gov/auctions/upcoming/',
+    });
+    // 10년물 - 매월 둘째 수요일 (가장 중요)
+    const yr10=nthWeekdayOfMonth(year,m,3,2);
+    events.push({
+      date:nyEventDate(year,m,yr10,13,0),
+      title:'미국 10년물 국채 입찰',
+      type:'econ',
+      meta:'재무부 · 한국 새벽 03:00 · 시장 벤치마크 금리',
+      imp:3,
+      url:'https://www.treasurydirect.gov/auctions/upcoming/',
+    });
+    // 30년물 - 10년물 다음날 목요일
+    const yr30=yr10+1;
+    if(yr30<=daysInMonth(year,m)){
+      events.push({
+        date:nyEventDate(year,m,yr30,13,0),
+        title:'미국 30년물 국채 입찰',
+        type:'econ',
+        meta:'재무부 · 한국 새벽 03:00 · 장기금리',
+        imp:2,
+        url:'https://www.treasurydirect.gov/auctions/upcoming/',
+      });
+    }
+
+    // ─── 옵션 만기 ───
+    if([3,6,9,12].includes(m)){
+      // 쿼드러플 위칭 - 3,6,9,12월 셋째 금요일 (변동성 큰 날)
+      const opex=nthWeekdayOfMonth(year,m,5,3);
+      events.push({
+        date:krEventDate(year,m,opex),  // 종일 이벤트 (한국 기준 그날)
+        title:'쿼드러플 위칭 (옵션·선물 만기)',
+        type:'econ',
+        meta:'NYSE · 종일 거래 변동성 확대',
+        imp:3,
+        url:'https://www.nasdaq.com/glossary/q/quadruple-witching',
+      });
+    }else{
+      // 나머지 달 셋째 금요일 일반 옵션 만기
+      const opex=nthWeekdayOfMonth(year,m,5,3);
+      events.push({
+        date:krEventDate(year,m,opex),
+        title:'월간 옵션 만기',
+        type:'econ',
+        meta:'NYSE · 변동성 주의',
+        imp:1,
+        url:'https://www.nasdaq.com/glossary/o/options-expiration',
+      });
+    }
+
+    // ─── 한국 금통위 (연 8회: 1,2,4,5,7,8,10,11월) ET와 무관 ───
+    if([1,2,4,5,7,8,10,11].includes(m)){
+      const bok=nthWeekdayOfMonth(year,m,4,2);  // 둘째 목요일
+      events.push({
+        date:new Date(year,m-1,bok,10,0),  // 한국 시간 10:00
+        title:'한국은행 금통위 (기준금리 결정)',
+        type:'econ',
+        meta:'BOK · 한국 10:00 발표',
+        imp:2,
+        url:'https://www.bok.or.kr/portal/main/contents.do?menuNo=200643',
+      });
+    }
+
+    // ─── ECB 회의 (연 8회) ET 08:15 = 한국 22:15 (서머) ───
+    if([1,3,4,6,7,9,10,12].includes(m)){
+      const ecb=nthWeekdayOfMonth(year,m,4,1);  // 첫째 목요일
+      events.push({
+        date:nyEventDate(year,m,ecb,8,15),
+        title:'ECB 통화정책 회의',
+        type:'econ',
+        meta:'ECB · 한국 22:15 발표 · 유로존 금리',
+        imp:2,
+        url:'https://www.ecb.europa.eu/press/calendars/mgcgc/html/index.en.html',
+      });
+    }
+
+    // ─── BOJ 회의 (연 8회) 일본 시간 기준 ───
+    if([1,3,4,6,7,9,10,12].includes(m)){
+      const bojD=findWeekdayInRange(year,m,18,22,[1,2,3,4,5]);
+      events.push({
+        date:new Date(year,m-1,bojD,12,0),  // 일본 시간 발표 (한국과 동일)
+        title:'BOJ 통화정책 회의',
+        type:'econ',
+        meta:'BOJ · 일본 정오 발표 · 엔화·금리 영향',
+        imp:2,
+        url:'https://www.boj.or.jp/en/mopo/mpmsche_minu/index.htm',
+      });
+    }
+
+    // ─── OPEC+ 회의 (연 8회: 1,3,4,6,7,9,10,12월 첫째 주 월요일) ───
+    if([1,3,4,6,7,9,10,12].includes(m)){
+      const opec=nthWeekdayOfMonth(year,m,1,1);
+      events.push({
+        date:krEventDate(year,m,opec),
+        title:'OPEC+ 회의',
+        type:'econ',
+        meta:'산유국 회의 · 원유 공급 결정',
+        imp:2,
+        url:'https://www.opec.org/opec_web/en/press_room/index.htm',
+      });
+    }
+
+    // ─── 한국 경제 지표 ───
+    // 한국 CPI - 매월 첫째 영업일~5일 사이 (통계청) 08:00
+    const krCpiDay=findWeekdayInRange(year,m,1,5,[1,2,3,4,5]);
+    events.push({
+      date:new Date(year,m-1,krCpiDay,8,0),
+      title:'한국 소비자물가지수 (CPI)',
+      type:'econ',
+      meta:'통계청 · 한국 08:00 발표',
+      imp:2,
+      url:'https://kostat.go.kr/board.es?mid=a10301010000&bid=210',
+    });
+
+    // 한국 GDP - 분기별 (1,4,7,10월 말경)
+    if([1,4,7,10].includes(m)){
+      const krGdp=findWeekdayInRange(year,m,25,29,[1,2,3,4,5]);
+      events.push({
+        date:new Date(year,m-1,krGdp,8,0),
+        title:'한국 GDP (속보치)',
+        type:'econ',
+        meta:'한국은행 · 한국 08:00 발표',
+        imp:3,
+        url:'https://www.bok.or.kr/portal/main/contents.do?menuNo=200733',
+      });
+    }
+
+    // 한국 수출입 통계 - 매월 1일 (관세청) 09:00
+    events.push({
+      date:new Date(year,m-1,1,9,0),
+      title:'한국 수출입 통계',
+      type:'econ',
+      meta:'관세청 · 한국 09:00 발표 · 전월 실적',
+      imp:2,
+      url:'https://unipass.customs.go.kr/ets/index.do',
+    });
+
+    // 한국 산업활동동향 - 매월 마지막 평일 (통계청) 08:00
+    const krIndProd=lastBusinessDayOfMonth(year,m);
+    events.push({
+      date:new Date(year,m-1,krIndProd,8,0),
+      title:'한국 산업활동동향',
+      type:'econ',
+      meta:'통계청 · 한국 08:00 발표',
+      imp:1,
+      url:'https://kostat.go.kr/',
+    });
+
+    // ─── 일본 CPI - 매월 셋째 금요일 ───
+    const jpCpi=nthWeekdayOfMonth(year,m,5,3);
+    events.push({
+      date:new Date(year,m-1,jpCpi,8,30),
+      title:'일본 CPI',
+      type:'econ',
+      meta:'통계국 · 한국 08:30 발표 · 엔화 영향',
+      imp:1,
+      url:'https://www.stat.go.jp/english/data/cpi/',
+    });
+
+    // ─── 중국 CPI/PPI/소매판매/산업생산 (매월) ───
+    // 중국 CPI - 매월 9~10일경 (중국 시간 09:30 = 한국 10:30)
+    const cnCpi=findWeekdayInRange(year,m,9,11,[1,2,3,4,5]);
+    events.push({
+      date:new Date(year,m-1,cnCpi,10,30),
+      title:'중국 CPI/PPI',
+      type:'econ',
+      meta:'국가통계국 · 한국 10:30 발표 · 글로벌 인플레이션',
+      imp:1,
+      url:'http://www.stats.gov.cn/english/PressRelease/',
+    });
+
+    // 중국 소매판매·산업생산 - 매월 15일경
+    const cnRetail=findWeekdayInRange(year,m,14,17,[1,2,3,4,5]);
+    events.push({
+      date:new Date(year,m-1,cnRetail,11,0),
+      title:'중국 소매판매·산업생산',
+      type:'econ',
+      meta:'국가통계국 · 한국 11:00 발표',
+      imp:2,
+      url:'http://www.stats.gov.cn/english/PressRelease/',
+    });
+
+    // 중국 차이신 제조업 PMI - 매월 첫째 영업일 (한국 10:45)
+    const cnPmi=findWeekdayInRange(year,m,1,3,[1,2,3,4,5]);
+    events.push({
+      date:new Date(year,m-1,cnPmi,10,45),
+      title:'중국 차이신 제조업 PMI',
+      type:'econ',
+      meta:'Caixin · 한국 10:45 발표',
+      imp:1,
+      url:'https://www.caixinglobal.com/',
+    });
+
+    // ─── 미국 시간외 매도 (Vanguard 등 정기 리밸런싱) ───
+    // ─── 매월 첫째 영업일: ATA Truck Tonnage Index 등 마이너 지표 생략
+
+    // ─── 미국 베이지북 (FOMC 2주 전 수요일) ET 14:00 = 한국 04:00 ───
+    // FOMC 일정으로부터 역산 (복잡하니 생략 — 정확한 자료는 위 FOMC_DATES로 처리)
+  }
+
+  // 한국 휴장일 (KOSPI/KOSDAQ)
+  addKoreanHolidays(events,year);
+}
+
+// 한국 휴장일
+function addKoreanHolidays(events,year){
+  // 고정 휴장일
+  const fixedHolidays=[
+    {m:1,d:1,name:'신정'},
+    {m:3,d:1,name:'삼일절'},
+    {m:5,d:5,name:'어린이날'},
+    {m:6,d:6,name:'현충일'},
+    {m:8,d:15,name:'광복절'},
+    {m:10,d:3,name:'개천절'},
+    {m:10,d:9,name:'한글날'},
+    {m:12,d:25,name:'성탄절'},
+    {m:12,d:31,name:'연말 휴장'},
+  ];
+  for(const h of fixedHolidays){
+    events.push({
+      date:krEventDate(year,h.m,h.d),
+      title:`한국장 휴장 (${h.name})`,
+      type:'holiday',
+      meta:'KOSPI/KOSDAQ 휴장',
+      imp:1,
+      url:'https://www.krx.co.kr/main/main.jsp',
+    });
+  }
+
+  // 어버이날 (5/8) - 휴장 아님, 정보만 (제외)
+
+  // 부처님오신날 (음력 4/8) - 매년 다름, 정확한 데이터는 별도 필요
+  // 2026: 5월 25일, 2027: 5월 13일, 2028: 5월 2일
+  const buddhaDates={2025:'2025-05-05',2026:'2026-05-24',2027:'2027-05-13',2028:'2028-05-02'};
+  if(buddhaDates[year]){
+    const [y,m,d]=buddhaDates[year].split('-').map(Number);
+    events.push({
+      date:krEventDate(y,m,d),
+      title:'한국장 휴장 (부처님오신날)',
+      type:'holiday',
+      meta:'KOSPI/KOSDAQ 휴장',
+      imp:1,
+      url:'https://www.krx.co.kr/',
+    });
+  }
+
+  // 설날·추석 (음력) - 연도별 명시
+  const lunarHolidays={
+    2025:[{name:'설날',dates:['2025-01-28','2025-01-29','2025-01-30']},{name:'추석',dates:['2025-10-05','2025-10-06','2025-10-07','2025-10-08']}],
+    2026:[{name:'설날',dates:['2026-02-16','2026-02-17','2026-02-18']},{name:'추석',dates:['2026-09-24','2026-09-25']}],
+    2027:[{name:'설날',dates:['2027-02-05','2027-02-08']},{name:'추석',dates:['2027-09-14','2027-09-15','2027-09-16','2027-09-17']}],
+    2028:[{name:'설날',dates:['2028-01-26','2028-01-27','2028-01-28']},{name:'추석',dates:['2028-10-02','2028-10-03','2028-10-04']}],
+  };
+  if(lunarHolidays[year]){
+    for(const lh of lunarHolidays[year]){
+      for(const dStr of lh.dates){
+        const [y,m,d]=dStr.split('-').map(Number);
+        events.push({
+          date:krEventDate(y,m,d),
+          title:`한국장 휴장 (${lh.name})`,
+          type:'holiday',
+          meta:'KOSPI/KOSDAQ 휴장',
+          imp:1,
+          url:'https://www.krx.co.kr/',
+        });
+      }
+    }
+  }
+}
+
+  // ─── 잭슨홀 심포지엄 - 매년 8월 마지막 주 목~토 ───
+  const jhStart=lastWeekdayOfMonth(year,8,4);
+  events.push({
+    date:krEventDate(year,8,jhStart),
+    title:'잭슨홀 심포지엄',
+    type:'econ',
+    meta:'Fed 캔자스시티 · 글로벌 통화정책 컨퍼런스',
+    imp:3,
+    url:'https://www.kansascityfed.org/research/jackson-hole-economic-symposium/',
+  });
+
+  // ─── 러셀 리밸런싱 - 6월 마지막 금요일 ───
+  const russell=lastWeekdayOfMonth(year,6,5);
+  events.push({
+    date:krEventDate(year,6,russell),
+    title:'러셀지수 리밸런싱',
+    type:'econ',
+    meta:'FTSE Russell · 소형주 변동성 확대',
+    imp:2,
+    url:'https://www.ftserussell.com/research-insights/russell-reconstitution',
+  });
+}
+
+// 메이저 컨퍼런스 (매년 비슷한 시기)
+function addMajorConferences(events,year){
+  // CES - 매년 1월 7~10일 라스베가스
+  events.push({
+    date:krEventDate(year,1,7),
+    title:'CES (소비자 가전 박람회)',
+    type:'econ',
+    meta:'라스베가스 · 기술주·반도체 영향',
+    imp:2,
+    url:'https://www.ces.tech/',
+  });
+
+  // NVIDIA GTC - 매년 3월 중순 (보통 셋째 주)
+  const gtc=nthWeekdayOfMonth(year,3,2,3);  // 3월 셋째 화요일
+  events.push({
+    date:krEventDate(year,3,gtc),
+    title:'NVIDIA GTC',
+    type:'econ',
+    meta:'NVDA · AI 컨퍼런스 · 젠슨 황 키노트',
+    imp:3,
+    url:'https://www.nvidia.com/gtc/',
+  });
+
+  // Apple WWDC - 매년 6월 첫째 월요일~금요일
+  const wwdc=nthWeekdayOfMonth(year,6,1,1);
+  events.push({
+    date:krEventDate(year,6,wwdc),
+    title:'Apple WWDC',
+    type:'econ',
+    meta:'AAPL · iOS 신버전 · 신제품 발표',
+    imp:2,
+    url:'https://developer.apple.com/wwdc/',
+  });
+
+  // Apple 가을 이벤트 (iPhone) - 매년 9월 둘째 화요일경
+  const appleFall=nthWeekdayOfMonth(year,9,2,2);
+  events.push({
+    date:krEventDate(year,9,appleFall),
+    title:'Apple 가을 이벤트 (iPhone)',
+    type:'econ',
+    meta:'AAPL · 신형 iPhone 공개',
+    imp:2,
+    url:'https://www.apple.com/apple-events/',
+  });
+
+  // Google I/O - 매년 5월 중순
+  const googleIO=nthWeekdayOfMonth(year,5,3,2);  // 5월 둘째 수요일
+  events.push({
+    date:krEventDate(year,5,googleIO),
+    title:'Google I/O',
+    type:'econ',
+    meta:'GOOGL · 개발자 컨퍼런스 · AI/Android',
+    imp:2,
+    url:'https://io.google/',
+  });
+
+  // Microsoft Build - 매년 5월 중순
+  const msBuild=nthWeekdayOfMonth(year,5,3,3);  // 5월 셋째 화요일
+  events.push({
+    date:krEventDate(year,5,msBuild),
+    title:'Microsoft Build',
+    type:'econ',
+    meta:'MSFT · 개발자 컨퍼런스 · Azure/AI',
+    imp:2,
+    url:'https://mybuild.microsoft.com/',
+  });
+
+  // Tesla AI Day / Battery Day (비정기적이지만 보통 가을)
+  // 정해진 날짜 없음, 표시 생략
+
+  // Berkshire Hathaway 주주총회 - 매년 5월 첫째 주 토요일
+  const brkAGM=nthWeekdayOfMonth(year,5,6,1);
+  events.push({
+    date:krEventDate(year,5,brkAGM),
+    title:'Berkshire Hathaway 주주총회',
+    type:'econ',
+    meta:'BRK · 워런 버핏 주주서한',
+    imp:2,
+    url:'https://www.berkshirehathaway.com/sharehold.html',
+  });
+
+  // ─── 메이저 기업 실적 발표 (분기별 정기) ───
+  // 실적 발표는 정확한 날짜를 알기 어려우니, 분기 끝 후 대략적인 시기로 표시
+  // 보통 분기 종료 후 2~6주 사이 발표 (현재 분기 + 차기 분기)
+  addMajorEarnings(events,year);
+}
+
+// 메이저 기업 실적 발표 (분기별 정기 패턴)
+function addMajorEarnings(events,year){
+  // 미국 빅테크 + 주요 종목 실적 발표 시즌
+  // 매 분기 발표 시기는 비슷한 패턴
+  // Q4(전년도) 발표: 1월말~2월초
+  // Q1 발표: 4월말~5월초
+  // Q2 발표: 7월말~8월초
+  // Q3 발표: 10월말~11월초
+
+  const earningsSeasons=[
+    {month:1,label:'Q4'},   // 1월말
+    {month:4,label:'Q1'},   // 4월말
+    {month:7,label:'Q2'},   // 7월말
+    {month:10,label:'Q3'},  // 10월말
+  ];
+
+  // 빅테크 (Magnificent 7) — 보통 분기 첫째 ~ 셋째 주 목요일
+  const magnificent=[
+    {ticker:'AAPL',name:'Apple',week:[3,4,4,3]},      // 분기별 보통 첫째~넷째 주
+    {ticker:'MSFT',name:'Microsoft',week:[3,3,3,4]},
+    {ticker:'GOOGL',name:'Alphabet',week:[4,4,4,3]},
+    {ticker:'AMZN',name:'Amazon',week:[4,5,5,4]},
+    {ticker:'META',name:'Meta',week:[3,4,4,4]},
+    {ticker:'NVDA',name:'NVIDIA',week:[null,5,5,5]},  // NVIDIA는 1월에 발표 안 함
+    {ticker:'TSLA',name:'Tesla',week:[4,4,4,4]},
+  ];
+
+  for(const co of magnificent){
+    for(let qi=0;qi<earningsSeasons.length;qi++){
+      const wk=co.week[qi];
+      if(!wk)continue;
+      const m=earningsSeasons[qi].month;
+      // 해당 월의 wk번째 목요일
+      const day=nthWeekdayOfMonth(year,m,4,wk);
+      if(day>daysInMonth(year,m))continue;
+      events.push({
+        date:nyEventDate(year,m,day,16,30),  // ET 16:30 (장 마감 후)
+        title:`${co.ticker} 실적 발표 (${earningsSeasons[qi].label})`,
+        type:'earn',
+        meta:`${co.name} · 한국 새벽 06:30 발표 · 장 마감 후`,
+        imp:3,
+        url:`https://finance.yahoo.com/quote/${co.ticker}/`,
+      });
+    }
+  }
+
+  // 주요 금융주
+  const banks=[
+    {ticker:'JPM',name:'JP Morgan'},
+    {ticker:'BAC',name:'Bank of America'},
+    {ticker:'GS',name:'Goldman Sachs'},
+    {ticker:'MS',name:'Morgan Stanley'},
+  ];
+  for(const b of banks){
+    for(const s of earningsSeasons){
+      // 금융주는 분기 첫주 ~ 둘째주 화/수에 먼저 발표
+      const day=nthWeekdayOfMonth(year,s.month,3,2);  // 둘째 수요일
+      if(day>daysInMonth(year,s.month))continue;
+      events.push({
+        date:nyEventDate(year,s.month,day,8,0),  // ET 08:00 (장 시작 전)
+        title:`${b.ticker} 실적 발표 (${s.label})`,
+        type:'earn',
+        meta:`${b.name} · 한국 22:00 발표 · 장 시작 전`,
+        imp:2,
+        url:`https://finance.yahoo.com/quote/${b.ticker}/`,
+      });
+    }
+  }
+
+  // 반도체 추가
+  const chips=[
+    {ticker:'AMD',name:'AMD'},
+    {ticker:'TSM',name:'TSMC'},
+    {ticker:'INTC',name:'Intel'},
+    {ticker:'AVGO',name:'Broadcom'},
+  ];
+  for(const c of chips){
+    for(const s of earningsSeasons){
+      const day=nthWeekdayOfMonth(year,s.month,3,4);  // 넷째 수요일
+      if(day>daysInMonth(year,s.month))continue;
+      events.push({
+        date:nyEventDate(year,s.month,day,16,30),
+        title:`${c.ticker} 실적 발표 (${s.label})`,
+        type:'earn',
+        meta:`${c.name} · 한국 새벽 06:30 발표 · 장 마감 후`,
+        imp:2,
+        url:`https://finance.yahoo.com/quote/${c.ticker}/`,
+      });
+    }
+  }
+
+  // 한국 주요 종목 실적 발표 (잠정 실적 공시)
+  const krEarnings=[
+    {ticker:'005930.KS',name:'삼성전자',months:[1,4,7,10],day:8},
+    {ticker:'000660.KS',name:'SK하이닉스',months:[1,4,7,10],day:25},
+    {ticker:'373220.KS',name:'LG에너지솔루션',months:[1,4,7,10],day:25},
+    {ticker:'207940.KS',name:'삼성바이오로직스',months:[1,4,7,10],day:25},
+    {ticker:'005380.KS',name:'현대차',months:[1,4,7,10],day:25},
+    {ticker:'035420.KS',name:'NAVER',months:[2,5,8,11],day:5},
+    {ticker:'035720.KS',name:'카카오',months:[2,5,8,11],day:5},
+  ];
+  for(const k of krEarnings){
+    for(const mIdx in k.months){
+      const m=k.months[mIdx];
+      const qLabel=['Q4','Q1','Q2','Q3'][mIdx];
+      // 한국 시간 16:00 (장 마감 후)
+      events.push({
+        date:new Date(year,m-1,k.day,16,0),
+        title:`${k.name} 실적 발표 (${qLabel})`,
+        type:'earn',
+        meta:`${k.ticker} · 한국 16:00 잠정실적 (장 마감 후)`,
+        imp:2,
+        url:`https://finance.yahoo.com/quote/${k.ticker.replace('.KS','.KS')}/`,
+      });
+    }
+  }
+}
+
+// ─── 헬퍼 함수 ───
+function nthWeekdayOfMonth(year,month,dow,n){
+  // year, month(1-12), dow(0=일~6=토), n(몇 번째)
+  const first=new Date(year,month-1,1).getDay();
+  let day=1+((dow-first+7)%7)+(n-1)*7;
+  return day;
+}
+function lastWeekdayOfMonth(year,month,dow){
+  const lastDay=new Date(year,month,0);
+  const lastDow=lastDay.getDay();
+  const offset=(lastDow-dow+7)%7;
+  return lastDay.getDate()-offset;
+}
+function lastBusinessDayOfMonth(year,month){
+  let d=new Date(year,month,0);
+  while(d.getDay()===0||d.getDay()===6)d.setDate(d.getDate()-1);
+  return d.getDate();
+}
+function daysInMonth(year,month){
+  return new Date(year,month,0).getDate();
+}
+function findWeekdayInRange(year,month,startDay,endDay,preferredDows){
+  // startDay~endDay 사이에서 preferredDows([1,2,3,4,5]=평일) 만족하는 첫째 날
+  for(let d=startDay;d<=endDay;d++){
+    const dt=new Date(year,month-1,d);
+    if(preferredDows.includes(dt.getDay()))return d;
+  }
+  // 못 찾으면 startDay 반환
+  return startDay;
 }
 
 function renderCalendarMonth(){
@@ -6607,11 +7230,7 @@ function renderCalendarMonth(){
   const todayStr=localDateStr(today);
 
   // 필터 적용
-  let filtered=CAL_DATA;
-  if(CAL_FILTER==='econ')filtered=CAL_DATA.filter(e=>e.type==='econ');
-  else if(CAL_FILTER==='earn')filtered=CAL_DATA.filter(e=>e.type==='earn');
-  else if(CAL_FILTER==='holiday')filtered=CAL_DATA.filter(e=>e.type==='holiday');
-  else if(CAL_FILTER==='watch')filtered=CAL_DATA.filter(e=>e.meta==='관심 종목'||e.meta==='보유 종목');
+  const filtered=applyCalFilter(CAL_DATA);
 
   // 날짜별 이벤트 그룹화
   const eventsByDate={};
@@ -6673,11 +7292,7 @@ function showDayDetail(dateStr){
   if(!detail)return;
   const dayEvents=CAL_DATA.filter(e=>localDateStr(new Date(e.date))===dateStr);
   // 필터 적용
-  let filtered=dayEvents;
-  if(CAL_FILTER==='econ')filtered=dayEvents.filter(e=>e.type==='econ');
-  else if(CAL_FILTER==='earn')filtered=dayEvents.filter(e=>e.type==='earn');
-  else if(CAL_FILTER==='holiday')filtered=dayEvents.filter(e=>e.type==='holiday');
-  else if(CAL_FILTER==='watch')filtered=dayEvents.filter(e=>e.meta==='관심 종목'||e.meta==='보유 종목');
+  const filtered=applyCalFilter(dayEvents);
 
   const dt=new Date(dateStr);
   const dateLabel=dt.toLocaleDateString('ko-KR',{year:'numeric',month:'long',day:'numeric',weekday:'long'});
@@ -6685,15 +7300,26 @@ function showDayDetail(dateStr){
     detail.innerHTML=`<div class="card"><strong style="font-size:13px">${dateLabel}</strong><div class="ltxt" style="margin-top:10px;text-align:left">일정 없음</div></div>`;
     return;
   }
+  // 시간순 정렬
+  filtered=[...filtered].sort((a,b)=>new Date(a.date)-new Date(b.date));
   detail.innerHTML=`<div class="card">
     <strong style="font-size:13px;display:block;margin-bottom:12px">${dateLabel}</strong>
     ${filtered.map(e=>{
       const stars='⭐'.repeat(e.imp||1);
       const typeColors={econ:'#4a9eff',earn:'#f5b53d',holiday:'#ff5b6e'};
-      return `<div style="display:flex;gap:10px;padding:9px 0;border-bottom:1px solid var(--border)">
+      // 한국 시간 표시 (시간 정보가 있을 때만)
+      const evDate=new Date(e.date);
+      const hasTime=evDate.getHours()!==0||evDate.getMinutes()!==0;
+      const timeStr=hasTime?evDate.toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit',hour12:false}):'';
+      const linkAttrs=e.url?`onclick="window.open('${e.url.replace(/'/g,'&#39;')}','_blank','noopener');event.stopPropagation();" style="cursor:pointer"`:'';
+      return `<div ${linkAttrs} style="display:flex;gap:10px;padding:9px 0;border-bottom:1px solid var(--border);${e.url?'cursor:pointer':''}" ${e.url?`title="공식 사이트로 이동"`:''}>
         <div style="width:3px;background:${typeColors[e.type]||'var(--text2)'};border-radius:2px;flex-shrink:0"></div>
         <div style="flex:1;min-width:0">
-          <div style="font-weight:600;font-size:13px;color:var(--text)">${e.title}</div>
+          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+            <span style="font-weight:600;font-size:13px;color:var(--text)">${e.title}</span>
+            ${timeStr?`<span style="font-size:10.5px;font-family:'JetBrains Mono',monospace;color:var(--accent);background:var(--accent-soft);padding:1px 5px;border-radius:3px;font-weight:600">🕐 ${timeStr}</span>`:''}
+            ${e.url?`<span style="font-size:9px;color:var(--text3)">↗</span>`:''}
+          </div>
           <div style="font-size:10.5px;color:var(--text2);margin-top:3px">${e.meta||''} <span style="color:${typeColors[e.type]}">${stars}</span></div>
         </div>
       </div>`;
@@ -6706,6 +7332,31 @@ function setCalFilter(f){
   document.querySelectorAll('.cal-filter button').forEach(b=>b.classList.toggle('on',b.dataset.cal===f));
   if(CAL_VIEW==='month')renderCalendarMonth();
   else renderCalendar();
+}
+
+// 통합 필터 헬퍼
+function applyCalFilter(data){
+  if(CAL_FILTER==='all')return data;
+  if(CAL_FILTER==='econ')return data.filter(e=>e.type==='econ'&&!isCentralBank(e)&&!isKoreanEvent(e));
+  if(CAL_FILTER==='fomc')return data.filter(e=>isCentralBank(e));
+  if(CAL_FILTER==='earn')return data.filter(e=>e.type==='earn');
+  if(CAL_FILTER==='conf')return data.filter(e=>isConference(e));
+  if(CAL_FILTER==='holiday')return data.filter(e=>e.type==='holiday');
+  if(CAL_FILTER==='kr')return data.filter(e=>isKoreanEvent(e));
+  if(CAL_FILTER==='watch')return data.filter(e=>e.meta==='관심 종목'||e.meta==='보유 종목');
+  return data;
+}
+function isCentralBank(e){
+  const t=e.title||'';
+  return /FOMC|금통위|ECB|BOJ|중앙은행|기준금리|OPEC/.test(t);
+}
+function isKoreanEvent(e){
+  const t=e.title||'',m=e.meta||'';
+  return /한국|KOSPI|KOSDAQ|BOK|금통위|005930|000660|373220|207940|005380|035420|035720/.test(t+m);
+}
+function isConference(e){
+  const t=e.title||'';
+  return /CES|WWDC|GTC|I\/O|Build|주주총회|컨퍼런스|잭슨홀|Apple|NVIDIA|Google|Microsoft|이벤트/.test(t);
 }
 
 // 미국장 휴장일 2026
@@ -6814,11 +7465,7 @@ function setCalSort(sort){
 
 function renderCalendar(){
   const list=$('cal-list');
-  let filtered=CAL_DATA;
-  if(CAL_FILTER==='econ')filtered=CAL_DATA.filter(e=>e.type==='econ');
-  else if(CAL_FILTER==='earn')filtered=CAL_DATA.filter(e=>e.type==='earn');
-  else if(CAL_FILTER==='holiday')filtered=CAL_DATA.filter(e=>e.type==='holiday');
-  else if(CAL_FILTER==='watch')filtered=CAL_DATA.filter(e=>e.meta==='관심 종목'||e.meta==='보유 종목');
+  const filtered=applyCalFilter(CAL_DATA);
   if(!filtered.length){list.innerHTML='<div class="empty">표시할 일정이 없습니다.</div>';return;}
 
   if(CAL_SORT==='importance'){
@@ -6842,13 +7489,18 @@ function renderCalendar(){
         const isHoliday=e.type==='holiday';
         const itemStyle=isHoliday?'background:rgba(255,77,109,0.06);border-left:3px solid var(--down)':'';
         const titleEmoji=isHoliday?'🔴 ':'';
-        return `<div class="event-item" style="${itemStyle};margin-bottom:6px">
+        // 시간 추출
+        const evDate2=new Date(e.date);
+        const hasTime=evDate2.getHours()!==0||evDate2.getMinutes()!==0;
+        const timeStr=hasTime?evDate2.toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit',hour12:false}):'';
+        const linkClick=e.url?`onclick="window.open('${e.url.replace(/'/g,'&#39;')}','_blank','noopener');event.stopPropagation();" style="cursor:pointer"`:'';
+        return `<div class="event-item" ${linkClick} style="${itemStyle};margin-bottom:6px;${e.url?'cursor:pointer':''}" ${e.url?'title="공식 사이트로 이동"':''}>
           <div class="event-imp imp-${e.imp}"></div>
           <div class="event-content">
-            <div class="event-title">${titleEmoji}${e.title} <span class="event-stars" data-imp="${e.imp||1}">${'⭐'.repeat(e.imp||1)}</span></div>
+            <div class="event-title">${titleEmoji}${e.title} <span class="event-stars" data-imp="${e.imp||1}">${'⭐'.repeat(e.imp||1)}</span>${timeStr?`<span style="font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--accent);background:var(--accent-soft);padding:1px 5px;border-radius:3px;font-weight:600;margin-left:4px">🕐 ${timeStr}</span>`:''}${e.url?'<span style="font-size:9px;color:var(--text3);margin-left:3px">↗</span>':''}</div>
             <div class="event-meta">${dateStr} · ${e.meta||''}</div>
           </div>
-          ${isHoliday?'':`<button class="event-bell ${on?'on':''}" onclick="toggleEventAlert('${id}')">${ic('bell',16)}</button>`}
+          ${isHoliday?'':`<button class="event-bell ${on?'on':''}" onclick="event.stopPropagation();toggleEventAlert('${id}')">${ic('bell',16)}</button>`}
         </div>`;
       }).join('');
     return;
@@ -6857,7 +7509,7 @@ function renderCalendar(){
   // 날짜별 그룹 (기존 방식)
   const byDate={};
   filtered.forEach(e=>{
-    const k=e.date.toISOString().substring(0,10);
+    const k=localDateStr(new Date(e.date));
     if(!byDate[k])byDate[k]=[];byDate[k].push(e);
   });
 
@@ -6878,13 +7530,18 @@ function renderCalendar(){
         const isHoliday=e.type==='holiday';
         const itemStyle=isHoliday?'background:rgba(255,77,109,0.06);border-left:3px solid var(--down)':'';
         const titleEmoji=isHoliday?'🔴 ':'';
-        return`<div class="event-item" style="${itemStyle}">
+        // 시간 추출
+        const evDate3=new Date(e.date);
+        const hasTime=evDate3.getHours()!==0||evDate3.getMinutes()!==0;
+        const timeStr=hasTime?evDate3.toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit',hour12:false}):'';
+        const linkClick=e.url?`onclick="window.open('${e.url.replace(/'/g,'&#39;')}','_blank','noopener');event.stopPropagation();" style="cursor:pointer"`:'';
+        return`<div class="event-item" ${linkClick} style="${itemStyle};${e.url?'cursor:pointer':''}" ${e.url?'title="공식 사이트로 이동"':''}>
           <div class="event-imp imp-${e.imp}"></div>
           <div class="event-content">
-            <div class="event-title">${titleEmoji}${e.title} <span class="event-stars" data-imp="${e.imp||1}">${'⭐'.repeat(e.imp||1)}</span></div>
+            <div class="event-title">${titleEmoji}${e.title} <span class="event-stars" data-imp="${e.imp||1}">${'⭐'.repeat(e.imp||1)}</span>${timeStr?`<span style="font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--accent);background:var(--accent-soft);padding:1px 5px;border-radius:3px;font-weight:600;margin-left:4px">🕐 ${timeStr}</span>`:''}${e.url?'<span style="font-size:9px;color:var(--text3);margin-left:3px">↗</span>':''}</div>
             <div class="event-meta">${e.meta}</div>
           </div>
-          ${isHoliday?'':`<button class="event-bell ${on?'on':''}" onclick="toggleEventAlert('${id}')">${ic('bell',16)}</button>`}
+          ${isHoliday?'':`<button class="event-bell ${on?'on':''}" onclick="event.stopPropagation();toggleEventAlert('${id}')">${ic('bell',16)}</button>`}
         </div>`;
       }).join('')}
     </div>`;
