@@ -164,7 +164,6 @@ body::before{
   -webkit-backdrop-filter:blur(20px) saturate(180%);
   border-bottom:1px solid var(--border);
   padding:14px 20px;
-  /* iOS notch / status bar 영역 확보: 기본 padding-top 50px + safe-area 더하기 */
   padding-top:calc(env(safe-area-inset-top,0px) + 14px);
   padding-left:calc(env(safe-area-inset-left,0px) + 20px);
   padding-right:calc(env(safe-area-inset-right,0px) + 20px);
@@ -173,14 +172,24 @@ body::before{
   width:100%;
   box-sizing:border-box;
 }
+/* iOS PWA standalone 모드: 최소 padding 강제 적용 (env가 0 반환 버그 대응) */
+@media (display-mode:standalone){
+  .topbar{
+    padding-top:max(calc(env(safe-area-inset-top,0px) + 14px), 60px);
+  }
+}
 @supports (-webkit-touch-callout:none){
-  /* iOS Safari/PWA 전용: sticky 보강 + 최소 padding 보장 */
   .topbar{
     position:-webkit-sticky;
     position:sticky;
-    /* iOS는 notch 보호 위해 최소 44px 확보 (Apple HIG: status bar 최소 44pt) */
-    padding-top:max(calc(env(safe-area-inset-top,0px) + 14px), 50px);
   }
+}
+/* iOS PWA용 클래스 (JS로 감지 후 부여) */
+body.ios-pwa .topbar{
+  padding-top:max(60px, calc(env(safe-area-inset-top,0px) + 14px));
+}
+body.has-notch .topbar{
+  padding-top:max(60px, calc(env(safe-area-inset-top,0px) + 14px));
 }
 .tb-title{display:flex;align-items:center;gap:10px;font-weight:700;font-size:17px;letter-spacing:-0.02em;}
 .tb-mark{
@@ -8841,6 +8850,33 @@ setInterval(autoRefreshAssets,30000);   // 30초마다 자산 가격 갱신
 
 updateClock();
 updateMarketStatus();
+
+// ─── iOS PWA / notch 감지 후 topbar padding 강제 적용 ───
+// env(safe-area-inset-top)이 일부 iOS 버전에서 0 반환하는 버그 우회
+(function detectIOSPwa(){
+  try{
+    const ua=navigator.userAgent||'';
+    const isIOS=/iPhone|iPad|iPod/i.test(ua);
+    const isStandalone=window.navigator.standalone===true||window.matchMedia('(display-mode: standalone)').matches;
+    if(isIOS){
+      document.body.classList.add('ios');
+      // 화면 높이로 notch 있는 모델 추정 (iPhone X 이후는 812 이상)
+      const sh=window.screen.height;
+      const hasNotch=sh>=812;
+      if(hasNotch)document.body.classList.add('has-notch');
+      if(isStandalone){
+        document.body.classList.add('ios-pwa');
+        // 직접 padding 셋팅: env() 0 반환 버그 대응
+        const tb=document.querySelector('.topbar');
+        if(tb){
+          // notch 모델: 47px, 비-notch: 20px 기본
+          const safeTop=hasNotch?47:20;
+          tb.style.paddingTop=(safeTop+14)+'px';
+        }
+      }
+    }
+  }catch(e){console.warn('iOS PWA 감지 실패:',e);}
+})();
 
 // 첫 로드: 홈 화면
 loadHome();
