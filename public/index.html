@@ -4810,14 +4810,17 @@ async function loadKrxEtfNames(){
   try{
     const r = await fetch('/api/krx-etf');
     if(!r.ok){
-      console.warn('[Pulsa] KRX ETF API 실패:', r.status);
+      const txt = await r.text().catch(()=>'');
+      console.warn('[Pulsa] KRX ETF API 실패:', r.status, txt.slice(0,200));
       return;
     }
     const data = await r.json();
     if(data && data.etfs){
       KRX_ETF_NAMES = data.etfs;
       KRX_ETF_LOADED = true;
-      console.log(`[Pulsa] KRX ETF 매핑 로드: ${Object.keys(KRX_ETF_NAMES).length}개 (출처: ${data.source}, 날짜: ${data.date})`);
+      console.log(`[Pulsa] ✅ KRX ETF 매핑 로드: ${Object.keys(KRX_ETF_NAMES).length}개 (출처: ${data.source}, 날짜: ${data.date})`);
+    }else if(data && data.error){
+      console.warn('[Pulsa] KRX ETF 에러 응답:', data.error);
     }
   }catch(e){
     console.warn('[Pulsa] KRX ETF 로드 에러:', e);
@@ -4834,7 +4837,8 @@ async function loadKrxStocks(){
   try{
     const r = await fetch('/api/krx-stocks');
     if(!r.ok){
-      console.warn('[Pulsa] KRX 종목 API 실패:', r.status);
+      const txt = await r.text().catch(()=>'');
+      console.warn('[Pulsa] KRX 종목 API 실패:', r.status, txt.slice(0,200));
       return;
     }
     const data = await r.json();
@@ -4848,7 +4852,9 @@ async function loadKrxStocks(){
         market: s.market,
         nameUpper: (s.name || '').toUpperCase(),
       }));
-      console.log(`[Pulsa] KRX 종목 데이터 로드: ${Object.keys(KRX_STOCKS).length}개`);
+      console.log(`[Pulsa] ✅ KRX 종목 데이터 로드: ${Object.keys(KRX_STOCKS).length}개`);
+    }else if(data && data.error){
+      console.warn('[Pulsa] KRX 종목 에러 응답:', data.error);
     }
   }catch(e){
     console.warn('[Pulsa] KRX 종목 로드 에러:', e);
