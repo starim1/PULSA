@@ -7870,6 +7870,7 @@ async function loadCalendar(){
 
   // ─── 실제 실적 발표 일정 (Finnhub earnings/calendar) ───
   // 무료 플랜 지원, 향후 90일 데이터, 정확한 날짜 + 시간
+  let addedSymbols=new Set();  // 이미 추가된 종목 (중복 방지)
   try{
     const earningsResp=await fetch('/api/finnhub?type=earnings_calendar').then(r=>r.ok?r.json():null).catch(()=>null);
     const list=earningsResp?.earningsCalendar;
@@ -7887,18 +7888,14 @@ async function loadCalendar(){
         const isWatch=watchTickers.includes(e.symbol);
         const isPortfolio=portfolioTickers.includes(e.symbol);
         const tag=isPortfolio?'보유 종목':(isWatch?'관심 종목':'주요 종목');
-        // hour 값: bmo=장 시작 전 (~한국 22:30), amc=장 마감 후 (~한국 06:30), dmh=장 중
         const hour=e.hour||'';
         let timeNote='';
         let dateObj;
-        // 날짜 + 시간 처리
         const [yy,mm,dd]=e.date.split('-').map(Number);
         if(hour==='bmo'){
-          // ET 8:00 → 한국 22:00 (같은 날 저녁)
           dateObj=nyEventDate(yy,mm,dd,8,0);
           timeNote='한국 22:00 발표 · 장 시작 전';
         }else if(hour==='amc'){
-          // ET 16:30 → 한국 새벽 06:30 (다음날)
           dateObj=nyEventDate(yy,mm,dd,16,30);
           timeNote='한국 새벽 06:30 발표 · 장 마감 후';
         }else if(hour==='dmh'){
@@ -7917,11 +7914,64 @@ async function loadCalendar(){
           imp:isWatch||isPortfolio?3:2,
           url:`https://finance.yahoo.com/quote/${e.symbol}/`,
         });
+        addedSymbols.add(e.symbol);
         added++;
       }
-      console.log(`[Pulsa] ✅ 실제 실적 캘린더 ${added}개 추가 (Finnhub)`);
+      console.log(`[Pulsa] ✅ 실제 실적 캘린더 ${added}개 추가 (Finnhub calendar)`);
+
+      // ─── 누락 종목 보강: 보유 + 관심 + 주요 빅테크 ───
+      // calendar endpoint에서 빠진 종목은 종목별 earnings endpoint로 개별 조회
+      const importantToCheck=[
+        ...new Set([
+          ...portfolioTickers,  // 보유 (최우선)
+          ...watchTickers,      // 관심
+          'AAPL','MSFT','GOOGL','AMZN','NVDA','META','TSLA','AVGO','TSM','AMD','PLTR','NFLX','ORCL',  // 빅테크/대표주
+        ])
+      ].filter(tk=>tk&&!addedSymbols.has(tk)&&/^[A-Z.]+$/.test(tk));  // 미국 종목만
+
+      let backfilled=0;
+      // 너무 많이 호출하면 한도 소진 - 최대 15개로 제한
+      const toFetch=importantToCheck.slice(0,15);
+      const results=await Promise.all(
+        toFetch.map(tk=>fetch(`/api/finnhub?symbol=${tk}&type=earnings`).then(r=>r.ok?r.json():null).catch(()=>null))
+      );
+
+      for(let i=0;i<toFetch.length;i++){
+        const tk=toFetch[i];
+        const data=results[i];
+        if(!Array.isArray(data))continue;
+        // 다음 예정 발표 찾기 (period가 미래인 것)
+        const now=new Date();
+        for(const item of data){
+          if(!item.period)continue;
+          const itemDate=new Date(item.period);
+          if(itemDate<now||addedSymbols.has(tk))continue;
+          // 미래 일정 + actual이 null이면 예정
+          if(item.actual==null){
+            const [yy,mm,dd]=item.period.split('-').map(Number);
+            const isWatch=watchTickers.includes(tk);
+            const isPortfolio=portfolioTickers.includes(tk);
+            const tag=isPortfolio?'보유 종목':(isWatch?'관심 종목':'주요 종목');
+            // 시간 모름 - 보통 장 마감 후
+            const dateObj=nyEventDate(yy,mm,dd,16,30);
+            const epsNote=item.estimate?` · 예상 EPS $${Number(item.estimate).toFixed(2)}`:'';
+            events.push({
+              date:dateObj,
+              title:`${tk} 실적 발표`,
+              type:'earn',
+              meta:`${tag} · 발표 예정${epsNote}`,
+              imp:isWatch||isPortfolio?3:2,
+              url:`https://finance.yahoo.com/quote/${tk}/`,
+            });
+            addedSymbols.add(tk);
+            backfilled++;
+            break;  // 한 종목당 다음 1개만
+          }
+        }
+      }
+      if(backfilled>0)console.log(`[Pulsa] ✅ 누락 종목 ${backfilled}개 보강 (개별 earnings endpoint)`);
     }else{
-      console.warn('[Pulsa] Finnhub earnings 데이터 없음 - 알고리즘 fallback 사용');
+      console.warn('[Pulsa] Finnhub earnings 데이터 없음');
     }
   }catch(e){console.warn('[Pulsa] earnings 실패:',e);}
 
