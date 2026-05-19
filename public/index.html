@@ -9491,9 +9491,32 @@ Promise.all([
   loadKrxEtfNames(),
   loadKrxStocks(),
 ]).then(()=>{
-  // 자산 화면이 떠 있으면 다시 그리기 (섹터 차트 갱신)
-  if(document.querySelector('#tab-assets:not(.off)')){
-    if(typeof renderAssets==='function')renderAssets();
+  // KRX 로드 완료 후 portfolio의 한국 ETF/종목 sector 재계산
+  try{
+    if(typeof portfolio!=='undefined'&&Array.isArray(portfolio)){
+      let updated=0;
+      for(const p of portfolio){
+        if(!p||!p.tk)continue;
+        const tk=p.tk;
+        // 한국 ETF만 대상
+        if(!tk.endsWith('.KS')&&!tk.endsWith('.KQ'))continue;
+        const newSec=getETFSector(tk);
+        if(newSec&&newSec!==p.sector){
+          p.sector=newSec;
+          updated++;
+        }
+      }
+      if(updated>0){
+        console.log(`[Pulsa] KRX 로드 후 한국 ETF ${updated}개 섹터 재분류`);
+        if(typeof savePF==='function')savePF();
+      }
+    }
+    // 자산 화면이 떠 있으면 다시 그리기
+    if(typeof renderAssets==='function'){
+      renderAssets();
+    }
+  }catch(e){
+    console.warn('[Pulsa] KRX 재분류 에러:',e);
   }
 });
 
