@@ -7,7 +7,7 @@ export default async function handler(req, res) {
   }
 
   // symbol 없이도 호출 가능한 타입
-  const symbolFreeTypes = new Set(['general_news', 'forex_news', 'crypto_news', 'merger_news']);
+  const symbolFreeTypes = new Set(['general_news', 'forex_news', 'crypto_news', 'merger_news', 'earnings_calendar']);
   if (!symbol && !symbolFreeTypes.has(type)) {
     return res.status(400).json({ error: 'symbol required' });
   }
@@ -18,6 +18,10 @@ export default async function handler(req, res) {
   fromDate.setDate(fromDate.getDate() - 30);
   const fromStr = fromDate.toISOString().split('T')[0];
   const toStr = today.toISOString().split('T')[0];
+
+  // 실적 캘린더: 과거 7일 ~ 미래 90일
+  const earnFrom = new Date(today.getTime() - 7*24*60*60*1000).toISOString().slice(0,10);
+  const earnTo = new Date(today.getTime() + 90*24*60*60*1000).toISOString().slice(0,10);
 
   const endpoints = {
     recommend: `/stock/recommendation?symbol=${symbol}`,
@@ -39,6 +43,8 @@ export default async function handler(req, res) {
     financials_annual: `/stock/financials-reported?symbol=${symbol}&freq=annual`,
     // 분기 실적 (EPS actual/estimate)
     earnings: `/stock/earnings?symbol=${symbol}&limit=20`,
+    // 전체 실적 캘린더 (과거 7일 ~ 미래 90일)
+    earnings_calendar: `/calendar/earnings?from=${earnFrom}&to=${earnTo}`,
   };
 
   const path = endpoints[type] || endpoints.recommend;
