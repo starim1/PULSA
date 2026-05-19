@@ -1612,9 +1612,13 @@ body.has-notch .topbar{
 
       <!-- 추가 폼 -->
       <div class="add-row">
-        <div class="ig"><label>티커</label><input type="text" id="assets-tk" placeholder="NVDA" style="width:90px;text-transform:uppercase"></div>
+        <div class="ig" style="position:relative">
+          <label>티커</label>
+          <input type="text" id="assets-tk" placeholder="NVDA / 삼성전자" style="width:160px" autocomplete="off" oninput="onAssetsTkInput()" onfocus="onAssetsTkInput()" onblur="setTimeout(()=>{const d=document.getElementById('assets-search-dropdown');if(d)d.style.display='none';},200)">
+          <div id="assets-search-dropdown" class="search-dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;min-width:240px;z-index:100"></div>
+        </div>
         <div class="ig"><label>수량</label><input type="number" id="assets-sh" placeholder="10" min="0" style="width:90px"></div>
-        <div class="ig"><label>평단가($)</label><input type="number" id="assets-avg" placeholder="120" step="0.01" min="0" style="width:110px"></div>
+        <div class="ig"><label>평단가</label><input type="number" id="assets-avg" placeholder="120" step="0.01" min="0" style="width:110px"></div>
         <button class="btn btn-p btn-icon" data-icon="plus" data-icon-size="14" onclick="addAsset()"><span class="ico"></span>추가</button>
       </div>
       <div id="assets-loading" class="ltxt" style="display:none">가격 업데이트 중...</div>
@@ -4751,6 +4755,54 @@ function clearSupportLines(){SUPPORT_LINES=[];saveSupportLines();drawPrice();ren
 
 // ── Portfolio ─────────────────────────────────────────
 // ── Assets (자산 관리) ────────────────────────────────
+// 자산 추가 입력창 자동완성
+function onAssetsTkInput(){
+  const input=$('assets-tk');
+  const dd=$('assets-search-dropdown');
+  if(!input||!dd)return;
+  const q=input.value.trim();
+  if(!q){dd.style.display='none';return;}
+
+  // 기존 매핑 + KRX 검색
+  let results=searchTickerMap(q,6);
+  if(KRX_STOCK_SEARCH_INDEX.length){
+    const krxResults=searchKrxStocks(q,6);
+    const existing=new Set(results.map(r=>r.ticker));
+    const merged=[];
+    for(const k of krxResults){
+      const fullTk=k.code+(k.market==='KOSDAQ'?'.KQ':'.KS');
+      if(!existing.has(fullTk)){
+        merged.push({
+          ticker:fullTk,
+          name:k.name,
+          market:'KR',
+          isEtf:k.isEtf,
+        });
+      }
+    }
+    results=[...merged.slice(0,6),...results].slice(0,10);
+  }
+
+  if(!results.length){dd.style.display='none';return;}
+  dd.innerHTML=results.map(r=>`
+    <div class="search-dropdown-item" onclick="selectAssetSearchItem('${r.ticker}','${(r.name||'').replace(/'/g,'&#39;')}')">
+      <div style="display:flex;flex-direction:column;gap:2px;min-width:0;flex:1">
+        <div class="sd-name">${r.name||r.ticker}</div>
+        <div class="sd-tk">${r.ticker}${r.isEtf?' · ETF':''}</div>
+      </div>
+      <div class="sd-market ${r.market==='KR'?'kr':'us'}">${r.market}</div>
+    </div>
+  `).join('');
+  dd.style.display='block';
+}
+
+function selectAssetSearchItem(ticker,name){
+  $('assets-tk').value=ticker;
+  $('assets-search-dropdown').style.display='none';
+  // 수량 입력 칸으로 포커스 이동
+  $('assets-sh').focus();
+}
+
 async function addAsset(){
   const tk=$('assets-tk').value.trim().toUpperCase();
   const sh=parseFloat($('assets-sh').value);
@@ -4819,6 +4871,10 @@ async function loadKrxEtfNames(){
       KRX_ETF_NAMES = data.etfs;
       KRX_ETF_LOADED = true;
       console.log(`[Pulsa] ✅ KRX ETF 매핑 로드: ${Object.keys(KRX_ETF_NAMES).length}개 (출처: ${data.source}, 날짜: ${data.date})`);
+      // ETF 로드 후 검색 인덱스도 재구축 (이미 KRX_STOCKS 로드돼 있으면)
+      if(KRX_STOCKS_LOADED && typeof rebuildKrxSearchIndex === 'function'){
+        rebuildKrxSearchIndex();
+      }
     }else if(data && data.error){
       console.warn('[Pulsa] KRX ETF 에러 응답:', data.error);
     }
@@ -4845,13 +4901,7 @@ async function loadKrxStocks(){
     if(data && data.stocks){
       KRX_STOCKS = data.stocks;
       KRX_STOCKS_LOADED = true;
-      // 검색용 인덱스 구축
-      KRX_STOCK_SEARCH_INDEX = Object.values(KRX_STOCKS).map(s => ({
-        code: s.code,
-        name: s.name,
-        market: s.market,
-        nameUpper: (s.name || '').toUpperCase(),
-      }));
+      rebuildKrxSearchIndex();
       console.log(`[Pulsa] ✅ KRX 종목 데이터 로드: ${Object.keys(KRX_STOCKS).length}개`);
     }else if(data && data.error){
       console.warn('[Pulsa] KRX 종목 에러 응답:', data.error);
@@ -4859,6 +4909,42 @@ async function loadKrxStocks(){
   }catch(e){
     console.warn('[Pulsa] KRX 종목 로드 에러:', e);
   }
+}
+
+// 검색 인덱스 = 일반 주식 + ETF 합쳐서 구축
+function rebuildKrxSearchIndex(){
+  const map = {};  // code → entry (중복 제거)
+  // 1) 일반 주식
+  for(const s of Object.values(KRX_STOCKS)){
+    if(!s.code)continue;
+    map[s.code] = {
+      code: s.code,
+      name: s.name || '',
+      market: s.market || 'KS',
+      isEtf: false,
+      nameUpper: (s.name || '').toUpperCase(),
+    };
+  }
+  // 2) ETF (KRX_ETF_NAMES에서 추가)
+  for(const [code, name] of Object.entries(KRX_ETF_NAMES)){
+    if(!code || !name)continue;
+    // 이미 있으면 이름만 업데이트
+    if(map[code]){
+      map[code].name = name;
+      map[code].nameUpper = name.toUpperCase();
+      map[code].isEtf = true;
+    }else{
+      map[code] = {
+        code,
+        name,
+        market: 'KS',  // ETF는 거의 다 KOSPI
+        isEtf: true,
+        nameUpper: name.toUpperCase(),
+      };
+    }
+  }
+  KRX_STOCK_SEARCH_INDEX = Object.values(map);
+  console.log(`[Pulsa] 검색 인덱스 재구축: ${KRX_STOCK_SEARCH_INDEX.length}개 (주식+ETF)`);
 }
 
 // 한국 종목 검색 (자동완성용)
@@ -6430,7 +6516,13 @@ function drawSectorChart(totMkt){
   // 섹터별 집계
   const sectorMap={};
   portfolio.filter(s=>s.price).forEach(s=>{
-    const sec=s.sector||'분류 안됨';
+    let sec=s.sector;
+    // 한국 ETF는 항상 KRX 데이터로 재계산 (저장값 무시)
+    if(s.tk&&(s.tk.endsWith('.KS')||s.tk.endsWith('.KQ'))){
+      const fresh=getETFSector(s.tk);
+      if(fresh)sec=fresh;
+    }
+    if(!sec)sec='분류 안됨';
     if(!sectorMap[sec])sectorMap[sec]=0;
     sectorMap[sec]+=s.price*s.sh;
   });
