@@ -7,7 +7,7 @@ export default async function handler(req, res) {
   }
 
   // symbol 없이도 호출 가능한 타입
-  const symbolFreeTypes = new Set(['general_news', 'forex_news', 'crypto_news', 'merger_news', 'earnings_calendar']);
+  const symbolFreeTypes = new Set(['general_news', 'forex_news', 'crypto_news', 'merger_news', 'earnings_calendar', 'ipo_calendar']);
   if (!symbol && !symbolFreeTypes.has(type)) {
     return res.status(400).json({ error: 'symbol required' });
   }
@@ -23,6 +23,10 @@ export default async function handler(req, res) {
   const earnFrom = new Date(today.getTime() - 7*24*60*60*1000).toISOString().slice(0,10);
   const earnTo = new Date(today.getTime() + 90*24*60*60*1000).toISOString().slice(0,10);
 
+  // IPO 캘린더: 과거 60일 ~ 미래 180일 (최근 상장 + 예정 IPO 모두 추적)
+  const ipoFrom = new Date(today.getTime() - 60*24*60*60*1000).toISOString().slice(0,10);
+  const ipoTo = new Date(today.getTime() + 180*24*60*60*1000).toISOString().slice(0,10);
+
   const endpoints = {
     recommend: `/stock/recommendation?symbol=${symbol}`,
     target: `/stock/price-target?symbol=${symbol}`,
@@ -36,15 +40,12 @@ export default async function handler(req, res) {
     forex_news: `/news?category=forex`,
     crypto_news: `/news?category=crypto`,
     merger_news: `/news?category=merger`,
-    // 펀더멘털 추이용 (basic_financials의 series 필드에 시계열 포함)
     basic_financials: `/stock/metric?symbol=${symbol}&metric=all`,
-    // 분기 income statement
     financials_quarterly: `/stock/financials-reported?symbol=${symbol}&freq=quarterly`,
     financials_annual: `/stock/financials-reported?symbol=${symbol}&freq=annual`,
-    // 분기 실적 (EPS actual/estimate)
     earnings: `/stock/earnings?symbol=${symbol}&limit=20`,
-    // 전체 실적 캘린더 (과거 7일 ~ 미래 90일)
     earnings_calendar: `/calendar/earnings?from=${earnFrom}&to=${earnTo}`,
+    ipo_calendar: `/calendar/ipo?from=${ipoFrom}&to=${ipoTo}`,
   };
 
   const path = endpoints[type];
