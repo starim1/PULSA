@@ -7877,8 +7877,33 @@ async function loadCalendar(){
     if(Array.isArray(list)){
       const watchTickers=watchlist.map(w=>w.tk.replace(/\.(KS|KQ|US)$/i,''));
       const portfolioTickers=portfolio.map(p=>p.tk.replace(/\.(KS|KQ|US)$/i,''));
-      // 모든 빅테크 + S&P500 주요 + 메이저 금융주
-      const majorTickers=['AAPL','MSFT','GOOGL','GOOG','AMZN','NVDA','META','TSLA','BRK.B','BRK.A','JPM','V','UNH','XOM','LLY','MA','AVGO','PG','HD','CVX','MRK','ABBV','PEP','KO','COST','BAC','ORCL','ADBE','NFLX','CRM','AMD','INTC','QCOM','MU','TSM','ASML','PLTR','SMCI','SHOP','UBER','ABNB','PYPL','SQ','COIN','DIS','MCD','SBUX','NKE','LULU','BA','GE','CAT','DE','JNJ','PFE','TGT','WMT','LOW','GS','MS','C','WFC','BLK','RTX','HON','SCHW','BX','SPGI','TMO','ABT','DHR','VZ','T','CMCSA','NOW','ISRG','BKNG','AMAT','LRCX','KLAC','AMGN','GILD','REGN','VRTX','BIIB'];
+      // 대규모 기업 — Mag 7 + S&P500 핵심 + 빅테크 + 금융 + 헬스 + 소비재 + 산업 + 한국 ADR
+      const majorTickers=[
+        // Magnificent 7
+        'AAPL','MSFT','GOOGL','GOOG','AMZN','NVDA','META','TSLA',
+        // 반도체
+        'AVGO','TSM','AMD','INTC','QCOM','MU','ASML','TXN','AMAT','LRCX','KLAC','MRVL','ON','MCHP','SMCI',
+        // 빅 소프트웨어/클라우드
+        'ORCL','CRM','ADBE','NOW','SHOP','SNOW','PLTR','UBER','ABNB','SQ','PYPL','COIN','NET','DDOG','MDB','OKTA','TEAM','ZS','CRWD','PANW','FTNT',
+        // 통신/미디어/엔터
+        'NFLX','DIS','CMCSA','VZ','T','TMUS','SPOT','EA','ATVI','RBLX','PINS','SNAP',
+        // 금융
+        'BRK.B','BRK.A','JPM','V','MA','BAC','GS','MS','C','WFC','BLK','SCHW','BX','SPGI','AXP','PYPL','PNC','TFC','USB','MMC','AIG','COF','HOOD',
+        // 헬스/바이오
+        'UNH','LLY','JNJ','PFE','ABBV','MRK','TMO','ABT','DHR','AMGN','GILD','REGN','VRTX','BIIB','ISRG','BMY','SYK','MDT','BSX','EW','HCA','CVS','CI','HUM','ELV','MRNA','BNTX',
+        // 에너지
+        'XOM','CVX','COP','SLB','EOG','PSX','MPC','OXY','PXD','VLO','HES',
+        // 산업/항공
+        'BA','GE','HON','RTX','LMT','NOC','GD','UPS','FDX','UAL','DAL','LUV','CAT','DE','MMM','EMR','ETN','ITW','PH','TT','CMI',
+        // 소비재
+        'WMT','HD','COST','PG','KO','PEP','MCD','SBUX','NKE','LULU','TGT','LOW','TJX','BKNG','EBAY','DG','DLTR','ROST','CMG','YUM','MAR','HLT','EL','CL','KMB','GIS','SJM','HSY','CPB','MDLZ',
+        // 자동차/EV
+        'F','GM','RIVN','LCID','XPEV','LI','NIO',
+        // 한국 ADR
+        'CPNG','SE','BABA','JD','PDD','BIDU','NTES',
+        // 기타 대형
+        'ACN','CSCO','IBM','INTU','TXN','BKNG','REGN','SOXL','SOXS','TQQQ','SQQQ',
+      ];
       const allTrack=new Set([...watchTickers,...portfolioTickers,...majorTickers]);
 
       let added=0;
@@ -7917,59 +7942,46 @@ async function loadCalendar(){
         addedSymbols.add(e.symbol);
         added++;
       }
-      console.log(`[Pulsa] ✅ 실제 실적 캘린더 ${added}개 추가 (Finnhub calendar)`);
+      console.log(`[Pulsa] ✅ Finnhub 실적 캘린더 ${added}개 추가`);
 
-      // ─── 누락 종목 보강: 보유 + 관심 + 주요 빅테크 ───
-      // calendar endpoint에서 빠진 종목은 종목별 earnings endpoint로 개별 조회
-      const importantToCheck=[
-        ...new Set([
-          ...portfolioTickers,  // 보유 (최우선)
-          ...watchTickers,      // 관심
-          'AAPL','MSFT','GOOGL','AMZN','NVDA','META','TSLA','AVGO','TSM','AMD','PLTR','NFLX','ORCL',  // 빅테크/대표주
-        ])
-      ].filter(tk=>tk&&!addedSymbols.has(tk)&&/^[A-Z.]+$/.test(tk));  // 미국 종목만
-
-      let backfilled=0;
-      // 너무 많이 호출하면 한도 소진 - 최대 15개로 제한
-      const toFetch=importantToCheck.slice(0,15);
-      const results=await Promise.all(
-        toFetch.map(tk=>fetch(`/api/finnhub?symbol=${tk}&type=earnings`).then(r=>r.ok?r.json():null).catch(()=>null))
-      );
-
-      for(let i=0;i<toFetch.length;i++){
-        const tk=toFetch[i];
-        const data=results[i];
-        if(!Array.isArray(data))continue;
-        // 다음 예정 발표 찾기 (period가 미래인 것)
-        const now=new Date();
-        for(const item of data){
-          if(!item.period)continue;
-          const itemDate=new Date(item.period);
-          if(itemDate<now||addedSymbols.has(tk))continue;
-          // 미래 일정 + actual이 null이면 예정
-          if(item.actual==null){
-            const [yy,mm,dd]=item.period.split('-').map(Number);
-            const isWatch=watchTickers.includes(tk);
-            const isPortfolio=portfolioTickers.includes(tk);
+      // ─── Alpha Vantage 보강: Finnhub에 빠진 빅테크/주요 종목 ───
+      // AV EARNINGS_CALENDAR는 향후 3개월 일정, 빅테크 포함
+      // CSV 응답이라 별도 처리. 무료 25 calls/day지만 캘린더는 1회만 호출
+      try{
+        const avResp=await fetch('/api/alphavantage?type=earnings_calendar').then(r=>r.ok?r.json():null).catch(()=>null);
+        if(avResp&&Array.isArray(avResp.earnings)){
+          let avAdded=0;
+          for(const e of avResp.earnings){
+            const sym=e.symbol||'';
+            if(!sym||addedSymbols.has(sym))continue;
+            if(!allTrack.has(sym))continue;  // 추적 대상 종목만
+            // reportDate: YYYY-MM-DD
+            const reportDate=e.reportDate||'';
+            if(!reportDate)continue;
+            const [yy,mm,dd]=reportDate.split('-').map(Number);
+            if(!yy||!mm||!dd)continue;
+            const isWatch=watchTickers.includes(sym);
+            const isPortfolio=portfolioTickers.includes(sym);
             const tag=isPortfolio?'보유 종목':(isWatch?'관심 종목':'주요 종목');
-            // 시간 모름 - 보통 장 마감 후
+            // AV는 시간 정보 없음 → 장 마감 후 (대부분 빅테크는 amc)
             const dateObj=nyEventDate(yy,mm,dd,16,30);
-            const epsNote=item.estimate?` · 예상 EPS $${Number(item.estimate).toFixed(2)}`:'';
+            const epsNote=e.estimate&&e.estimate!=='None'?` · 예상 EPS $${Number(e.estimate).toFixed(2)}`:'';
             events.push({
               date:dateObj,
-              title:`${tk} 실적 발표`,
+              title:`${sym} 실적 발표`,
               type:'earn',
-              meta:`${tag} · 발표 예정${epsNote}`,
+              meta:`${tag} · 한국 새벽 06:30 발표 예정${epsNote}`,
               imp:isWatch||isPortfolio?3:2,
-              url:`https://finance.yahoo.com/quote/${tk}/`,
+              url:`https://finance.yahoo.com/quote/${sym}/`,
             });
-            addedSymbols.add(tk);
-            backfilled++;
-            break;  // 한 종목당 다음 1개만
+            addedSymbols.add(sym);
+            avAdded++;
           }
+          console.log(`[Pulsa] ✅ Alpha Vantage 보강: ${avAdded}개 추가 (빅테크 포함)`);
+        }else{
+          console.warn('[Pulsa] AV earnings calendar 실패 - 무료 한도 가능성');
         }
-      }
-      if(backfilled>0)console.log(`[Pulsa] ✅ 누락 종목 ${backfilled}개 보강 (개별 earnings endpoint)`);
+      }catch(e){console.warn('[Pulsa] AV 보강 에러:',e);}
     }else{
       console.warn('[Pulsa] Finnhub earnings 데이터 없음');
     }
