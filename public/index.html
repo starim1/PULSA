@@ -877,10 +877,13 @@ body.has-notch .topbar{
   font-size:9px;padding:1px 4px;border-radius:3px;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600;
 }
-.cal-cell-event.econ{background:rgba(74,158,255,0.15);color:#4a9eff;}
-.cal-cell-event.earn{background:rgba(245,181,61,0.15);color:#f5b53d;}
-.cal-cell-event.holiday{background:rgba(255,91,110,0.15);color:#ff5b6e;}
-.cal-cell-event.watch{background:rgba(38,215,130,0.15);color:#26d782;}
+.cal-cell-event.econ,.cal-cell-event.cat-econ{background:rgba(74,158,255,0.15);color:#4a9eff;}
+.cal-cell-event.earn,.cal-cell-event.cat-earn{background:rgba(245,181,61,0.15);color:#f5b53d;}
+.cal-cell-event.holiday,.cal-cell-event.cat-holiday{background:rgba(255,91,110,0.15);color:#ff5b6e;}
+.cal-cell-event.watch,.cal-cell-event.cat-watch{background:rgba(255,140,66,0.15);color:#ff8c42;}
+.cal-cell-event.cat-fomc{background:rgba(191,114,255,0.15);color:#bf72ff;}
+.cal-cell-event.cat-conf{background:rgba(38,215,130,0.15);color:#26d782;}
+.cal-cell-event.cat-kr{background:rgba(16,208,144,0.15);color:#10d090;}
 .cal-cell-more{font-size:9px;color:var(--text3);font-weight:600;}
 @media (max-width:600px){
   .cal-grid{padding:4px;gap:2px;}
@@ -900,10 +903,13 @@ body.has-notch .topbar{
     border-radius:50%;flex-shrink:0;
     color:transparent;overflow:hidden;
   }
-  .cal-cell-event.econ{background:#4a9eff !important;}
-  .cal-cell-event.earn{background:#f5b53d !important;}
-  .cal-cell-event.holiday{background:#ff5b6e !important;}
-  .cal-cell-event.watch{background:#26d782 !important;}
+  .cal-cell-event.econ,.cal-cell-event.cat-econ{background:#4a9eff !important;}
+  .cal-cell-event.earn,.cal-cell-event.cat-earn{background:#f5b53d !important;}
+  .cal-cell-event.holiday,.cal-cell-event.cat-holiday{background:#ff5b6e !important;}
+  .cal-cell-event.watch,.cal-cell-event.cat-watch{background:#ff8c42 !important;}
+  .cal-cell-event.cat-fomc{background:#bf72ff !important;}
+  .cal-cell-event.cat-conf{background:#26d782 !important;}
+  .cal-cell-event.cat-kr{background:#10d090 !important;}
   .cal-cell-more{
     font-size:9px;color:var(--text3);font-weight:600;
     width:100%;text-align:center;line-height:1;margin-top:2px;
@@ -929,9 +935,33 @@ body.has-notch .topbar{
 .event-item{display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-top:1px solid var(--border);}
 .event-item:first-child{border-top:none;}
 .event-imp{width:4px;border-radius:2px;flex-shrink:0;align-self:stretch;}
+/* 중요도 기반 (fallback) */
 .imp-3{background:var(--down);}
 .imp-2{background:var(--accent);}
 .imp-1{background:var(--neutral);}
+/* 타입별 색상 (우선 적용) */
+.evt-econ{background:#4a9eff !important;}     /* 경제지표 - 파랑 */
+.evt-earn{background:#f5b53d !important;}     /* 실적 - 노랑/주황 */
+.evt-holiday{background:#ff5b6e !important;}  /* 휴장일 - 빨강 */
+.evt-fomc{background:#bf72ff !important;}     /* FOMC/중앙은행 - 보라 */
+.evt-conf{background:#26d782 !important;}     /* 컨퍼런스/이벤트 - 초록 */
+.evt-kr{background:#10d090 !important;}       /* 한국 일정 - 민트 */
+.evt-watch{background:#ff8c42 !important;}    /* 관심/보유 종목 - 오렌지 */
+
+/* 타입 배지 (텍스트 라벨) */
+.evt-badge{
+  display:inline-block;font-size:9.5px;font-weight:700;
+  padding:1.5px 6px;border-radius:4px;letter-spacing:0.3px;
+  vertical-align:middle;flex-shrink:0;
+}
+.evt-badge.b-econ{background:rgba(74,158,255,0.15);color:#4a9eff;border:1px solid rgba(74,158,255,0.3);}
+.evt-badge.b-earn{background:rgba(245,181,61,0.15);color:#f5b53d;border:1px solid rgba(245,181,61,0.3);}
+.evt-badge.b-holiday{background:rgba(255,91,110,0.15);color:#ff5b6e;border:1px solid rgba(255,91,110,0.3);}
+.evt-badge.b-fomc{background:rgba(191,114,255,0.15);color:#bf72ff;border:1px solid rgba(191,114,255,0.3);}
+.evt-badge.b-conf{background:rgba(38,215,130,0.15);color:#26d782;border:1px solid rgba(38,215,130,0.3);}
+.evt-badge.b-kr{background:rgba(16,208,144,0.15);color:#10d090;border:1px solid rgba(16,208,144,0.3);}
+.evt-badge.b-watch{background:rgba(255,140,66,0.15);color:#ff8c42;border:1px solid rgba(255,140,66,0.3);}
+
 .event-content{flex:1;}
 .event-title{font-size:13px;font-weight:600;margin-bottom:2px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
 .event-stars{
@@ -2304,65 +2334,149 @@ function navTo(name){
 // 좌우 스와이프로 탭 이동 (모바일)
 // ═══════════════════════════════════════════════════════════
 const NAV_ORDER=['home','analysis','news','picks','assets','calendar'];
-let SWIPE_START_X=0,SWIPE_START_Y=0,SWIPE_START_TIME=0,SWIPE_ACTIVE=false;
+let SWIPE_START_X=0,SWIPE_START_Y=0,SWIPE_START_TIME=0,SWIPE_ACTIVE=false,SWIPE_DRAGGING=false;
+const SWIPE_THRESHOLD=120;   // 70 → 120px (실수 방지)
+const SWIPE_MAX_TIME=600;
+const SWIPE_VEL_MIN=0.3;     // 최소 속도 px/ms (빠른 스와이프는 짧아도 OK)
 
 function setupSwipeNav(){
-  // 본문 영역 (네비 제외)
   const body=document.body;
   body.addEventListener('touchstart',(e)=>{
     if(e.touches.length!==1)return;
-    // 이미 다른 제스처 중인 요소면 무시 (차트 그리기, 핀치 줌, 모달, 입력 등)
     const target=e.target;
-    if(target.closest('.chart-wrap.drawing'))return;       // 차트 그리기 중
-    if(target.closest('canvas'))return;                     // 모든 캔버스 (차트 등)
-    if(target.closest('.search-dropdown'))return;           // 검색 자동완성
-    if(target.closest('.modal-overlay.on'))return;          // 열린 모달
-    if(target.closest('input,textarea,select'))return;      // 입력 폼
-    if(target.closest('.cmp-row'))return;                   // 비교 입력
-    if(target.closest('.cal-grid'))return;                  // 캘린더 셀
-    if(target.closest('.news-cat-filter'))return;           // 뉴스 카테고리 가로 스크롤
-    if(target.closest('.cal-filter'))return;                // 캘린더 필터
+    if(target.closest('.chart-wrap.drawing'))return;
+    if(target.closest('canvas'))return;
+    if(target.closest('.search-dropdown'))return;
+    if(target.closest('.modal-overlay.on'))return;
+    if(target.closest('input,textarea,select'))return;
+    if(target.closest('.cmp-row'))return;
+    if(target.closest('.cal-grid'))return;
+    if(target.closest('.news-cat-filter'))return;
+    if(target.closest('.cal-filter'))return;
     if(target.closest('.cal-view-toggle'))return;
     if(target.closest('.picks-tabs'))return;
-    if(target.closest('.tabs'))return;                      // 분석 탭바
+    if(target.closest('.tabs'))return;
     SWIPE_START_X=e.touches[0].clientX;
     SWIPE_START_Y=e.touches[0].clientY;
     SWIPE_START_TIME=Date.now();
     SWIPE_ACTIVE=true;
+    SWIPE_DRAGGING=false;
+  },{passive:true});
+
+  body.addEventListener('touchmove',(e)=>{
+    if(!SWIPE_ACTIVE||e.touches.length!==1)return;
+    const touch=e.touches[0];
+    const dx=touch.clientX-SWIPE_START_X;
+    const dy=touch.clientY-SWIPE_START_Y;
+    // 가로 방향이 우세할 때만 드래그 시작
+    if(!SWIPE_DRAGGING){
+      // 가로 / 세로 판별 (10px 이상 움직였을 때)
+      if(Math.abs(dx)>10||Math.abs(dy)>10){
+        if(Math.abs(dy)>Math.abs(dx)*0.8){
+          // 세로 우세 → 스와이프 취소 (스크롤 우선)
+          SWIPE_ACTIVE=false;
+          return;
+        }
+        SWIPE_DRAGGING=true;
+      }
+    }
+    if(SWIPE_DRAGGING){
+      // 실시간 화면 따라가기 (밀리는 느낌)
+      const curScreen=document.querySelector('.screen.on');
+      if(curScreen){
+        // 끝 탭에서 같은 방향 스와이프는 저항 (고무줄 효과)
+        const curName=curScreen.id.replace('screen-','');
+        const curIdx=NAV_ORDER.indexOf(curName);
+        let actualDx=dx;
+        if((curIdx===0&&dx>0)||(curIdx===NAV_ORDER.length-1&&dx<0)){
+          actualDx=dx*0.3;  // 30%만 따라감
+        }
+        curScreen.style.transform=`translateX(${actualDx}px)`;
+        curScreen.style.transition='none';
+      }
+    }
   },{passive:true});
 
   body.addEventListener('touchend',(e)=>{
     if(!SWIPE_ACTIVE)return;
     SWIPE_ACTIVE=false;
+    const wasDragging=SWIPE_DRAGGING;
+    SWIPE_DRAGGING=false;
+    
+    const curScreen=document.querySelector('.screen.on');
+    
+    if(!wasDragging){
+      // 드래그 안 한 거 - 그냥 탭이었음
+      if(curScreen){curScreen.style.transform='';curScreen.style.transition='';}
+      return;
+    }
+    
     const dt=Date.now()-SWIPE_START_TIME;
-    if(dt>500)return;  // 500ms 이상은 스와이프로 안 침
     const touch=e.changedTouches[0];
-    if(!touch)return;
+    if(!touch){
+      if(curScreen){curScreen.style.transform='';curScreen.style.transition='transform 0.25s cubic-bezier(0.2,0.8,0.4,1)';}
+      return;
+    }
     const dx=touch.clientX-SWIPE_START_X;
     const dy=touch.clientY-SWIPE_START_Y;
-    // 가로 스와이프 우세 + 임계값
-    if(Math.abs(dx)<70)return;                       // 70px 이상
-    if(Math.abs(dy)>Math.abs(dx)*0.7)return;         // 세로가 크면 무시
-    // 현재 탭
-    const curScreen=document.querySelector('.screen.on');
+    const velocity=Math.abs(dx)/Math.max(dt,1);  // px/ms
+    
+    // 통과 조건: (거리 충분) OR (빠른 플릭)
+    const distanceOK=Math.abs(dx)>=SWIPE_THRESHOLD;
+    const flickOK=velocity>=SWIPE_VEL_MIN&&Math.abs(dx)>60;
+    const horizontalOK=Math.abs(dy)<Math.abs(dx)*0.8;
+    const timeOK=dt<SWIPE_MAX_TIME;
+    
+    if(!horizontalOK||!timeOK||(!distanceOK&&!flickOK)){
+      // 복귀 애니메이션
+      if(curScreen){
+        curScreen.style.transform='translateX(0)';
+        curScreen.style.transition='transform 0.22s cubic-bezier(0.2,0.8,0.4,1)';
+        setTimeout(()=>{
+          curScreen.style.transform='';
+          curScreen.style.transition='';
+        },240);
+      }
+      return;
+    }
+    
+    // 통과 - 탭 전환
     if(!curScreen)return;
     const curName=curScreen.id.replace('screen-','');
     const curIdx=NAV_ORDER.indexOf(curName);
     if(curIdx<0)return;
     let nextIdx;
-    if(dx<0){
-      // 왼쪽으로 스와이프 → 다음 탭
-      nextIdx=curIdx+1;
-      if(nextIdx>=NAV_ORDER.length)return;  // 마지막 탭이면 더 이상 X
-    }else{
-      // 오른쪽으로 스와이프 → 이전 탭
-      nextIdx=curIdx-1;
-      if(nextIdx<0)return;
-    }
-    navTo(NAV_ORDER[nextIdx]);
+    if(dx<0){nextIdx=curIdx+1;if(nextIdx>=NAV_ORDER.length){
+      // 마지막 탭에서 더 갈 곳 없음 - 복귀
+      curScreen.style.transform='translateX(0)';
+      curScreen.style.transition='transform 0.22s cubic-bezier(0.2,0.8,0.4,1)';
+      setTimeout(()=>{curScreen.style.transform='';curScreen.style.transition='';},240);
+      return;
+    }}
+    else{nextIdx=curIdx-1;if(nextIdx<0){
+      curScreen.style.transform='translateX(0)';
+      curScreen.style.transition='transform 0.22s cubic-bezier(0.2,0.8,0.4,1)';
+      setTimeout(()=>{curScreen.style.transform='';curScreen.style.transition='';},240);
+      return;
+    }}
+    
+    // 현재 화면 미는 애니메이션 마무리 → 새 탭으로 전환
+    const targetX=dx<0?-window.innerWidth:window.innerWidth;
+    curScreen.style.transform=`translateX(${targetX*0.4}px)`;
+    curScreen.style.transition='transform 0.2s cubic-bezier(0.3,0.7,0.4,1)';
+    setTimeout(()=>{
+      curScreen.style.transform='';
+      curScreen.style.transition='';
+      navTo(NAV_ORDER[nextIdx]);
+    },180);
   },{passive:true});
 
-  body.addEventListener('touchcancel',()=>{SWIPE_ACTIVE=false;},{passive:true});
+  body.addEventListener('touchcancel',()=>{
+    SWIPE_ACTIVE=false;
+    SWIPE_DRAGGING=false;
+    const curScreen=document.querySelector('.screen.on');
+    if(curScreen){curScreen.style.transform='';curScreen.style.transition='';}
+  },{passive:true});
 }
 
 
@@ -2773,6 +2887,39 @@ function isKRTicker(tk){
   return tk&&(tk.endsWith('.KS')||tk.endsWith('.KQ')||tk.startsWith('^KS')||tk.startsWith('^KQ'));
 }
 
+// 통화별 가격 포맷
+function fmtPrice(v,tk,decimals){
+  if(v==null||v===''||isNaN(v))return '—';
+  const isKr=isKRTicker(tk);
+  const n=Number(v);
+  if(isKr){
+    // 한국 종목 - 원화, 소수점 X
+    return '₩'+Math.round(n).toLocaleString();
+  }
+  // 미국 종목 - 달러
+  const d=decimals!=null?decimals:(Math.abs(n)>=100?2:2);
+  return '$'+n.toFixed(d);
+}
+// 짧은 형식 (큰 숫자 K/M/B)
+function fmtMoney(v,tk){
+  if(v==null||v===''||isNaN(v))return '—';
+  const isKr=isKRTicker(tk);
+  const sym=isKr?'₩':'$';
+  const n=Number(v);
+  const abs=Math.abs(n);
+  if(isKr){
+    if(abs>=1e12)return sym+(n/1e12).toFixed(2)+'조';
+    if(abs>=1e8)return sym+(n/1e8).toFixed(1)+'억';
+    if(abs>=1e4)return sym+(n/1e4).toFixed(0)+'만';
+    return sym+Math.round(n).toLocaleString();
+  }
+  if(abs>=1e12)return sym+(n/1e12).toFixed(2)+'T';
+  if(abs>=1e9)return sym+(n/1e9).toFixed(2)+'B';
+  if(abs>=1e6)return sym+(n/1e6).toFixed(2)+'M';
+  if(abs>=1e3)return sym+(n/1e3).toFixed(2)+'K';
+  return sym+n.toFixed(2);
+}
+
 // 매핑 검색 (자동완성용 - 2단계에서 활용)
 function searchTickerMap(query,limit=10){
   if(!query||!query.trim())return [];
@@ -3036,7 +3183,7 @@ async function go(){
     $('ht').textContent=tk;
 
     // 회사명 (FMP가 더 정확, fallback Finnhub)
-    const longName = D.fmpProfile?.companyName || D.finProfile?.name || '';
+    const longName = D.fmpProfile?.companyName || D.finProfile?.name || (isKRTicker(D.tk)?(D.krName||KRX_ETF_NAMES[D.tk.replace(/\.(KS|KQ)$/i,'')]||''):'') || '';
     if(longName){$('hname').textContent=longName;}else{$('hname').textContent='';}
 
     // 로고 (FMP > Finnhub)
@@ -3185,7 +3332,7 @@ async function go(){
     // AI 자동 1줄 요약 (백그라운드 실행)
     fetchAIQuickSummary();
     // 검색 히스토리 저장
-    const histName=D.fmpProfile?.companyName||D.finProfile?.name||tk;
+    const histName=D.fmpProfile?.companyName||D.finProfile?.name||(isKRTicker(tk)?(D.krName||KRX_ETF_NAMES[tk.replace(/\.(KS|KQ)$/i,'')]||tk):tk);
     saveSearchHistory({ticker:tk,name:histName,market:isKRTicker(tk)?'KR':'US'});
   }catch(e){$('lmsg').textContent='⚠️ '+e.message;}
 }
@@ -3354,7 +3501,7 @@ function drawPrice(){
               min:ZOOM_RANGE&&d.ts?d.ts[ZOOM_RANGE.min]:undefined,
               max:ZOOM_RANGE&&d.ts?d.ts[ZOOM_RANGE.max]:undefined,
             },
-            y:{grid:{color:'rgba(150,150,170,.08)'},ticks:{font:{size:10,family:'JetBrains Mono'},color:txt2,callback:v=>'$'+f2(v)}}
+            y:{grid:{color:'rgba(150,150,170,.08)'},ticks:{font:{size:10,family:'JetBrains Mono'},color:txt2,callback:v=>fmtPrice(v,d.tk)}}
           }
         }
       });
@@ -3374,9 +3521,9 @@ function drawPrice(){
       {label:'매도',data:sp,borderColor:'#ff4d6d',backgroundColor:'#ff4d6d',pointRadius:8,pointStyle:'triangle',rotation:180,showLine:false,order:1},
       ...slDatasets
     ]},options:{responsive:true,maintainAspectRatio:false,animation:false,
-      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.dataset.label+': $'+f2(c.parsed.y)},backgroundColor:'rgba(10,22,40,0.95)'}},
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.dataset.label+': '+fmtPrice(c.parsed.y,d.tk)},backgroundColor:'rgba(10,22,40,0.95)'}},
       scales:{x:{grid:{display:false},ticks:{maxTicksLimit:8,font:{size:10,family:'JetBrains Mono'},color:txt2,autoSkip:true},min:ZOOM_RANGE?ZOOM_RANGE.min:undefined,max:ZOOM_RANGE?ZOOM_RANGE.max:undefined},
-      y:{grid:{color:'rgba(150,150,170,.08)'},ticks:{font:{size:10,family:'JetBrains Mono'},color:txt2,callback:v=>'$'+f2(v)}}}}});
+      y:{grid:{color:'rgba(150,150,170,.08)'},ticks:{font:{size:10,family:'JetBrains Mono'},color:txt2,callback:v=>fmtPrice(v,d.tk)}}}}});
   }
   renderSupportList();
   // 차트 도구 설정 (이벤트 핸들러 + 그림 레이어 복원)
@@ -7846,7 +7993,7 @@ async function loadCalendar(){
   if($('cal-list'))$('cal-list').innerHTML='<div class="ltxt">로딩 중...</div>';
 
   // 캐시: 24시간 (하루 1회 자동 최신화)
-  const cacheKey='cal_cache_v2';  // v2: 실제 실적 데이터 사용 (Finnhub)
+  const cacheKey='cal_cache_v3';  // v3: IPO 추가
   try{
     const cached=localStorage.getItem(cacheKey);
     if(cached){
@@ -7986,6 +8133,44 @@ async function loadCalendar(){
       console.warn('[Pulsa] Finnhub earnings 데이터 없음');
     }
   }catch(e){console.warn('[Pulsa] earnings 실패:',e);}
+
+  // ─── 신규 IPO 일정 (Finnhub calendar/ipo) ───
+  // 과거 60일 ~ 미래 180일. 주요 IPO + 사용자 관심 가능 종목 강조
+  try{
+    const ipoResp=await fetch('/api/finnhub?type=ipo_calendar').then(r=>r.ok?r.json():null).catch(()=>null);
+    const ipoList=ipoResp?.ipoCalendar;
+    if(Array.isArray(ipoList)){
+      // 주목할만한 키워드 (대형 IPO 자동 감지)
+      const watchKeywords=/AI|robotic|quantum|semiconductor|space|defense|crypto|fintech|cloud|biotech|EV|autonomous|chip|cyber|SaaS|AnthropPIC|OpenAI|SpaceX|Stripe|Databricks|Cerebras|Groq|Perplexity|Discord|Klarna|Revolut|Plaid|Canva|Notion|Figma|Reddit/i;
+      let ipoAdded=0;
+      for(const ipo of ipoList){
+        if(!ipo.date||!ipo.symbol&&!ipo.name)continue;
+        const [yy,mm,dd]=ipo.date.split('-').map(Number);
+        if(!yy||!mm||!dd)continue;
+        const name=ipo.name||ipo.symbol;
+        const sym=ipo.symbol||'';
+        // 주요 IPO 판별: (1) 시가총액 10억 이상, (2) 주목 키워드 매치, (3) 가격 책정됨
+        const marketCap=parseFloat(ipo.totalSharesValue)||0;
+        const isMajor=marketCap>=1e9||watchKeywords.test(name+' '+sym);
+        // 중요한 것만 표시 (캘린더 너무 복잡해지면 안되니까)
+        if(!isMajor&&marketCap<5e8)continue;  // 5억 미만은 스킵
+        const status=ipo.status||'';
+        const statusLabel=status==='priced'?'상장 완료':status==='filed'?'서류 제출':status==='expected'?'예정':'';
+        const priceRange=ipo.priceRange?` · 공모가 ${ipo.priceRange}`:'';
+        const sharesValue=marketCap>=1e9?` · 규모 $${(marketCap/1e9).toFixed(1)}B`:'';
+        events.push({
+          date:new Date(yy,mm-1,dd),
+          title:`🚀 ${name} IPO${sym?` (${sym})`:''}`,
+          type:'conf',  // 컨퍼런스 카테고리로 (초록 색)
+          meta:`신규 상장${statusLabel?` · ${statusLabel}`:''}${priceRange}${sharesValue}`,
+          imp:isMajor?3:2,
+          url:sym?`https://finance.yahoo.com/quote/${sym}/`:'',
+        });
+        ipoAdded++;
+      }
+      console.log(`[Pulsa] ✅ IPO ${ipoAdded}개 추가 (대형 + 주목할만한)`);
+    }
+  }catch(e){console.warn('[Pulsa] IPO 캘린더 실패:',e);}
 
   events.sort((a,b)=>a.date-b.date);
   // 과거 1주일 ~ 미래 모두
@@ -8981,12 +9166,12 @@ function renderCalendarMonth(){
     else if(dow===6)cls+=' sat';
     if(hasHoliday)cls+=' holiday-day';
 
-    // 셀 내 이벤트 (최대 3개)
+    // 셀 내 이벤트 (최대 3개) - 카테고리 색상 적용
     const shownEvents=dayEvents.slice(0,3);
     const eventsHtml=shownEvents.map(e=>{
-      const cls=e.type==='watch'?'watch':e.type;
+      const cat=getEventCategory(e);
       const title=e.title.length>10?e.title.slice(0,9)+'…':e.title;
-      return `<div class="cal-cell-event ${cls}">${title}</div>`;
+      return `<div class="cal-cell-event cat-${cat}">${title}</div>`;
     }).join('');
     const moreCount=dayEvents.length-shownEvents.length;
     const moreHtml=moreCount>0?`<div class="cal-cell-more">+${moreCount}</div>`:'';
@@ -9055,17 +9240,13 @@ function setCalFilter(f){
   else renderCalendar();
 }
 
-// 통합 필터 헬퍼
+// 통합 필터 헬퍼 — getEventCategory 기준으로 일관되게 분류
 function applyCalFilter(data){
   if(CAL_FILTER==='all')return data;
-  if(CAL_FILTER==='econ')return data.filter(e=>e.type==='econ'&&!isCentralBank(e)&&!isKoreanEvent(e));
-  if(CAL_FILTER==='fomc')return data.filter(e=>isCentralBank(e));
-  if(CAL_FILTER==='earn')return data.filter(e=>e.type==='earn');
-  if(CAL_FILTER==='conf')return data.filter(e=>isConference(e));
-  if(CAL_FILTER==='holiday')return data.filter(e=>e.type==='holiday');
-  if(CAL_FILTER==='kr')return data.filter(e=>isKoreanEvent(e));
-  if(CAL_FILTER==='watch')return data.filter(e=>e.meta==='관심 종목'||e.meta==='보유 종목');
-  return data;
+  return data.filter(e=>{
+    const cat=getEventCategory(e);
+    return cat===CAL_FILTER;
+  });
 }
 function isCentralBank(e){
   const t=e.title||'';
@@ -9077,8 +9258,35 @@ function isKoreanEvent(e){
 }
 function isConference(e){
   const t=e.title||'';
-  return /CES|WWDC|GTC|I\/O|Build|주주총회|컨퍼런스|잭슨홀|Apple|NVIDIA|Google|Microsoft|이벤트/.test(t);
+  return /CES|WWDC|GTC|I\/O|Build|주주총회|컨퍼런스|잭슨홀|Apple|NVIDIA|Google|Microsoft|이벤트|IPO|🚀/.test(t);
 }
+function isWatchEvent(e){
+  const m=e.meta||'';
+  return /관심 종목|보유 종목/.test(m);
+}
+
+// 이벤트의 시각적 카테고리 반환 (한 이벤트는 하나의 주요 카테고리만)
+// 우선순위: 휴장일 > 보유/관심 > 중앙은행 > 한국 > 컨퍼런스 > 실적 > 경제지표
+function getEventCategory(e){
+  if(e.type==='holiday')return 'holiday';
+  if(isWatchEvent(e))return 'watch';
+  if(isCentralBank(e))return 'fomc';
+  if(isKoreanEvent(e))return 'kr';
+  if(isConference(e))return 'conf';
+  if(e.type==='earn')return 'earn';
+  return 'econ';
+}
+
+// 카테고리 → 배지 라벨
+const EVT_CAT_LABELS={
+  econ:'경제지표',
+  earn:'실적',
+  holiday:'휴장',
+  fomc:'중앙은행',
+  conf:'기업행사',
+  kr:'한국',
+  watch:'관심',
+};
 
 // 미국장 휴장일 2026
 // 미국장 휴장일 자동 계산 (현재 연도 + 다음 연도)
@@ -9215,10 +9423,12 @@ function renderCalendar(){
         const hasTime=evDate2.getHours()!==0||evDate2.getMinutes()!==0;
         const timeStr=hasTime?evDate2.toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit',hour12:false}):'';
         const linkClick=e.url?`onclick="window.open('${e.url.replace(/'/g,'&#39;')}','_blank','noopener');event.stopPropagation();" style="cursor:pointer"`:'';
+        const cat=getEventCategory(e);
+        const badgeLabel=EVT_CAT_LABELS[cat]||'';
         return `<div class="event-item" ${linkClick} style="${itemStyle};margin-bottom:6px;${e.url?'cursor:pointer':''}" ${e.url?'title="공식 사이트로 이동"':''}>
-          <div class="event-imp imp-${e.imp}"></div>
+          <div class="event-imp evt-${cat}"></div>
           <div class="event-content">
-            <div class="event-title">${titleEmoji}${e.title} <span class="event-stars" data-imp="${e.imp||1}">${'⭐'.repeat(e.imp||1)}</span>${timeStr?`<span style="font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--accent);background:var(--accent-soft);padding:1px 5px;border-radius:3px;font-weight:600;margin-left:4px">🕐 ${timeStr}</span>`:''}${e.url?'<span style="font-size:9px;color:var(--text3);margin-left:3px">↗</span>':''}</div>
+            <div class="event-title">${titleEmoji}${e.title} <span class="evt-badge b-${cat}">${badgeLabel}</span> <span class="event-stars" data-imp="${e.imp||1}">${'⭐'.repeat(e.imp||1)}</span>${timeStr?`<span style="font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--accent);background:var(--accent-soft);padding:1px 5px;border-radius:3px;font-weight:600;margin-left:4px">🕐 ${timeStr}</span>`:''}${e.url?'<span style="font-size:9px;color:var(--text3);margin-left:3px">↗</span>':''}</div>
             <div class="event-meta">${dateStr} · ${e.meta||''}</div>
           </div>
           ${isHoliday?'':`<button class="event-bell ${on?'on':''}" onclick="event.stopPropagation();toggleEventAlert('${id}')">${ic('bell',16)}</button>`}
@@ -9256,10 +9466,12 @@ function renderCalendar(){
         const hasTime=evDate3.getHours()!==0||evDate3.getMinutes()!==0;
         const timeStr=hasTime?evDate3.toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit',hour12:false}):'';
         const linkClick=e.url?`onclick="window.open('${e.url.replace(/'/g,'&#39;')}','_blank','noopener');event.stopPropagation();" style="cursor:pointer"`:'';
+        const cat=getEventCategory(e);
+        const badgeLabel=EVT_CAT_LABELS[cat]||'';
         return`<div class="event-item" ${linkClick} style="${itemStyle};${e.url?'cursor:pointer':''}" ${e.url?'title="공식 사이트로 이동"':''}>
-          <div class="event-imp imp-${e.imp}"></div>
+          <div class="event-imp evt-${cat}"></div>
           <div class="event-content">
-            <div class="event-title">${titleEmoji}${e.title} <span class="event-stars" data-imp="${e.imp||1}">${'⭐'.repeat(e.imp||1)}</span>${timeStr?`<span style="font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--accent);background:var(--accent-soft);padding:1px 5px;border-radius:3px;font-weight:600;margin-left:4px">🕐 ${timeStr}</span>`:''}${e.url?'<span style="font-size:9px;color:var(--text3);margin-left:3px">↗</span>':''}</div>
+            <div class="event-title">${titleEmoji}${e.title} <span class="evt-badge b-${cat}">${badgeLabel}</span> <span class="event-stars" data-imp="${e.imp||1}">${'⭐'.repeat(e.imp||1)}</span>${timeStr?`<span style="font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--accent);background:var(--accent-soft);padding:1px 5px;border-radius:3px;font-weight:600;margin-left:4px">🕐 ${timeStr}</span>`:''}${e.url?'<span style="font-size:9px;color:var(--text3);margin-left:3px">↗</span>':''}</div>
             <div class="event-meta">${e.meta}</div>
           </div>
           ${isHoliday?'':`<button class="event-bell ${on?'on':''}" onclick="event.stopPropagation();toggleEventAlert('${id}')">${ic('bell',16)}</button>`}
