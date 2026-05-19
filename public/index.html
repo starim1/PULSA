@@ -7871,8 +7871,9 @@ async function loadCalendar(){
   // ─── 실제 실적 발표 일정 (Finnhub earnings/calendar) ───
   // 무료 플랜 지원, 향후 90일 데이터, 정확한 날짜 + 시간
   try{
-    const earningsResp=await fetch('/api/earnings-calendar').then(r=>r.ok?r.json():null).catch(()=>null);
-    if(earningsResp&&Array.isArray(earningsResp.earnings)){
+    const earningsResp=await fetch('/api/finnhub?type=earnings_calendar').then(r=>r.ok?r.json():null).catch(()=>null);
+    const list=earningsResp?.earningsCalendar;
+    if(Array.isArray(list)){
       const watchTickers=watchlist.map(w=>w.tk.replace(/\.(KS|KQ|US)$/i,''));
       const portfolioTickers=portfolio.map(p=>p.tk.replace(/\.(KS|KQ|US)$/i,''));
       // 모든 빅테크 + S&P500 주요 + 메이저 금융주
@@ -7880,7 +7881,7 @@ async function loadCalendar(){
       const allTrack=new Set([...watchTickers,...portfolioTickers,...majorTickers]);
 
       let added=0;
-      for(const e of earningsResp.earnings){
+      for(const e of list){
         if(!e.symbol||!e.date)continue;
         if(!allTrack.has(e.symbol))continue;
         const isWatch=watchTickers.includes(e.symbol);
