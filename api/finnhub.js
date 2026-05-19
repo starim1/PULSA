@@ -47,7 +47,10 @@ export default async function handler(req, res) {
     earnings_calendar: `/calendar/earnings?from=${earnFrom}&to=${earnTo}`,
   };
 
-  const path = endpoints[type] || endpoints.recommend;
+  const path = endpoints[type];
+  if (!path) {
+    return res.status(400).json({ error: `Unknown type: ${type}`, available: Object.keys(endpoints) });
+  }
   const url = `https://finnhub.io/api/v1${path}&token=${process.env.FINNHUB_API_KEY}`;
 
   try {
