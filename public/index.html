@@ -7846,7 +7846,7 @@ async function loadCalendar(){
   if($('cal-list'))$('cal-list').innerHTML='<div class="ltxt">로딩 중...</div>';
 
   // 캐시: 24시간 (하루 1회 자동 최신화)
-  const cacheKey='cal_cache';
+  const cacheKey='cal_cache_v2';  // v2: 실제 실적 데이터 사용 (Finnhub)
   try{
     const cached=localStorage.getItem(cacheKey);
     if(cached){
@@ -7868,29 +7868,59 @@ async function loadCalendar(){
   // 미국장 휴장일
   events.push(...getMarketHolidays());
 
-  // FMP earnings calendar - 향후 60일
+  // ─── 실제 실적 발표 일정 (Finnhub earnings/calendar) ───
+  // 무료 플랜 지원, 향후 90일 데이터, 정확한 날짜 + 시간
   try{
-    const from=localDateStr(today);
-    const toDate=new Date(today);toDate.setDate(toDate.getDate()+60);
-    const to=localDateStr(toDate);
-    const earnings=await tryFetch(`/api/fmp?type=earnings_cal&from=${from}&to=${to}`).catch(()=>null);
-    if(Array.isArray(earnings)){
-      const watchTickers=watchlist.map(w=>w.tk);
-      const portfolioTickers=portfolio.map(p=>p.tk);
-      const majorTickers=['AAPL','MSFT','GOOGL','GOOG','AMZN','NVDA','META','TSLA','BRK.B','JPM','V','UNH','XOM','LLY','MA','AVGO','PG','HD','CVX','MRK','ABBV','PEP','KO','COST','BAC','ORCL','ADBE','NFLX','CRM','AMD','INTC','QCOM','MU','TSM','ASML','PLTR','SMCI','SHOP','UBER','ABNB','PYPL','SQ','COIN','DIS','MCD','SBUX','NKE','LULU','BA','GE','CAT','DE','JNJ','PFE','TGT','WMT','HD','LOW','GOOG','GS','MS','C','WFC','BLK'];
-      const allTrack=[...new Set([...watchTickers,...portfolioTickers,...majorTickers])];
-      earnings.filter(e=>e.symbol&&allTrack.includes(e.symbol)).slice(0,80).forEach(e=>{
+    const earningsResp=await fetch('/api/earnings-calendar').then(r=>r.ok?r.json():null).catch(()=>null);
+    if(earningsResp&&Array.isArray(earningsResp.earnings)){
+      const watchTickers=watchlist.map(w=>w.tk.replace(/\.(KS|KQ|US)$/i,''));
+      const portfolioTickers=portfolio.map(p=>p.tk.replace(/\.(KS|KQ|US)$/i,''));
+      // 모든 빅테크 + S&P500 주요 + 메이저 금융주
+      const majorTickers=['AAPL','MSFT','GOOGL','GOOG','AMZN','NVDA','META','TSLA','BRK.B','BRK.A','JPM','V','UNH','XOM','LLY','MA','AVGO','PG','HD','CVX','MRK','ABBV','PEP','KO','COST','BAC','ORCL','ADBE','NFLX','CRM','AMD','INTC','QCOM','MU','TSM','ASML','PLTR','SMCI','SHOP','UBER','ABNB','PYPL','SQ','COIN','DIS','MCD','SBUX','NKE','LULU','BA','GE','CAT','DE','JNJ','PFE','TGT','WMT','LOW','GS','MS','C','WFC','BLK','RTX','HON','SCHW','BX','SPGI','TMO','ABT','DHR','VZ','T','CMCSA','NOW','ISRG','BKNG','AMAT','LRCX','KLAC','AMGN','GILD','REGN','VRTX','BIIB'];
+      const allTrack=new Set([...watchTickers,...portfolioTickers,...majorTickers]);
+
+      let added=0;
+      for(const e of earningsResp.earnings){
+        if(!e.symbol||!e.date)continue;
+        if(!allTrack.has(e.symbol))continue;
         const isWatch=watchTickers.includes(e.symbol);
         const isPortfolio=portfolioTickers.includes(e.symbol);
         const tag=isPortfolio?'보유 종목':(isWatch?'관심 종목':'주요 종목');
+        // hour 값: bmo=장 시작 전 (~한국 22:30), amc=장 마감 후 (~한국 06:30), dmh=장 중
+        const hour=e.hour||'';
+        let timeNote='';
+        let dateObj;
+        // 날짜 + 시간 처리
+        const [yy,mm,dd]=e.date.split('-').map(Number);
+        if(hour==='bmo'){
+          // ET 8:00 → 한국 22:00 (같은 날 저녁)
+          dateObj=nyEventDate(yy,mm,dd,8,0);
+          timeNote='한국 22:00 발표 · 장 시작 전';
+        }else if(hour==='amc'){
+          // ET 16:30 → 한국 새벽 06:30 (다음날)
+          dateObj=nyEventDate(yy,mm,dd,16,30);
+          timeNote='한국 새벽 06:30 발표 · 장 마감 후';
+        }else if(hour==='dmh'){
+          dateObj=nyEventDate(yy,mm,dd,12,0);
+          timeNote='장 중 발표';
+        }else{
+          dateObj=new Date(yy,mm-1,dd);
+          timeNote='시간 미정';
+        }
+        const epsNote=e.epsEstimate?` · 예상 EPS $${Number(e.epsEstimate).toFixed(2)}`:'';
         events.push({
-          date:new Date(e.date),
+          date:dateObj,
           title:`${e.symbol} 실적 발표`,
           type:'earn',
-          meta:tag+(e.epsEstimated?` · 예상 EPS $${e.epsEstimated}`:''),
+          meta:`${tag} · ${timeNote}${epsNote}`,
           imp:isWatch||isPortfolio?3:2,
+          url:`https://finance.yahoo.com/quote/${e.symbol}/`,
         });
-      });
+        added++;
+      }
+      console.log(`[Pulsa] ✅ 실제 실적 캘린더 ${added}개 추가 (Finnhub)`);
+    }else{
+      console.warn('[Pulsa] Finnhub earnings 데이터 없음 - 알고리즘 fallback 사용');
     }
   }catch(e){console.warn('[Pulsa] earnings 실패:',e);}
 
@@ -8649,20 +8679,15 @@ function addMajorConferences(events,year){
     url:'https://www.berkshirehathaway.com/sharehold.html',
   });
 
-  // ─── 메이저 기업 실적 발표 (분기별 정기) ───
-  // 실적 발표는 정확한 날짜를 알기 어려우니, 분기 끝 후 대략적인 시기로 표시
-  // 보통 분기 종료 후 2~6주 사이 발표 (현재 분기 + 차기 분기)
-  addMajorEarnings(events,year);
+  // ─── 메이저 기업 실적 발표 ───
+  // 알고리즘 추정 제거 → loadCalendar에서 Finnhub earnings/calendar 실제 데이터 사용
 }
 
 // 메이저 기업 실적 발표 (분기별 정기 패턴)
 function addMajorEarnings(events,year){
   // 미국 빅테크 + 주요 종목 실적 발표 시즌
-  // 매 분기 발표 시기는 비슷한 패턴
-  // Q4(전년도) 발표: 1월말~2월초
-  // Q1 발표: 4월말~5월초
-  // Q2 발표: 7월말~8월초
-  // Q3 발표: 10월말~11월초
+  // 일반 빅테크 회계연도: 12월 마감, 분기 발표 1/4/7/10월말
+  // ※ NVIDIA는 1월 회계연도라 2/5/8/11월에 발표 (별도 처리)
 
   const earningsSeasons=[
     {month:1,label:'Q4'},   // 1월말
@@ -8671,34 +8696,75 @@ function addMajorEarnings(events,year){
     {month:10,label:'Q3'},  // 10월말
   ];
 
-  // 빅테크 (Magnificent 7) — 보통 분기 첫째 ~ 셋째 주 목요일
+  // 일반 빅테크 (Magnificent 7 중 NVIDIA 제외)
+  // 회사별 정확한 발표 주 패턴 (보통 매년 비슷한 시기)
+  // [Q4발표월(1월), Q1발표월(4월), Q2발표월(7월), Q3발표월(10월)]
+  // 숫자 = 그 달의 N번째 주, 0 = 발표 안 함, dow = 발표 요일 (0=일, 4=목)
   const magnificent=[
-    {ticker:'AAPL',name:'Apple',week:[3,4,4,3]},      // 분기별 보통 첫째~넷째 주
-    {ticker:'MSFT',name:'Microsoft',week:[3,3,3,4]},
-    {ticker:'GOOGL',name:'Alphabet',week:[4,4,4,3]},
-    {ticker:'AMZN',name:'Amazon',week:[4,5,5,4]},
-    {ticker:'META',name:'Meta',week:[3,4,4,4]},
-    {ticker:'NVDA',name:'NVIDIA',week:[null,5,5,5]},  // NVIDIA는 1월에 발표 안 함
-    {ticker:'TSLA',name:'Tesla',week:[4,4,4,4]},
+    {ticker:'AAPL',name:'Apple',schedule:[
+      // Q4(전년): 1월 마지막 목, Q1: 5월 첫주 목, Q2: 7월 마지막 목, Q3: 10월 마지막 목
+      {m:1,wk:-1,dow:4},{m:5,wk:1,dow:4},{m:7,wk:-1,dow:4},{m:10,wk:-1,dow:4},
+    ]},
+    {ticker:'MSFT',name:'Microsoft',schedule:[
+      {m:1,wk:-1,dow:2},{m:4,wk:-1,dow:2},{m:7,wk:-1,dow:2},{m:10,wk:-1,dow:2},
+    ]},
+    {ticker:'GOOGL',name:'Alphabet',schedule:[
+      {m:1,wk:-1,dow:2},{m:4,wk:-1,dow:2},{m:7,wk:-1,dow:2},{m:10,wk:-1,dow:2},
+    ]},
+    {ticker:'AMZN',name:'Amazon',schedule:[
+      {m:1,wk:-1,dow:4},{m:4,wk:-1,dow:4},{m:7,wk:-1,dow:4},{m:10,wk:-1,dow:4},
+    ]},
+    {ticker:'META',name:'Meta',schedule:[
+      {m:1,wk:-1,dow:3},{m:4,wk:-1,dow:3},{m:7,wk:-1,dow:3},{m:10,wk:-1,dow:3},
+    ]},
+    {ticker:'TSLA',name:'Tesla',schedule:[
+      {m:1,wk:4,dow:3},{m:4,wk:4,dow:3},{m:7,wk:4,dow:3},{m:10,wk:4,dow:3},
+    ]},
   ];
 
   for(const co of magnificent){
-    for(let qi=0;qi<earningsSeasons.length;qi++){
-      const wk=co.week[qi];
-      if(!wk)continue;
-      const m=earningsSeasons[qi].month;
-      // 해당 월의 wk번째 목요일
-      const day=nthWeekdayOfMonth(year,m,4,wk);
-      if(day>daysInMonth(year,m))continue;
+    for(let i=0;i<co.schedule.length;i++){
+      const s=co.schedule[i];
+      const label=['Q4','Q1','Q2','Q3'][i];
+      let day;
+      if(s.wk===-1){
+        // 마지막 N요일
+        day=lastWeekdayOfMonth(year,s.m,s.dow);
+      }else{
+        day=nthWeekdayOfMonth(year,s.m,s.dow,s.wk);
+      }
+      if(!day||day>daysInMonth(year,s.m))continue;
       events.push({
-        date:nyEventDate(year,m,day,16,30),  // ET 16:30 (장 마감 후)
-        title:`${co.ticker} 실적 발표 (${earningsSeasons[qi].label})`,
+        date:nyEventDate(year,s.m,day,16,30),  // ET 16:30 (장 마감 후)
+        title:`${co.ticker} 실적 발표 (${label})`,
         type:'earn',
         meta:`${co.name} · 한국 새벽 06:30 발표 · 장 마감 후`,
         imp:3,
         url:`https://finance.yahoo.com/quote/${co.ticker}/`,
       });
     }
+  }
+
+  // ─── NVIDIA 별도 처리 (1월 회계연도) ───
+  // NVIDIA는 2/5/8/11월에 발표, 보통 셋째~넷째 주 수요일
+  // 실제 패턴: 2025-02-26, 2025-05-28, 2025-08-27, 2025-11-19 (모두 수요일)
+  const nvdaSchedule=[
+    {m:2,wk:4,dow:3,label:'Q4 (FY 전년)'},  // 2월 넷째 수요일
+    {m:5,wk:4,dow:3,label:'Q1'},           // 5월 넷째 수요일
+    {m:8,wk:4,dow:3,label:'Q2'},           // 8월 넷째 수요일
+    {m:11,wk:3,dow:3,label:'Q3'},          // 11월 셋째 수요일
+  ];
+  for(const s of nvdaSchedule){
+    const day=nthWeekdayOfMonth(year,s.m,s.dow,s.wk);
+    if(!day||day>daysInMonth(year,s.m))continue;
+    events.push({
+      date:nyEventDate(year,s.m,day,16,30),
+      title:`NVDA 실적 발표 (${s.label})`,
+      type:'earn',
+      meta:`NVIDIA · 한국 새벽 06:30 발표 · 장 마감 후`,
+      imp:3,
+      url:'https://finance.yahoo.com/quote/NVDA/',
+    });
   }
 
   // 주요 금융주
