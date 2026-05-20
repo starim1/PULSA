@@ -1884,6 +1884,7 @@ const ICONS = {
   home: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11.5L12 4l9 7.5"/><path d="M5 10v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V10"/><path d="M9 21V13h6v8"/></svg>',
   moon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>',
   sun: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>',
+  settings: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>',
   'chevron-left': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>',
   'chevron-right': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>',
   grid: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>',
@@ -3068,15 +3069,19 @@ function onSearchInput(){
     return;
   }
   dd.innerHTML=`<div class="search-dropdown-section-title">검색 결과</div>`+
-    results.map((r,i)=>`
+    results.map((r,i)=>{
+      const isKr=r.market==='KR'||isKRTicker(r.ticker);
+      // 한국 종목: 티커 안 보이게 (필요시만 작게 - 사실상 숨김)
+      const tkLine=isKr?'':`<div class="sd-tk">${r.ticker}</div>`;
+      return `
       <div class="search-dropdown-item" data-idx="${i}" data-ticker="${r.ticker}" onclick="selectSearchItem('${r.ticker}','${(r.name||'').replace(/'/g,'&#39;')}')">
         <div style="display:flex;flex-direction:column;gap:2px;min-width:0;flex:1">
-          <div class="sd-name">${r.name}</div>
-          <div class="sd-tk">${r.ticker}</div>
+          <div class="sd-name">${r.name||r.ticker}</div>
+          ${tkLine}
         </div>
-        <div class="sd-market ${r.market==='KR'?'kr':'us'}">${r.market}</div>
+        <div class="sd-market ${isKr?'kr':'us'}">${isKr?'KR':r.market}</div>
       </div>
-    `).join('');
+    `;}).join('');
   dd.style.display='block';
 }
 
@@ -3244,12 +3249,22 @@ async function go(){
     }
     const v=calcVerdict(D,analystScore);D.verdict=v;
 
-    // === UI 업데이트 ===
-    $('ht').textContent=tk;
-
     // 회사명 (FMP가 더 정확, fallback Finnhub)
-    const longName = D.fmpProfile?.companyName || D.finProfile?.name || (isKRTicker(D.tk)?(D.krName||KRX_ETF_NAMES[D.tk.replace(/\.(KS|KQ)$/i,'')]||''):'') || '';
-    if(longName){$('hname').textContent=longName;}else{$('hname').textContent='';}
+    const krName=isKRTicker(D.tk)?(D.krName||KRX_ETF_NAMES[D.tk.replace(/\.(KS|KQ)$/i,'')]||''):'';
+    const longName = D.fmpProfile?.companyName || D.finProfile?.name || krName || '';
+    
+    // === UI 업데이트 ===
+    // 한국 종목: 한글 이름을 메인으로, 티커는 숨김 (또는 작게)
+    // 미국 종목: 티커 메인, 종목명 서브
+    if(isKRTicker(tk)&&krName){
+      $('ht').textContent=krName;
+      $('ht').style.fontSize='';
+      $('hname').textContent='';  // 서브 없음 (이름이 이미 메인)
+    }else{
+      $('ht').textContent=tk;
+      $('ht').style.fontSize='';
+      if(longName){$('hname').textContent=longName;}else{$('hname').textContent='';}
+    }
 
     // 로고 (FMP > Finnhub)
     const logoUrl = D.fmpProfile?.image || D.finProfile?.logo || '';
@@ -4997,15 +5012,18 @@ function onAssetsTkInput(){
   }
 
   if(!results.length){dd.style.display='none';return;}
-  dd.innerHTML=results.map(r=>`
+  dd.innerHTML=results.map(r=>{
+    const isKr=r.market==='KR'||isKRTicker(r.ticker);
+    const tkLine=isKr?(r.isEtf?'<div class="sd-tk">ETF</div>':''):`<div class="sd-tk">${r.ticker}${r.isEtf?' · ETF':''}</div>`;
+    return `
     <div class="search-dropdown-item" onclick="selectAssetSearchItem('${r.ticker}','${(r.name||'').replace(/'/g,'&#39;')}')">
       <div style="display:flex;flex-direction:column;gap:2px;min-width:0;flex:1">
         <div class="sd-name">${r.name||r.ticker}</div>
-        <div class="sd-tk">${r.ticker}${r.isEtf?' · ETF':''}</div>
+        ${tkLine}
       </div>
-      <div class="sd-market ${r.market==='KR'?'kr':'us'}">${r.market}</div>
+      <div class="sd-market ${isKr?'kr':'us'}">${isKr?'KR':r.market}</div>
     </div>
-  `).join('');
+  `;}).join('');
   dd.style.display='block';
 }
 
@@ -5079,14 +5097,20 @@ async function fetchAssetExtras(tk){
         if(price)portfolio[idx].price=price;
       }catch(e){}
     }
-    // 4) 섹터 - ETF 분류 시도
-    let etfSec=getETFSector(tk);
-    if(etfSec)portfolio[idx].sector=etfSec;
-    else{
-      // 일반 한국 주식 → KRX 데이터 또는 기본
-      const name=portfolio[idx].name||'';
-      portfolio[idx].sector=name?`한국 주식`:'한국 종목';
+    // 4) 섹터 분류 - 우선순위:
+    //   a) ETF 분류 (`getETFSector` 한국 ETF 매핑 또는 이름 기반 추정)
+    //   b) 한국 주요 종목 섹터 매핑 (KR_STOCK_SECTORS)
+    //   c) 종목명 기반 추정 (이름에 '반도체' '바이오' 등 키워드 매치)
+    //   d) 기본값 '한국 주식'
+    let sec=getETFSector(tk);
+    if(!sec){
+      sec=getKrStockSector(code);
     }
+    if(!sec){
+      const name=portfolio[idx].name||'';
+      sec=guessKrStockSectorByName(name);
+    }
+    portfolio[idx].sector=sec||'한국 주식';
     return;
   }
   
@@ -5249,6 +5273,101 @@ function getKrxStockInfo(tk){
   return KRX_STOCKS[code] || null;
 }
 
+// 주요 한국 종목 섹터 매핑 (코드 → 섹터)
+// KRX에는 직접 섹터 정보 없어서 수동 매핑 (시총 상위 + 주요 종목)
+const KR_STOCK_SECTORS={
+  // 반도체
+  '005930':'반도체','000660':'반도체','042700':'반도체','005935':'반도체',
+  '058470':'반도체장비','240810':'반도체장비','403870':'반도체장비','357780':'반도체',
+  '108860':'반도체','272210':'반도체장비','095340':'반도체','036930':'반도체장비',
+  // 2차전지
+  '373220':'2차전지','006400':'2차전지','051910':'2차전지','096770':'2차전지소재',
+  '247540':'2차전지소재','066970':'2차전지소재','003670':'2차전지소재','005490':'철강·2차전지',
+  '450080':'2차전지소재','004990':'2차전지','361610':'2차전지소재',
+  // 자동차
+  '005380':'자동차','000270':'자동차','012330':'자동차부품','161390':'자동차부품',
+  '011170':'화학·자동차','018880':'자동차부품',
+  // 화학·소재
+  '051915':'화학','009830':'화학','011170':'화학','271560':'식음료','097950':'식음료',
+  '004020':'철강','002380':'철강','010130':'비철금속',
+  // 바이오·헬스
+  '207940':'바이오','068270':'바이오','326030':'바이오','302440':'바이오','196170':'바이오',
+  '145020':'바이오','000100':'제약','009420':'제약','128940':'제약','069620':'제약',
+  '041960':'바이오','185750':'제약','170900':'바이오','328130':'바이오',
+  // 금융
+  '055550':'금융지주','105560':'금융지주','086790':'금융지주','316140':'금융지주',
+  '024110':'은행','138930':'금융지주','139130':'금융지주',
+  '030200':'통신','017670':'통신','032640':'통신',
+  '005830':'보험','000810':'보험','032830':'보험','088350':'보험','082640':'보험',
+  '006800':'증권','016360':'증권','008560':'증권','005940':'증권','030610':'증권',
+  '039490':'증권','071050':'증권','004170':'유통',
+  // 인터넷·게임
+  '035420':'인터넷','035720':'인터넷','181710':'인터넷','323410':'핀테크',
+  '251270':'게임','036570':'게임','259960':'게임','112040':'게임','194480':'게임',
+  '263750':'게임','293490':'게임','225570':'게임',
+  // 미디어·엔터
+  '041510':'엔터테인먼트','035900':'엔터테인먼트','122870':'엔터테인먼트','352820':'엔터테인먼트',
+  '079160':'미디어','253450':'미디어','035760':'미디어',
+  // 조선·중공업
+  '329180':'조선','009540':'조선','010140':'조선','042660':'조선','010620':'조선',
+  '267250':'기계','272210':'기계','064350':'기계','267270':'기계',
+  // 건설
+  '000720':'건설','047040':'건설','028050':'건설','375500':'건설',
+  // 항공·운송
+  '003490':'항공','020560':'항공','180640':'항공',
+  '028670':'운송','000120':'운송','003280':'운송',
+  // 유통·소비재
+  '023530':'유통','004170':'유통','007070':'유통','111770':'유통',
+  '097950':'식음료','271560':'식음료','280360':'식음료','005300':'식음료','004990':'식음료',
+  '282330':'식음료','000080':'식음료','035250':'레저',
+  // 에너지·전력
+  '015760':'전력','267260':'에너지','009830':'에너지','267290':'에너지','326030':'에너지',
+  '034220':'전자부품','009150':'전자부품','009830':'화학',
+  // 우주·방산
+  '047810':'방산','272210':'방산','079550':'방산','012450':'방산','064350':'방산',
+  '108860':'반도체','326030':'바이오',
+};
+
+// 주요 한국 종목 섹터 반환
+function getKrStockSector(code){
+  return KR_STOCK_SECTORS[code]||null;
+}
+
+// 한국 종목명 기반 섹터 추정 (KR_STOCK_SECTORS에 없을 때 폴백)
+function guessKrStockSectorByName(name){
+  if(!name)return null;
+  const checks=[
+    [/반도체|메모리|시스템반도체|파운드리/i,'반도체'],
+    [/2차전지|배터리|이차전지|리튬|양극재|음극재|전해질/i,'2차전지'],
+    [/바이오|제약|의약품|항체|백신|치료제|신약/i,'바이오·제약'],
+    [/은행|금융지주|뱅크/i,'금융'],
+    [/증권|투자증권/i,'증권'],
+    [/보험/i,'보험'],
+    [/통신|텔레콤/i,'통신'],
+    [/건설|건축|토목/i,'건설'],
+    [/조선|선박|해양|중공업/i,'조선·중공업'],
+    [/자동차|모터스|차량/i,'자동차'],
+    [/철강|금속|제강|제련/i,'철강·금속'],
+    [/화학|케미칼/i,'화학'],
+    [/식품|푸드|음료|제과|유업|주류/i,'식음료'],
+    [/패션|화장품|뷰티|코스메틱/i,'소비재·뷰티'],
+    [/엔터테인먼트|미디어|컨텐츠|영화|음반|방송/i,'미디어·엔터'],
+    [/게임|게임즈/i,'게임'],
+    [/AI|인공지능|로봇|로보틱스/i,'AI·로봇'],
+    [/항공|에어/i,'항공'],
+    [/운송|물류|해운/i,'운송·물류'],
+    [/전력|에너지|태양광|풍력/i,'에너지·전력'],
+    [/우주|방위|국방|항공우주|UAM/i,'우주·방산'],
+    [/리츠|REIT/i,'리츠'],
+    [/지주|홀딩스/i,'지주회사'],
+    [/유통|마트|편의점|백화점|쇼핑/i,'유통'],
+  ];
+  for(const [pat,sec] of checks){
+    if(pat.test(name))return sec;
+  }
+  return null;
+}
+
 // 주요 ETF의 기초자산 섹터 매핑
 // 구조: 카테고리 단위로 묶음 (광범위 지수 / 섹터 / 테마 / 채권 / 원자재 / 국제 / 한국)
 function getETFSector(tk){
@@ -5256,16 +5375,16 @@ function getETFSector(tk){
 
   // ─── 광범위 미국 지수 ETF ───
   const broadUS={
-    'SPY':'광범위 지수','VOO':'광범위 지수','IVV':'광범위 지수','SPLG':'광범위 지수',
-    'QQQ':'기술 (Nasdaq100)','QQQM':'기술 (Nasdaq100)','TQQQ':'기술 (3X 레버리지)',
-    'DIA':'광범위 지수 (다우)','IWM':'소형주 (러셀2000)','IWB':'대형주',
-    'VTI':'광범위 지수 (전체)','VT':'전세계 주식','VEA':'선진국','VWO':'신흥국',
+    'SPY':'미국 S&P 500','VOO':'미국 S&P 500','IVV':'미국 S&P 500','SPLG':'미국 S&P 500',
+    'QQQ':'미국 나스닥100','QQQM':'미국 나스닥100','TQQQ':'미국 나스닥100 (3X 레버리지)',
+    'DIA':'미국 다우존스','IWM':'미국 러셀2000','IWB':'미국 러셀1000',
+    'VTI':'미국 전체 시장','VT':'전세계 주식','VEA':'선진국','VWO':'신흥국',
     'IEFA':'선진국 (미국 제외)','IEMG':'신흥국','EFA':'선진국','EEM':'신흥국',
-    'MTUM':'모멘텀','QUAL':'퀄리티','VLUE':'가치주','SIZE':'중형주',
-    'USMV':'저변동성','SPYV':'가치주 (S&P500)','SPYG':'성장주 (S&P500)',
+    'MTUM':'모멘텀 팩터','QUAL':'퀄리티 팩터','VLUE':'가치 팩터','SIZE':'중형주',
+    'USMV':'저변동성','SPYV':'S&P 500 가치주','SPYG':'S&P 500 성장주',
     'VUG':'성장주','VTV':'가치주','SCHD':'배당주','VYM':'고배당',
     'DGRO':'배당성장','NOBL':'배당귀족','HDV':'고배당',
-    'JEPI':'커버드콜 배당','JEPQ':'커버드콜 배당 (Nasdaq)',
+    'JEPI':'S&P 500 커버드콜','JEPQ':'나스닥 커버드콜',
   };
   if(broadUS[t])return `ETF · ${broadUS[t]}`;
 
@@ -6493,12 +6612,27 @@ function renderAssets(){
     
     // 종목명 가져오기
     const code=isKr?s.tk.replace(/\.(KS|KQ)$/i,''):'';
-    const displayName=s.name||(isKr?(KRX_STOCKS[code]?.name||KRX_ETF_NAMES[code]||s.tk):s.tk);
-    const showName=displayName!==s.tk&&displayName?`<span style="display:block;font-size:10px;color:var(--text2);font-weight:400;margin-top:2px;font-family:inherit">${displayName.length>20?displayName.slice(0,19)+'…':displayName}</span>`:'';
+    const krName=isKr?(s.name||KRX_STOCKS[code]?.name||KRX_ETF_NAMES[code]||''):'';
+    // 섹터 표시 간소화: "ETF · 한국 우주항공&UAM (PLUS)" → "우주·방산"
+    let secDisplay=s.sector||'—';
+    if(secDisplay!=='—'){
+      // ETF 접두사 제거
+      secDisplay=secDisplay.replace(/^ETF\s*·\s*/,'');
+      // 운용사 표시 제거 (괄호 안 KODEX/TIGER 등)
+      secDisplay=secDisplay.replace(/\s*\((KODEX|TIGER|ACE|RISE|KoAct|KOACT|PLUS|HANARO|KOSEF|ARIRANG|TIMEFOLIO|KINDEX|SOL|WON|1Q|KBSTAR|WOORI|MIDAS)\)\s*$/,'');
+      // "한국 " prefix 제거
+      secDisplay=secDisplay.replace(/^한국\s*/,'');
+      // "미국 " prefix는 유지 (해외 분류 명확하게)
+    }
+    // 한국 종목: 종목명을 메인으로, 티커는 숨김 (또는 작게)
+    // 미국 종목: 티커 메인 + 종목명 서브
+    const cellHTML=isKr&&krName
+      ? `<strong style="font-family:Inter,sans-serif;cursor:pointer;color:var(--accent);font-size:13px" onclick="$('ti').value='${s.tk}';navTo('analysis');stab('chart');go();">${krName.length>22?krName.slice(0,21)+'…':krName}</strong>`
+      : `<strong style="font-family:Inter,sans-serif;cursor:pointer;color:var(--accent)" onclick="$('ti').value='${s.tk}';navTo('analysis');stab('chart');go();">${s.tk}</strong>${s.name&&s.name!==s.tk?`<span style="display:block;font-size:10px;color:var(--text2);font-weight:400;margin-top:2px;font-family:inherit">${s.name.length>22?s.name.slice(0,21)+'…':s.name}</span>`:''}`;
     
     return `<tr>
-      <td><strong style="font-family:Inter,sans-serif;cursor:pointer;color:var(--accent)" onclick="$('ti').value='${s.tk}';navTo('analysis');stab('chart');go();">${s.tk}</strong>${showName}</td>
-      <td style="font-size:11px;color:var(--text2);font-family:Inter,sans-serif">${s.sector||'—'}</td>
+      <td>${cellHTML}</td>
+      <td style="font-size:11px;color:var(--text2);font-family:Inter,sans-serif">${secDisplay}</td>
       <td>${s.sh}</td>
       <td>${fmtPrice(s.avg,s.tk)}</td>
       <td>${s.price?fmtPrice(s.price,s.tk):'—'}</td>
@@ -6531,6 +6665,32 @@ function renderAssets(){
     return (v>=0?'+':'-')+curSym+abs.toLocaleString();
   };
   
+  // 한국/미국 자산 비율 계산 (선택된 통화 기준)
+  const krMktInTarget=useKrw?totMktKRW:(totMktKRW/USD_KRW);
+  const usMktInTarget=useKrw?(totMktUSD*USD_KRW):totMktUSD;
+  const totMktForRatio=krMktInTarget+usMktInTarget;
+  const krPct=totMktForRatio?(krMktInTarget/totMktForRatio)*100:0;
+  const usPct=totMktForRatio?(usMktInTarget/totMktForRatio)*100:0;
+  const ratioBar=totMktForRatio>0?`
+    <div class="btc" style="grid-column:1/-1;padding:14px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <div style="display:flex;align-items:center;gap:8px;font-size:11px;color:var(--text2);font-weight:600;text-transform:uppercase;letter-spacing:0.5px">국가별 자산 비율</div>
+        <div style="display:flex;gap:14px;font-size:12px">
+          <span style="display:flex;align-items:center;gap:4px"><span style="display:inline-block;width:8px;height:8px;background:#4a9eff;border-radius:2px"></span><strong>🇺🇸 미국</strong> ${usPct.toFixed(1)}%</span>
+          <span style="display:flex;align-items:center;gap:4px"><span style="display:inline-block;width:8px;height:8px;background:#ff8c42;border-radius:2px"></span><strong>🇰🇷 한국</strong> ${krPct.toFixed(1)}%</span>
+        </div>
+      </div>
+      <div style="display:flex;height:10px;border-radius:5px;overflow:hidden;background:var(--bg3)">
+        ${usPct>0?`<div style="width:${usPct}%;background:#4a9eff;transition:width 0.3s" title="미국 ${fmtCur(usMktInTarget)}"></div>`:''}
+        ${krPct>0?`<div style="width:${krPct}%;background:#ff8c42;transition:width 0.3s" title="한국 ${fmtCur(krMktInTarget)}"></div>`:''}
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-top:6px;font-size:10px;color:var(--text3);font-family:'JetBrains Mono',monospace">
+        <span>${usPct>0?fmtCur(usMktInTarget):''}</span>
+        <span>${krPct>0?fmtCur(krMktInTarget):''}</span>
+      </div>
+    </div>
+  `:'';
+  
   // 평가금액을 큰 카드 1개로 + 토글 버튼
   $('assets-grid').innerHTML=`
     <div class="btc btc-main" style="grid-column:1/-1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:18px;background:linear-gradient(135deg,rgba(74,158,255,0.08),rgba(16,208,144,0.06));border:1px solid rgba(74,158,255,0.2);position:relative">
@@ -6540,6 +6700,7 @@ function renderAssets(){
         ${otherSym} ${otherLabel}
       </button>
     </div>
+    ${ratioBar}
     <div class="btc"><div class="btc-l">총 투자금</div><div class="btc-v" style="font-size:15px">${fmtCur(totCost)}</div></div>
     <div class="btc"><div class="btc-l">수익금</div><div class="btc-v ${totPnl>=0?'up':'down'}">${totMkt?fmtPnl(totPnl):'—'}</div></div>
     <div class="btc"><div class="btc-l">수익률</div><div class="btc-v ${totPct>=0?'up':'down'}">${totMkt?fp(totPct):'—'}</div></div>
@@ -8001,8 +8162,12 @@ async function loadSectorsGrid(){
       if(!d)return;
       const pct=card.querySelector('.sec-pct');pct.textContent=fp(d.chgPct);pct.className='sec-pct '+(d.chgPct>=0?'up':'down');
       const intensity=Math.min(Math.abs(d.chgPct)/3,1);
-      card.style.background=d.chgPct>=0?`rgba(38,215,130,${0.05+intensity*0.15})`:`rgba(255,77,109,${0.05+intensity*0.15})`;
-      card.style.borderColor=d.chgPct>=0?`rgba(38,215,130,${0.2+intensity*0.3})`:`rgba(255,77,109,${0.2+intensity*0.3})`;
+      // 색상 모드 (전 세계/한국) 반영
+      const upColor=SETTINGS.colorMode==='korea'?'255,77,109':'38,215,130';
+      const downColor=SETTINGS.colorMode==='korea'?'74,158,255':'255,77,109';
+      const colorRgb=d.chgPct>=0?upColor:downColor;
+      card.style.background=`rgba(${colorRgb},${0.05+intensity*0.15})`;
+      card.style.borderColor=`rgba(${colorRgb},${0.2+intensity*0.3})`;
     });
   }
 }
