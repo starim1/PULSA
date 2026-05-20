@@ -1695,7 +1695,12 @@ body.has-notch .topbar{
       </div>
 
       <!-- 보유 종목 리스트 -->
-      <div class="sec-title" style="display:flex;align-items:center;gap:8px">보유 종목 <span style="font-size:10px;color:var(--text3);font-weight:400">← 옆으로 밀어 더 보기</span></div>
+      <div class="sec-title" style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
+        <div style="display:flex;align-items:center;gap:8px">보유 종목 <span style="font-size:10px;color:var(--text3);font-weight:400;text-transform:none;letter-spacing:0">← 옆으로 밀어 더 보기</span></div>
+        <button id="us-currency-toggle" onclick="toggleUSStockCurrency()" style="background:rgba(74,158,255,0.12);border:1px solid rgba(74,158,255,0.3);color:var(--accent);padding:4px 10px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;display:none;align-items:center;gap:4px;letter-spacing:0;text-transform:none" title="미국 종목 가격을 원화/달러로 전환">
+          <span id="us-currency-label">미국 종목 ₩ 보기</span>
+        </button>
+      </div>
       <div class="assets-table-wrap" style="overflow-x:auto;-webkit-overflow-scrolling:touch;border-radius:8px;position:relative">
         <table class="pf-tbl" style="min-width:680px">
           <thead><tr><th>종목</th><th>섹터</th><th>수량</th><th>평단가</th><th>현재가</th><th>평가금액</th><th>수익률</th><th></th></tr></thead>
@@ -2951,6 +2956,22 @@ function resolveTicker(input){
 // 한국 종목 여부 판별
 function isKRTicker(tk){
   return tk&&(tk.endsWith('.KS')||tk.endsWith('.KQ')||tk.startsWith('^KS')||tk.startsWith('^KQ'));
+}
+
+// 종목 표시명 — 한국 종목은 한글 이름, 미국 종목은 티커
+// portfolio 객체에 name 저장된 경우 우선, 없으면 KRX/ETF 매핑에서 검색
+function getDisplayName(tk,portfolioName){
+  if(!tk)return '';
+  if(isKRTicker(tk)){
+    const code=tk.replace(/\.(KS|KQ)$/i,'');
+    return portfolioName||KRX_STOCKS[code]?.name||KRX_ETF_NAMES[code]||tk;
+  }
+  return tk;
+}
+// portfolio에서 종목 찾아서 표시명 반환
+function getPortfolioDisplayName(tk){
+  const p=portfolio.find(x=>x.tk===tk);
+  return getDisplayName(tk,p?.name);
 }
 
 // 통화별 가격 포맷
@@ -5114,7 +5135,7 @@ async function fetchAssetExtras(tk){
     return;
   }
   
-  // 미국 종목 (기존 로직)
+  // 미국 종목 (기존 로직 + 영어 섹터 한글 변환)
   try{
     const price=await fetchQuote(tk);
     if(price)portfolio[idx].price=price;
@@ -5122,7 +5143,8 @@ async function fetchAssetExtras(tk){
   try{
     const profile=await tryFetch(`/api/finnhub?symbol=${tk}&type=profile`);
     if(profile?.finnhubIndustry){
-      portfolio[idx].sector=profile.finnhubIndustry;
+      // 영어 섹터를 한글로 변환 (한국 주식과 같은 카테고리로 통일)
+      portfolio[idx].sector=translateSector(profile.finnhubIndustry);
       if(profile?.name)portfolio[idx].name=profile.name;
     }else{
       let etfSec=getETFSector(tk);
@@ -5341,8 +5363,8 @@ function guessKrStockSectorByName(name){
     [/2차전지|배터리|이차전지|리튬|양극재|음극재|전해질/i,'2차전지'],
     [/바이오|제약|의약품|항체|백신|치료제|신약/i,'바이오·제약'],
     [/은행|금융지주|뱅크/i,'금융'],
-    [/증권|투자증권/i,'증권'],
-    [/보험/i,'보험'],
+    [/증권|투자증권/i,'금융'],
+    [/보험/i,'금융'],
     [/통신|텔레콤/i,'통신'],
     [/건설|건축|토목/i,'건설'],
     [/조선|선박|해양|중공업/i,'조선·중공업'],
@@ -5368,6 +5390,128 @@ function guessKrStockSectorByName(name){
   return null;
 }
 
+// 미국 종목 영어 섹터(Finnhub) → 한국어 통일 매핑
+// 한국 주식과 같은 섹터명으로 통일해서 자산 분류 합산 가능
+const EN_TO_KR_SECTOR={
+  // Finnhub finnhubIndustry / FMP industry / sector
+  'Semiconductors':'반도체',
+  'Semiconductor':'반도체',
+  'Technology':'IT/기술',
+  'Software':'소프트웨어',
+  'Software—Infrastructure':'소프트웨어',
+  'Software—Application':'소프트웨어',
+  'Information Technology Services':'IT 서비스',
+  'Communication Equipment':'통신장비',
+  'Communication Services':'통신',
+  'Communications':'통신',
+  'Telecom Services':'통신',
+  'Internet Content & Information':'인터넷',
+  'Internet Retail':'인터넷',
+  'Computer Hardware':'IT/하드웨어',
+  'Consumer Electronics':'IT/하드웨어',
+  'Electronic Computers':'IT/하드웨어',
+  'Electronic Components':'전자부품',
+  'Electronic Gaming & Multimedia':'게임',
+  // 금융
+  'Banks':'금융','Banks—Diversified':'금융','Banks—Regional':'금융',
+  'Banking':'금융','Capital Markets':'금융','Credit Services':'금융',
+  'Asset Management':'금융','Financial Services':'금융','Financial':'금융',
+  'Financial Data & Stock Exchanges':'금융',
+  'Insurance—Life':'금융','Insurance—Property & Casualty':'금융',
+  'Insurance—Diversified':'금융','Insurance':'금융','Insurance Brokers':'금융',
+  // 헬스/바이오
+  'Biotechnology':'바이오·제약','Biotech':'바이오·제약',
+  'Drug Manufacturers—General':'바이오·제약',
+  'Drug Manufacturers—Specialty & Generic':'바이오·제약',
+  'Pharmaceuticals':'바이오·제약',
+  'Pharmaceutical':'바이오·제약',
+  'Healthcare':'헬스케어','Health Care':'헬스케어',
+  'Medical Devices':'헬스케어','Medical Instruments & Supplies':'헬스케어',
+  'Medical Care Facilities':'헬스케어','Medical Distribution':'헬스케어',
+  'Diagnostics & Research':'헬스케어',
+  'Health Information Services':'헬스케어',
+  // 자동차
+  'Auto Manufacturers':'자동차',
+  'Automobiles':'자동차',
+  'Auto—Manufacturers':'자동차',
+  'Auto Parts':'자동차',
+  'Automotive':'자동차',
+  'Recreational Vehicles':'자동차',
+  // 에너지/화학
+  'Oil & Gas E&P':'에너지·화학','Oil & Gas Integrated':'에너지·화학',
+  'Oil & Gas Refining & Marketing':'에너지·화학',
+  'Oil & Gas Midstream':'에너지·화학','Oil & Gas Equipment & Services':'에너지·화학',
+  'Energy':'에너지·화학',
+  'Specialty Chemicals':'에너지·화학','Chemicals':'에너지·화학',
+  'Agricultural Inputs':'에너지·화학',
+  // 산업/방산
+  'Aerospace & Defense':'우주항공·방산',
+  'Defense':'우주항공·방산',
+  'Industrial Machinery':'산업·기계','Specialty Industrial Machinery':'산업·기계',
+  'Farm & Heavy Construction Machinery':'산업·기계',
+  'Industrials':'산업·기계',
+  'Conglomerates':'산업·기계',
+  // 운송/항공
+  'Airlines':'운송','Air Transportation':'운송',
+  'Marine Shipping':'운송','Trucking':'운송','Railroads':'운송',
+  'Integrated Freight & Logistics':'운송',
+  // 건설/부동산
+  'Engineering & Construction':'건설',
+  'Residential Construction':'건설','Construction':'건설',
+  'Building Materials':'건설','Building Products & Equipment':'건설',
+  'REIT—Residential':'리츠·부동산','REIT—Retail':'리츠·부동산',
+  'REIT—Healthcare Facilities':'리츠·부동산','REIT—Industrial':'리츠·부동산',
+  'REIT—Office':'리츠·부동산','REIT—Diversified':'리츠·부동산',
+  'REIT—Specialty':'리츠·부동산','REIT—Hotel & Motel':'리츠·부동산',
+  'REIT—Mortgage':'리츠·부동산','Real Estate':'리츠·부동산',
+  'Real Estate Services':'리츠·부동산',
+  // 철강/금속
+  'Steel':'철강·금속','Aluminum':'철강·금속','Copper':'철강·금속',
+  'Other Industrial Metals & Mining':'철강·금속',
+  'Gold':'철강·금속','Silver':'철강·금속',
+  'Other Precious Metals & Mining':'철강·금속',
+  // 소비재
+  'Consumer Defensive':'식음료','Consumer Cyclical':'유통·소비재',
+  'Consumer Staples':'식음료','Consumer Discretionary':'유통·소비재',
+  'Beverages—Non-Alcoholic':'식음료','Beverages—Wineries & Distilleries':'식음료',
+  'Beverages—Brewers':'식음료',
+  'Packaged Foods':'식음료','Confectioners':'식음료',
+  'Farm Products':'식음료','Tobacco':'식음료',
+  'Apparel Retail':'유통·소비재','Apparel Manufacturing':'유통·소비재',
+  'Footwear & Accessories':'유통·소비재',
+  'Discount Stores':'유통·소비재','Department Stores':'유통·소비재',
+  'Home Improvement Retail':'유통·소비재','Specialty Retail':'유통·소비재',
+  'Internet Marketplace':'유통·소비재',
+  'Personal Services':'유통·소비재','Luxury Goods':'유통·소비재',
+  'Household & Personal Products':'유통·소비재',
+  'Personal Products':'뷰티·소비재',
+  // 미디어/엔터
+  'Entertainment':'미디어·엔터','Media':'미디어·엔터',
+  'Broadcasting':'미디어·엔터','Publishing':'미디어·엔터',
+  'Restaurants':'식음료','Travel Services':'레저·여행',
+  'Resorts & Casinos':'레저·여행','Lodging':'레저·여행',
+  'Leisure':'레저·여행','Gambling':'레저·여행',
+  // 유틸리티
+  'Utilities':'유틸리티','Utilities—Regulated Electric':'유틸리티',
+  'Utilities—Regulated Gas':'유틸리티','Utilities—Renewable':'유틸리티',
+  'Utilities—Diversified':'유틸리티',
+  // 기타
+  'Specialty Business Services':'기타 서비스',
+  'Business Services':'기타 서비스',
+  'Consulting Services':'기타 서비스',
+  'Staffing & Employment Services':'기타 서비스',
+  'Security & Protection Services':'기타 서비스',
+  'Rental & Leasing Services':'기타 서비스',
+  'Education & Training Services':'기타 서비스',
+  'Waste Management':'기타 서비스',
+};
+
+// 영어 섹터를 한글 섹터로 변환 (없으면 원본 반환)
+function translateSector(sec){
+  if(!sec)return sec;
+  return EN_TO_KR_SECTOR[sec]||EN_TO_KR_SECTOR[sec.trim()]||sec;
+}
+
 // 주요 ETF의 기초자산 섹터 매핑
 // 구조: 카테고리 단위로 묶음 (광범위 지수 / 섹터 / 테마 / 채권 / 원자재 / 국제 / 한국)
 function getETFSector(tk){
@@ -5375,16 +5519,28 @@ function getETFSector(tk){
 
   // ─── 광범위 미국 지수 ETF ───
   const broadUS={
+    // 미국 S&P 500 (가치/성장/일반 다 통합)
     'SPY':'미국 S&P 500','VOO':'미국 S&P 500','IVV':'미국 S&P 500','SPLG':'미국 S&P 500',
-    'QQQ':'미국 나스닥100','QQQM':'미국 나스닥100','TQQQ':'미국 나스닥100 (3X 레버리지)',
-    'DIA':'미국 다우존스','IWM':'미국 러셀2000','IWB':'미국 러셀1000',
-    'VTI':'미국 전체 시장','VT':'전세계 주식','VEA':'선진국','VWO':'신흥국',
-    'IEFA':'선진국 (미국 제외)','IEMG':'신흥국','EFA':'선진국','EEM':'신흥국',
-    'MTUM':'모멘텀 팩터','QUAL':'퀄리티 팩터','VLUE':'가치 팩터','SIZE':'중형주',
-    'USMV':'저변동성','SPYV':'S&P 500 가치주','SPYG':'S&P 500 성장주',
-    'VUG':'성장주','VTV':'가치주','SCHD':'배당주','VYM':'고배당',
-    'DGRO':'배당성장','NOBL':'배당귀족','HDV':'고배당',
-    'JEPI':'S&P 500 커버드콜','JEPQ':'나스닥 커버드콜',
+    'SPYV':'미국 S&P 500','SPYG':'미국 S&P 500',
+    'JEPI':'미국 S&P 500',
+    // 미국 나스닥 (성장주/100/커버드콜 등 다 통합)
+    'QQQ':'미국 나스닥','QQQM':'미국 나스닥','TQQQ':'미국 나스닥',
+    'JEPQ':'미국 나스닥',
+    // 미국 다우
+    'DIA':'미국 다우존스',
+    // 미국 러셀
+    'IWM':'미국 러셀','IWB':'미국 러셀',
+    // 미국 전체 시장
+    'VTI':'미국 전체 시장',
+    // 전세계/선진국/신흥국
+    'VT':'전세계 주식','VEA':'선진국','VWO':'신흥국',
+    'IEFA':'선진국','IEMG':'신흥국','EFA':'선진국','EEM':'신흥국',
+    // 팩터/스타일 (별도 카테고리)
+    'MTUM':'미국 팩터 ETF','QUAL':'미국 팩터 ETF','VLUE':'미국 팩터 ETF','SIZE':'미국 팩터 ETF',
+    'USMV':'미국 팩터 ETF',
+    'VUG':'미국 성장주','VTV':'미국 가치주',
+    // 배당
+    'SCHD':'미국 배당','VYM':'미국 배당','DGRO':'미국 배당','NOBL':'미국 배당','HDV':'미국 배당',
   };
   if(broadUS[t])return `ETF · ${broadUS[t]}`;
 
@@ -5793,112 +5949,88 @@ function guessETFSectorByName(name){
   // 한국 ETF 브랜드가 감지되지 않으면 한국 ETF 아닐 가능성
   if(!brand)return null;
 
-  // 키워드 매칭으로 카테고리 추정
+  // 키워드 매칭으로 카테고리 추정 (통일된 섹터명 사용)
+  // 같은 자산군은 같은 이름으로 (예: 모든 나스닥 관련 → "미국 나스닥")
   const checks=[
-    // 광범위 지수
+    // 광범위 한국 지수
     [/KOSPI200|코스피200|KOSPI\s*200/i,'한국 KOSPI200'],
     [/KOSDAQ150|코스닥150|KOSDAQ\s*150/i,'한국 KOSDAQ150'],
-    [/KOSPI(?!200)|코스피(?!200)/i,'한국 KOSPI'],
-    [/KOSDAQ(?!150)|코스닥(?!150)/i,'한국 KOSDAQ'],
+    [/KOSPI|코스피/i,'한국 KOSPI'],
+    [/KOSDAQ|코스닥/i,'한국 KOSDAQ'],
     // 레버리지/인버스
-    [/레버리지.*인버스|인버스.*레버리지|인버스2X|2X.*인버스/i,'한국 인버스 2X'],
-    [/인버스/i,'한국 인버스'],
-    [/레버리지|2X/i,'한국 레버리지'],
-    // 미국 주요 지수
-    [/S&P\s*500|S&P500|에스앤피500/i,'미국 S&P500'],
-    [/나스닥100|NASDAQ\s*100/i,'미국 나스닥100'],
-    [/나스닥|NASDAQ/i,'미국 나스닥'],
+    [/레버리지.*인버스|인버스.*레버리지|인버스2X|2X.*인버스/i,'레버리지/인버스'],
+    [/인버스/i,'레버리지/인버스'],
+    [/레버리지|2X/i,'레버리지/인버스'],
+    // 미국 광역 지수 (모두 통합)
+    [/S&P\s*500|S&P500|에스앤피500/i,'미국 S&P 500'],
+    [/나스닥|NASDAQ/i,'미국 나스닥'],  // 100, 성장주, 커버드콜 등 다 합침
     [/다우|DOW/i,'미국 다우존스'],
-    [/필라델피아|반도체.*미국|미국.*반도체/i,'미국 반도체'],
+    [/러셀|RUSSELL/i,'미국 러셀'],
+    // 미국 섹터/테마 ETF
+    [/필라델피아|반도체.*미국|미국.*반도체/i,'반도체'],
     [/빅테크|BIG\s*TECH|매그니피센트/i,'미국 빅테크'],
-    [/AI.*데이터센터|데이터센터.*AI/i,'미국 AI 데이터센터'],
-    [/AI.*반도체|반도체.*AI/i,'미국 AI반도체'],
-    [/AI.*전력|전력.*AI/i,'AI 전력 인프라'],
-    [/AI.*인프라|인프라.*AI/i,'AI 인프라'],
-    [/AI.*클라우드|클라우드.*AI/i,'미국 AI클라우드'],
-    [/AI.*소프트웨어|소프트웨어.*AI/i,'미국 AI소프트웨어'],
-    [/AI(테크|테마|밸류|컴퓨팅|빅테크)?/i,'AI 테마'],
+    [/AI.*데이터센터|데이터센터.*AI/i,'AI'],
+    [/AI.*반도체|반도체.*AI/i,'반도체'],  // AI반도체도 반도체로
+    [/AI.*전력|전력.*AI/i,'전력 인프라'],
+    [/AI.*인프라|인프라.*AI/i,'AI'],
+    [/AI.*클라우드|클라우드.*AI/i,'AI'],
+    [/AI.*소프트웨어|소프트웨어.*AI/i,'AI'],
+    [/AI/i,'AI'],
     [/양자.*컴퓨팅|QUANTUM/i,'양자컴퓨팅'],
-    // 우주/방산 (2024-2025 핫테마)
-    [/K[-·\s]*방산|한국.*방산|국내.*방산/i,'한국 K-방산'],
-    [/미국.*방산|글로벌.*방산|유럽.*방산/i,'글로벌/미국/유럽 방산'],
-    [/방산|방위산업|국방|DEFENSE/i,'방산'],
-    [/우주.*테크|우주항공.*기술|항공우주테크/i,'글로벌 우주테크'],
-    [/우주.*항공|UAM|항공.*우주|SPACE|에어로/i,'우주항공'],
-    [/우주/i,'우주'],
-    // 휴머노이드/로봇 (2025 신규)
-    [/휴머노이드/i,'휴머노이드 로봇'],
-    [/로봇|ROBOT/i,'로봇'],
-    // 원자력 / SMR / 전력 (2025 핫테마)
-    [/원자력|원전|NUCLEAR|SMR/i,'원자력/SMR'],
-    [/전력.*인프라|전력.*GRID|GRID|송전|배전/i,'전력 인프라'],
-    [/전력.*설비|전력기기|변압기/i,'전력 설비'],
-    // 조선 (2025 핫테마)
-    [/조선.*TOP|조선/i,'조선'],
+    // 우주/방산
+    [/방산|방위산업|국방|DEFENSE|우주.*항공|UAM|항공.*우주|에어로|우주테크|우주/i,'우주항공·방산'],
+    // 휴머노이드/로봇
+    [/휴머노이드|로봇|ROBOT/i,'로봇'],
+    // 원자력/전력
+    [/원자력|원전|NUCLEAR|SMR/i,'원자력'],
+    [/전력.*인프라|전력.*GRID|GRID|송전|배전|전력.*설비|전력기기|변압기/i,'전력 인프라'],
+    // 조선
+    [/조선/i,'조선'],
     // 중국/일본/인도
-    [/중국.*전기차|차이나.*전기차/i,'중국 전기차'],
-    [/중국.*휴머노이드|차이나.*휴머노이드/i,'중국 휴머노이드'],
+    [/중국.*전기차|차이나.*전기차/i,'중국'],
     [/중국|차이나|CHINA/i,'중국'],
-    [/일본.*닛케이|NIKKEI/i,'일본 닛케이225'],
-    [/일본|JAPAN|TOPIX/i,'일본'],
-    [/인도.*NIFTY|NIFTY.*50|니프티50/i,'인도 NIFTY50'],
-    [/인도|INDIA/i,'인도'],
+    [/일본|JAPAN|TOPIX|NIKKEI/i,'일본'],
+    [/인도|INDIA|NIFTY/i,'인도'],
     [/베트남|VIETNAM|VN30/i,'베트남'],
     [/신흥국|EMERGING/i,'신흥국'],
     [/유럽|EUROPE|STOXX/i,'유럽'],
-    [/선진국|글로벌.*주식|MSCI/i,'글로벌/선진국'],
-    // 한국 섹터
-    [/2차전지|배터리|BATTERY/i,'한국 2차전지'],
-    [/반도체|SEMICONDUCTOR/i,'한국 반도체'],
-    [/바이오|BIO|헬스/i,'한국 헬스케어/바이오'],
-    [/은행|BANK/i,'한국 은행'],
-    [/증권/i,'한국 증권'],
-    [/보험/i,'한국 보험'],
-    [/금융/i,'한국 금융'],
-    [/철강|STEEL/i,'한국 철강'],
-    [/에너지|화학/i,'한국 에너지화학'],
-    [/자동차|AUTO/i,'한국 자동차'],
-    [/건설/i,'한국 건설'],
-    [/운송/i,'한국 운송'],
-    [/게임|GAME/i,'한국 게임'],
-    [/미디어|컨텐츠|엔터테인먼트|엔터\b/i,'한국 미디어/엔터'],
-    // K-컬처 / K-수출 (2024-2025 트렌드)
-    [/K[-·\s]*팝|K[-·\s]*POP/i,'K-팝'],
-    [/K[-·\s]*컬처|K[-·\s]*CULTURE/i,'K-컬처'],
-    [/K[-·\s]*뷰티|K[-·\s]*BEAUTY/i,'K-뷰티'],
-    [/K[-·\s]*푸드|K[-·\s]*FOOD/i,'K-푸드'],
-    [/K[-·\s]*수출/i,'K-수출'],
-    [/웹툰|WEBTOON/i,'한국 웹툰'],
-    [/메타버스|METAVERSE/i,'메타버스'],
+    [/선진국|글로벌.*주식|MSCI/i,'선진국/글로벌'],
+    // 한국 섹터 (한국 주식과 통일!)
+    [/2차전지|배터리|BATTERY/i,'2차전지'],
+    [/반도체|SEMICONDUCTOR/i,'반도체'],
+    [/바이오|BIO|헬스|제약/i,'바이오·제약'],
+    [/은행|BANK/i,'금융'],
+    [/증권/i,'금융'],
+    [/보험/i,'금융'],
+    [/금융/i,'금융'],
+    [/철강|STEEL/i,'철강·금속'],
+    [/에너지|화학/i,'에너지·화학'],
+    [/자동차|AUTO/i,'자동차'],
+    [/건설/i,'건설'],
+    [/운송|항공/i,'운송'],
+    [/게임|GAME/i,'게임'],
+    [/미디어|컨텐츠|엔터테인먼트|엔터\b/i,'미디어·엔터'],
+    // K-컬처 / K-수출
+    [/K[-·\s]*팝|K[-·\s]*POP/i,'미디어·엔터'],
+    [/K[-·\s]*컬처|K[-·\s]*CULTURE/i,'미디어·엔터'],
+    [/K[-·\s]*뷰티|K[-·\s]*BEAUTY/i,'뷰티·소비재'],
+    [/K[-·\s]*푸드|K[-·\s]*FOOD/i,'식음료'],
+    [/K[-·\s]*수출/i,'한국 종합'],
+    [/웹툰|WEBTOON/i,'미디어·엔터'],
+    [/메타버스|METAVERSE/i,'AI'],
     [/ESG|친환경|탄소중립/i,'ESG/친환경'],
-    [/IPO|신규상장/i,'IPO/신규상장'],
-    [/WIDE.*MOAT|와이드.*모트|우량/i,'우량주 (Wide Moat)'],
-    [/버크셔|BUFFETT|버핏/i,'버크셔 포트폴리오'],
-    [/빌리어네어|BILLIONAIRE/i,'빌리어네어 13F'],
-    // 채권
-    [/국고채.*10년|10년.*국고채/i,'한국 국고채 10년'],
-    [/국고채.*3년|3년.*국고채/i,'한국 국고채 3년'],
-    [/국고채|국채/i,'한국 국채'],
-    [/회사채.*AA|AA.*회사채/i,'한국 우량회사채'],
-    [/회사채/i,'한국 회사채'],
-    [/통안채/i,'한국 통안채'],
-    [/단기.*채권|단기.*채|머니마켓|MMF/i,'한국 단기채권'],
-    [/CD\s*금리|KOFR/i,'한국 CD/KOFR 금리'],
-    [/만기매칭|존속기한/i,'만기매칭 채권'],
-    [/30년.*국채.*미국|미국.*30년/i,'미국 30년국채'],
-    [/미국.*국채|미국채권/i,'미국 채권'],
-    [/하이일드|HIGH\s*YIELD/i,'미국 하이일드'],
+    [/IPO|신규상장/i,'IPO'],
+    [/WIDE.*MOAT|와이드.*모트|우량|버크셔|BUFFETT|버핏|빌리어네어|BILLIONAIRE/i,'미국 가치주'],
+    // 채권 (모두 채권으로 통합)
+    [/국고채|국채|회사채|통안채|단기.*채권|단기.*채|머니마켓|MMF|CD\s*금리|KOFR|만기매칭|존속기한|채권|하이일드|HIGH\s*YIELD/i,'채권'],
     // 리츠 / 부동산
-    [/리츠|REIT/i,'리츠 (REITs)'],
-    [/부동산.*인프라|부동산리츠인프라/i,'부동산 인프라'],
-    [/부동산|REAL\s*ESTATE/i,'부동산'],
-    // 원자재
+    [/리츠|REIT|부동산|REAL\s*ESTATE/i,'리츠·부동산'],
+    // 원자재 (모두 통합)
     [/금\s*선물|금현물|GOLD/i,'금'],
-    [/은\s*선물|SILVER/i,'은'],
-    [/구리|COPPER/i,'구리'],
-    [/원유|오일|WTI|CRUDE/i,'원유'],
-    [/천연가스|GAS/i,'천연가스'],
-    [/농산물|AGRICULTURE/i,'농산물'],
+    [/은\s*선물|SILVER/i,'원자재'],
+    [/구리|COPPER/i,'원자재'],
+    [/원유|오일|WTI|CRUDE|천연가스|GAS/i,'에너지·원자재'],
+    [/농산물|AGRICULTURE/i,'원자재'],
     // 통화
     [/달러.*레버리지/i,'미국달러 레버리지'],
     [/달러.*인버스/i,'미국달러 인버스'],
@@ -6594,6 +6726,34 @@ function renderAssets(){
     if(CH.assetsSector){try{CH.assetsSector.destroy();}catch(e){}CH.assetsSector=null;}
     return;
   }
+  
+  // 기존 저장된 영어 섹터 한글로 일괄 마이그레이션 (1회)
+  let migrated=false;
+  portfolio.forEach(s=>{
+    if(s.sector&&EN_TO_KR_SECTOR[s.sector]){
+      s.sector=EN_TO_KR_SECTOR[s.sector];
+      migrated=true;
+    }
+  });
+  if(migrated)savePF();
+
+  // 미국 종목 가격을 표시할 통화 (원화/달러 토글)
+  const usInKrw=US_STOCK_CURRENCY==='krw';
+  // 미국 종목 있으면 토글 버튼 표시
+  const hasUS=portfolio.some(s=>!isKRTicker(s.tk));
+  const usToggle=$('us-currency-toggle');
+  if(usToggle){
+    usToggle.style.display=hasUS?'inline-flex':'none';
+    const lbl=$('us-currency-label');
+    if(lbl)lbl.textContent=usInKrw?'미국 종목 $ 보기':'미국 종목 ₩ 보기';
+  }
+  // 종목별 가격 포맷 (한국은 항상 ₩, 미국은 토글 따라가게)
+  const fmtCellPrice=(v,tk)=>{
+    if(v==null||isNaN(v))return '—';
+    if(isKRTicker(tk))return '₩'+Math.round(v).toLocaleString();
+    if(usInKrw)return '₩'+Math.round(v*USD_KRW).toLocaleString();
+    return '$'+Number(v).toFixed(2);
+  };
 
   // 통화별 합계 (USD/KRW 분리)
   let totMktUSD=0,totMktKRW=0,totCostUSD=0,totCostKRW=0;
@@ -6613,17 +6773,8 @@ function renderAssets(){
     // 종목명 가져오기
     const code=isKr?s.tk.replace(/\.(KS|KQ)$/i,''):'';
     const krName=isKr?(s.name||KRX_STOCKS[code]?.name||KRX_ETF_NAMES[code]||''):'';
-    // 섹터 표시 간소화: "ETF · 한국 우주항공&UAM (PLUS)" → "우주·방산"
-    let secDisplay=s.sector||'—';
-    if(secDisplay!=='—'){
-      // ETF 접두사 제거
-      secDisplay=secDisplay.replace(/^ETF\s*·\s*/,'');
-      // 운용사 표시 제거 (괄호 안 KODEX/TIGER 등)
-      secDisplay=secDisplay.replace(/\s*\((KODEX|TIGER|ACE|RISE|KoAct|KOACT|PLUS|HANARO|KOSEF|ARIRANG|TIMEFOLIO|KINDEX|SOL|WON|1Q|KBSTAR|WOORI|MIDAS)\)\s*$/,'');
-      // "한국 " prefix 제거
-      secDisplay=secDisplay.replace(/^한국\s*/,'');
-      // "미국 " prefix는 유지 (해외 분류 명확하게)
-    }
+    // 섹터 표시 (정규화)
+    const secDisplay=normalizeSector(s);
     // 한국 종목: 종목명을 메인으로, 티커는 숨김 (또는 작게)
     // 미국 종목: 티커 메인 + 종목명 서브
     const cellHTML=isKr&&krName
@@ -6634,9 +6785,9 @@ function renderAssets(){
       <td>${cellHTML}</td>
       <td style="font-size:11px;color:var(--text2);font-family:Inter,sans-serif">${secDisplay}</td>
       <td>${s.sh}</td>
-      <td>${fmtPrice(s.avg,s.tk)}</td>
-      <td>${s.price?fmtPrice(s.price,s.tk):'—'}</td>
-      <td>${mkt?fmtPrice(mkt,s.tk):'—'}</td>
+      <td>${fmtCellPrice(s.avg,s.tk)}</td>
+      <td>${s.price?fmtCellPrice(s.price,s.tk):'—'}</td>
+      <td>${mkt?fmtCellPrice(mkt,s.tk):'—'}</td>
       <td class="${pct>=0?'up':'down'}">${pct!=null?fp(pct):'—'}</td>
       <td><button class="del-btn" onclick="removeAsset(${i})">${ic('trash',13)}</button></td>
     </tr>`;
@@ -6945,16 +7096,35 @@ function drawAssetsPieChart(totMkt){
   const newC=document.createElement('canvas');newC.id='assets-pie';
   parent.replaceChild(newC,oldC);
 
-  const data=portfolio.filter(s=>s.price).map(s=>({
-    label:s.tk,
-    value:s.price*s.sh,
-  })).sort((a,b)=>b.value-a.value);
+  // 통화 설정에 따라 값을 표시 통화로 변환
+  const useKrw=ASSET_CURRENCY==='krw';
+  const data=portfolio.filter(s=>s.price).map(s=>{
+    const isKr=isKRTicker(s.tk);
+    const rawVal=s.price*s.sh;
+    const valInTarget=useKrw
+      ? (isKr?rawVal:rawVal*USD_KRW)
+      : (isKr?rawVal/USD_KRW:rawVal);
+    return {
+      label:getDisplayName(s.tk,s.name),
+      tk:s.tk,
+      value:valInTarget,
+      sh:s.sh,
+      price:s.price,
+      avg:s.avg,
+      isKr,
+    };
+  }).sort((a,b)=>b.value-a.value);
 
   const colors=['#10d090','#4a9eff','#22e8a8','#ffb432','#ff6b7a','#bf72ff','#26d782','#ff4d6d','#7a8499','#0ea860'];
   const txt2=getComputedStyle(document.documentElement).getPropertyValue('--text2');
+  const totalInTarget=data.reduce((sum,d)=>sum+d.value,0);
+  const sym=useKrw?'₩':'$';
+
+  // 라벨 길이 제한 (범례 깨지지 않게)
+  const shortLabels=data.map(d=>d.label.length>14?d.label.slice(0,13)+'…':d.label);
 
   CH.assetsPie=new Chart(newC,{type:'doughnut',data:{
-    labels:data.map(d=>d.label),
+    labels:shortLabels,
     datasets:[{
       data:data.map(d=>d.value),
       backgroundColor:data.map((_,i)=>colors[i%colors.length]),
@@ -6962,27 +7132,129 @@ function drawAssetsPieChart(totMkt){
     }]
   },options:{
     responsive:true,maintainAspectRatio:false,
+    onClick:(evt,elements)=>{
+      if(!elements.length)return;
+      const idx=elements[0].index;
+      const item=data[idx];
+      showStockHoldingDetail(item,totalInTarget,useKrw);
+    },
     plugins:{
       legend:{position:'right',labels:{font:{size:10,family:'Inter'},color:txt2,boxWidth:8,padding:6}},
-      tooltip:{callbacks:{label:c=>{const v=c.parsed;const pct=(v/totMkt*100).toFixed(1);return `${c.label}: $${Math.round(v).toLocaleString()} (${pct}%)`;}}}
+      tooltip:{callbacks:{label:c=>{
+        const v=c.parsed;
+        const pct=(v/totalInTarget*100).toFixed(1);
+        return `${data[c.dataIndex].label}: ${sym}${Math.round(v).toLocaleString()} (${pct}%)`;
+      }}}
     }
   }});
 }
 
+// 종목 클릭 시 상세 모달 표시
+function showStockHoldingDetail(item,totalInTarget,useKrw){
+  const sym=useKrw?'₩':'$';
+  const pct=(item.value/totalInTarget*100).toFixed(2);
+  // 종목별 가격은 종목의 원래 통화로 표시 (한국=원화, 미국=달러)
+  const origPrice=item.isKr?'₩'+Math.round(item.price).toLocaleString():'$'+item.price.toFixed(2);
+  const origAvg=item.isKr?'₩'+Math.round(item.avg).toLocaleString():'$'+item.avg.toFixed(2);
+  const pnl=(item.price-item.avg)*item.sh;
+  const pnlPct=((item.price-item.avg)/item.avg)*100;
+  const origPnl=item.isKr
+    ?((pnl>=0?'+':'-')+'₩'+Math.abs(Math.round(pnl)).toLocaleString())
+    :((pnl>=0?'+':'-')+'$'+Math.abs(pnl).toFixed(2));
+  
+  const html=`
+    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:18px;max-width:380px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,0.5)">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+        <div style="font-size:16px;font-weight:700">${item.label}</div>
+        <button onclick="this.closest('.modal-overlay').classList.remove('on')" style="background:var(--bg3);border:1px solid var(--border);color:var(--text);width:28px;height:28px;border-radius:6px;cursor:pointer;font-size:16px">×</button>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div style="background:var(--bg3);padding:10px;border-radius:8px">
+          <div style="font-size:10px;color:var(--text2);font-weight:600;text-transform:uppercase">보유 수량</div>
+          <div style="font-size:14px;font-weight:600;margin-top:4px">${item.sh}주</div>
+        </div>
+        <div style="background:var(--bg3);padding:10px;border-radius:8px">
+          <div style="font-size:10px;color:var(--text2);font-weight:600;text-transform:uppercase">비중</div>
+          <div style="font-size:14px;font-weight:600;margin-top:4px;color:var(--accent)">${pct}%</div>
+        </div>
+        <div style="background:var(--bg3);padding:10px;border-radius:8px">
+          <div style="font-size:10px;color:var(--text2);font-weight:600;text-transform:uppercase">평단가</div>
+          <div style="font-size:14px;font-weight:600;margin-top:4px">${origAvg}</div>
+        </div>
+        <div style="background:var(--bg3);padding:10px;border-radius:8px">
+          <div style="font-size:10px;color:var(--text2);font-weight:600;text-transform:uppercase">현재가</div>
+          <div style="font-size:14px;font-weight:600;margin-top:4px">${origPrice}</div>
+        </div>
+        <div style="background:var(--bg3);padding:10px;border-radius:8px;grid-column:1/-1">
+          <div style="font-size:10px;color:var(--text2);font-weight:600;text-transform:uppercase">평가금액 (${sym})</div>
+          <div style="font-size:18px;font-weight:700;margin-top:4px">${sym}${Math.round(item.value).toLocaleString()}</div>
+          <div style="font-size:12px;margin-top:2px;color:${pnl>=0?'var(--up)':'var(--down)'}">
+            ${origPnl} (${pnlPct>=0?'+':''}${pnlPct.toFixed(2)}%)
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+  let modal=$('stock-detail-modal');
+  if(!modal){
+    modal=document.createElement('div');
+    modal.id='stock-detail-modal';
+    modal.className='modal-overlay';
+    modal.onclick=e=>{if(e.target===modal)modal.classList.remove('on');};
+    document.body.appendChild(modal);
+  }
+  modal.innerHTML=html;
+  modal.classList.add('on');
+}
+
+// 종목의 섹터를 표시용으로 정규화
+// - 한국 종목: 1순위 매핑, 2순위 이름 추정
+// - 영어 섹터: 한글로 변환
+// - ETF 접두사/운용사 괄호 제거 (간소화)
+function normalizeSector(s){
+  if(!s||!s.tk)return '분류 안됨';
+  let sec=s.sector;
+  // 한국 종목: 항상 최신 ETF 분류로 (저장된 sector 오래된 값일 수 있음)
+  if(isKRTicker(s.tk)){
+    const fresh=getETFSector(s.tk);
+    if(fresh)sec=fresh;
+  }
+  if(!sec)return '분류 안됨';
+  // 영어 섹터 한글로
+  sec=translateSector(sec);
+  // ETF 접두사 + 운용사 + "한국 " 정리
+  sec=sec.replace(/^ETF\s*·\s*/,'');
+  sec=sec.replace(/\s*\((KODEX|TIGER|ACE|RISE|KoAct|KOACT|PLUS|HANARO|KOSEF|ARIRANG|TIMEFOLIO|KINDEX|SOL|WON|1Q|KBSTAR|WOORI|MIDAS)\)\s*$/i,'');
+  sec=sec.replace(/^한국\s*(?=[가-힣])/,'');
+  return sec;
+}
+
 function drawSectorChart(totMkt){
   if(CH.assetsSector){try{CH.assetsSector.destroy();}catch(e){}CH.assetsSector=null;}
-  // 섹터별 집계
+  // 통화 변환
+  const useKrw=ASSET_CURRENCY==='krw';
+  // 섹터별 집계 (정규화된 섹터명 + 표시 통화로 변환)
   const sectorMap={};
+  const sectorStocks={};  // 섹터별 보유 종목 목록 (모달용)
   portfolio.filter(s=>s.price).forEach(s=>{
-    let sec=s.sector;
-    // 한국 ETF는 항상 KRX 데이터로 재계산 (저장값 무시)
-    if(s.tk&&(s.tk.endsWith('.KS')||s.tk.endsWith('.KQ'))){
-      const fresh=getETFSector(s.tk);
-      if(fresh)sec=fresh;
-    }
-    if(!sec)sec='분류 안됨';
+    const sec=normalizeSector(s);
+    const isKr=isKRTicker(s.tk);
+    const rawVal=s.price*s.sh;
+    const valInTarget=useKrw
+      ? (isKr?rawVal:rawVal*USD_KRW)
+      : (isKr?rawVal/USD_KRW:rawVal);
     if(!sectorMap[sec])sectorMap[sec]=0;
-    sectorMap[sec]+=s.price*s.sh;
+    if(!sectorStocks[sec])sectorStocks[sec]=[];
+    sectorMap[sec]+=valInTarget;
+    sectorStocks[sec].push({
+      tk:s.tk,
+      name:getDisplayName(s.tk,s.name),
+      sh:s.sh,
+      price:s.price,
+      avg:s.avg,
+      value:valInTarget,
+      isKr,
+    });
   });
   const sectors=Object.entries(sectorMap).sort((a,b)=>b[1]-a[1]);
   if(sectors.length===0||sectors.every(([s])=>s==='분류 안됨')){
@@ -6990,6 +7262,8 @@ function drawSectorChart(totMkt){
     return;
   }
   $('assets-sector-empty').style.display='none';
+  // 섹터별 종목을 전역에 저장 (모달에서 사용)
+  window.__SECTOR_STOCKS__=sectorStocks;
 
   const oldC=$('assets-sector'),parent=oldC.parentNode;
   const newC=document.createElement('canvas');newC.id='assets-sector';
@@ -6998,6 +7272,9 @@ function drawSectorChart(totMkt){
   const colors=['#10d090','#4a9eff','#22e8a8','#ffb432','#ff6b7a','#bf72ff','#26d782','#ff4d6d','#7a8499','#0ea860'];
   const txt2=getComputedStyle(document.documentElement).getPropertyValue('--text2');
 
+  const totalSec=sectors.reduce((sum,s)=>sum+s[1],0);
+  const sym=useKrw?'₩':'$';
+  
   CH.assetsSector=new Chart(newC,{type:'doughnut',data:{
     labels:sectors.map(s=>s[0]),
     datasets:[{
@@ -7007,11 +7284,68 @@ function drawSectorChart(totMkt){
     }]
   },options:{
     responsive:true,maintainAspectRatio:false,
+    onClick:(evt,elements)=>{
+      if(!elements.length)return;
+      const idx=elements[0].index;
+      const sectorName=sectors[idx][0];
+      const stocks=window.__SECTOR_STOCKS__?.[sectorName]||[];
+      showSectorHoldingsDetail(sectorName,stocks,totalSec,useKrw);
+    },
     plugins:{
       legend:{position:'right',labels:{font:{size:10,family:'Inter'},color:txt2,boxWidth:8,padding:6}},
-      tooltip:{callbacks:{label:c=>{const v=c.parsed;const pct=(v/totMkt*100).toFixed(1);return `${c.label}: $${Math.round(v).toLocaleString()} (${pct}%)`;}}}
+      tooltip:{callbacks:{label:c=>{
+        const v=c.parsed;
+        const pct=(v/totalSec*100).toFixed(1);
+        return `${c.label}: ${sym}${Math.round(v).toLocaleString()} (${pct}%)`;
+      }}}
     }
   }});
+}
+
+// 섹터 클릭 시 그 섹터에 속한 보유 종목 모달
+function showSectorHoldingsDetail(sectorName,stocks,total,useKrw){
+  const sym=useKrw?'₩':'$';
+  const sectorTotal=stocks.reduce((s,x)=>s+x.value,0);
+  const sectorPct=(sectorTotal/total*100).toFixed(2);
+  const rows=stocks.sort((a,b)=>b.value-a.value).map(st=>{
+    const pct=(st.value/sectorTotal*100).toFixed(1);
+    const origPrice=st.isKr?'₩'+Math.round(st.price).toLocaleString():'$'+st.price.toFixed(2);
+    const pnl=(st.price-st.avg)*st.sh;
+    const pnlPct=((st.price-st.avg)/st.avg)*100;
+    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:10px;background:var(--bg3);border-radius:8px;margin-bottom:6px">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${st.name}</div>
+        <div style="font-size:10px;color:var(--text2);margin-top:2px">${st.sh}주 · ${origPrice}</div>
+      </div>
+      <div style="text-align:right;flex-shrink:0;margin-left:10px">
+        <div style="font-size:13px;font-weight:700">${sym}${Math.round(st.value).toLocaleString()}</div>
+        <div style="font-size:10px;color:${pnl>=0?'var(--up)':'var(--down)'}">${pnlPct>=0?'+':''}${pnlPct.toFixed(1)}% · ${pct}%</div>
+      </div>
+    </div>`;
+  }).join('');
+  
+  const html=`
+    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:18px;max-width:420px;width:100%;max-height:80vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.5)">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+        <div>
+          <div style="font-size:16px;font-weight:700">${sectorName}</div>
+          <div style="font-size:11px;color:var(--text2);margin-top:2px">${stocks.length}개 종목 · ${sectorPct}% · ${sym}${Math.round(sectorTotal).toLocaleString()}</div>
+        </div>
+        <button onclick="this.closest('.modal-overlay').classList.remove('on')" style="background:var(--bg3);border:1px solid var(--border);color:var(--text);width:28px;height:28px;border-radius:6px;cursor:pointer;font-size:16px">×</button>
+      </div>
+      <div>${rows}</div>
+    </div>
+  `;
+  let modal=$('sector-detail-modal');
+  if(!modal){
+    modal=document.createElement('div');
+    modal.id='sector-detail-modal';
+    modal.className='modal-overlay';
+    modal.onclick=e=>{if(e.target===modal)modal.classList.remove('on');};
+    document.body.appendChild(modal);
+  }
+  modal.innerHTML=html;
+  modal.classList.add('on');
 }
 
 function renderAssetsAnalysis(totMkt,totCost){
@@ -7055,12 +7389,15 @@ function renderAssetsAnalysis(totMkt,totCost){
   // 핵심 지표
   html+=`<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;margin-bottom:10px">`;
   if(best){
-    html+=`<div style="background:var(--up-bg);border-radius:8px;padding:10px"><div style="font-size:10px;color:var(--text2);font-weight:600;text-transform:uppercase;letter-spacing:0.04em">최고 수익</div><div style="font-size:14px;font-weight:600;margin-top:4px"><strong>${best.tk}</strong> <span class="up">${fp(best.pct)}</span></div></div>`;
+    const bestName=getDisplayName(best.tk,best.name);
+    html+=`<div style="background:var(--up-bg);border-radius:8px;padding:10px"><div style="font-size:10px;color:var(--text2);font-weight:600;text-transform:uppercase;letter-spacing:0.04em">최고 수익</div><div style="font-size:14px;font-weight:600;margin-top:4px"><strong>${bestName.length>14?bestName.slice(0,13)+'…':bestName}</strong> <span class="up">${fp(best.pct)}</span></div></div>`;
   }
   if(worst){
-    html+=`<div style="background:var(--down-bg);border-radius:8px;padding:10px"><div style="font-size:10px;color:var(--text2);font-weight:600;text-transform:uppercase;letter-spacing:0.04em">최대 손실</div><div style="font-size:14px;font-weight:600;margin-top:4px"><strong>${worst.tk}</strong> <span class="down">${fp(worst.pct)}</span></div></div>`;
+    const worstName=getDisplayName(worst.tk,worst.name);
+    html+=`<div style="background:var(--down-bg);border-radius:8px;padding:10px"><div style="font-size:10px;color:var(--text2);font-weight:600;text-transform:uppercase;letter-spacing:0.04em">최대 손실</div><div style="font-size:14px;font-weight:600;margin-top:4px"><strong>${worstName.length>14?worstName.slice(0,13)+'…':worstName}</strong> <span class="down">${fp(worst.pct)}</span></div></div>`;
   }
-  html+=`<div style="background:var(--bg3);border-radius:8px;padding:10px"><div style="font-size:10px;color:var(--text2);font-weight:600;text-transform:uppercase;letter-spacing:0.04em">집중도</div><div style="font-size:14px;font-weight:600;margin-top:4px"><strong>${concentratedTop.tk}</strong>가 ${topPct}%</div></div>`;
+  const concName=getDisplayName(concentratedTop.tk,concentratedTop.name);
+  html+=`<div style="background:var(--bg3);border-radius:8px;padding:10px"><div style="font-size:10px;color:var(--text2);font-weight:600;text-transform:uppercase;letter-spacing:0.04em">집중도</div><div style="font-size:14px;font-weight:600;margin-top:4px"><strong>${concName.length>14?concName.slice(0,13)+'…':concName}</strong>가 ${topPct}%</div></div>`;
   html+=`<div style="background:var(--bg3);border-radius:8px;padding:10px"><div style="font-size:10px;color:var(--text2);font-weight:600;text-transform:uppercase;letter-spacing:0.04em">섹터 분산</div><div style="font-size:14px;font-weight:600;margin-top:4px">${sectors.length}개 섹터</div></div>`;
   html+=`</div>`;
 
@@ -7295,6 +7632,17 @@ function loadAssetCurrency(){
   try{const v=localStorage.getItem('asset_currency');if(v==='krw'||v==='usd')ASSET_CURRENCY=v;}catch(e){}
 }
 
+// 미국 종목 개별 가격 표시 통화 (보유 종목 표 토글, 자산 합계와 별도)
+let US_STOCK_CURRENCY='usd';  // 'usd' | 'krw'
+function toggleUSStockCurrency(){
+  US_STOCK_CURRENCY=US_STOCK_CURRENCY==='usd'?'krw':'usd';
+  try{localStorage.setItem('us_stock_currency',US_STOCK_CURRENCY);}catch(e){}
+  renderAssets();
+}
+function loadUSStockCurrency(){
+  try{const v=localStorage.getItem('us_stock_currency');if(v==='krw'||v==='usd')US_STOCK_CURRENCY=v;}catch(e){}
+}
+
 function loadSettings(){
   try{
     const s=JSON.parse(localStorage.getItem('pulsa_settings')||'{}');
@@ -7381,7 +7729,7 @@ function closeSettings(){
 function toggleTheme(){
   setSetting('theme',SETTINGS.theme==='dark'?'light':'dark');
 }
-function applyStoredTheme(){loadSettings();loadAssetCurrency();}
+function applyStoredTheme(){loadSettings();loadAssetCurrency();loadUSStockCurrency();}
 
 // ── 자동 알림 (5% 변동 + 실적) ───────────────────────
 function saveAutoAlerts(){
