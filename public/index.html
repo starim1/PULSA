@@ -799,6 +799,31 @@ body.has-notch .topbar{
 }
 @keyframes fadeIn{from{opacity:0;}to{opacity:1;}}
 .modal-overlay.on{display:flex;}
+/* 설정 모달 z-index 더 높게 (topbar보다 위) */
+#settings-modal{z-index:1100;}
+/* 설정 모달 (간소화 버전) */
+.modal-card{
+  background:var(--bg2);border:1px solid var(--border);border-radius:16px;
+  width:100%;max-width:380px;max-height:85vh;overflow:hidden;
+  display:flex;flex-direction:column;
+  box-shadow:0 20px 60px rgba(0,0,0,0.5);
+  animation:slideUp .25s ease-out;
+}
+.modal-header{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--border);}
+.modal-body{padding:14px;overflow-y:auto;}
+.settings-section{margin-bottom:18px;}
+.settings-label{font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;}
+.settings-options{display:flex;flex-direction:column;gap:6px;}
+.settings-opt{
+  display:flex;align-items:center;gap:8px;
+  background:var(--bg3);border:1px solid var(--border);color:var(--text);
+  padding:10px 12px;border-radius:8px;cursor:pointer;
+  font-size:13px;font-weight:600;text-align:left;
+  transition:all 0.15s;
+}
+.settings-opt:hover{border-color:var(--accent);}
+.settings-opt.on{background:rgba(74,158,255,0.12);border-color:var(--accent);color:var(--accent);}
+.settings-hint{font-size:11px;color:var(--text3);margin-top:6px;}
 .modal-content{
   background:var(--bg2);border:1px solid var(--border);border-radius:16px;
   width:100%;max-width:480px;max-height:85vh;overflow:hidden;
@@ -1074,10 +1099,48 @@ body.has-notch .topbar{
         <span data-icon="bell" data-icon-size="16" class="ico"></span>
         <span id="tb-inbox-badge" style="display:none;position:absolute;top:0;right:0;background:var(--down);color:#fff;font-size:9px;font-weight:700;padding:2px 5px;border-radius:8px;line-height:1;min-width:14px;text-align:center">0</span>
       </button>
-      <button class="tb-action-btn" onclick="toggleTheme()" title="다크/라이트 모드">
-        <span id="theme-icon" data-icon="moon" data-icon-size="16" class="ico"></span>
+      <button class="tb-action-btn" onclick="openSettings()" title="설정">
+        <span data-icon="settings" data-icon-size="16" class="ico"></span>
       </button>
       <div class="tb-time" id="tb-time"></div>
+    </div>
+  </div>
+
+  <!-- 설정 모달 -->
+  <div id="settings-modal" class="modal-overlay" onclick="if(event.target===this)closeSettings()">
+    <div class="modal-card" style="max-width:380px">
+      <div class="modal-header">
+        <h3 style="margin:0">설정</h3>
+        <button onclick="closeSettings()" class="btn-icon" title="닫기">
+          <span data-icon="x" data-icon-size="18" class="ico"></span>
+        </button>
+      </div>
+      <div class="modal-body" style="padding:14px">
+        <!-- 테마 -->
+        <div class="settings-section">
+          <div class="settings-label">테마</div>
+          <div class="settings-options">
+            <button class="settings-opt" data-setting="theme" data-value="dark" onclick="setSetting('theme','dark')">
+              <span data-icon="moon" data-icon-size="14" class="ico"></span> 다크
+            </button>
+            <button class="settings-opt" data-setting="theme" data-value="light" onclick="setSetting('theme','light')">
+              <span data-icon="sun" data-icon-size="14" class="ico"></span> 라이트
+            </button>
+          </div>
+        </div>
+        <!-- 등락 색상 -->
+        <div class="settings-section">
+          <div class="settings-label">등락 색상</div>
+          <div class="settings-options">
+            <button class="settings-opt" data-setting="colorMode" data-value="global" onclick="setSetting('colorMode','global')">
+              <span style="display:inline-flex;gap:3px;align-items:center"><span style="width:8px;height:8px;background:#26d782;border-radius:50%"></span><span style="width:8px;height:8px;background:#ff4d6d;border-radius:50%"></span></span> 전 세계식 (상승 초록)
+            </button>
+            <button class="settings-opt" data-setting="colorMode" data-value="korea" onclick="setSetting('colorMode','korea')">
+              <span style="display:inline-flex;gap:3px;align-items:center"><span style="width:8px;height:8px;background:#ff4d6d;border-radius:50%"></span><span style="width:8px;height:8px;background:#4a9eff;border-radius:50%"></span></span> 한국식 (상승 빨강)
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -1632,9 +1695,9 @@ body.has-notch .topbar{
       </div>
 
       <!-- 보유 종목 리스트 -->
-      <div class="sec-title">보유 종목</div>
-      <div style="overflow-x:auto">
-        <table class="pf-tbl">
+      <div class="sec-title" style="display:flex;align-items:center;gap:8px">보유 종목 <span style="font-size:10px;color:var(--text3);font-weight:400">← 옆으로 밀어 더 보기</span></div>
+      <div class="assets-table-wrap" style="overflow-x:auto;-webkit-overflow-scrolling:touch;border-radius:8px;position:relative">
+        <table class="pf-tbl" style="min-width:680px">
           <thead><tr><th>종목</th><th>섹터</th><th>수량</th><th>평단가</th><th>현재가</th><th>평가금액</th><th>수익률</th><th></th></tr></thead>
           <tbody id="assets-body"><tr><td colspan="8" class="empty">아래에서 종목을 추가해주세요.</td></tr></tbody>
         </table>
@@ -1648,7 +1711,7 @@ body.has-notch .topbar{
           <div id="assets-search-dropdown" class="search-dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;min-width:240px;z-index:100"></div>
         </div>
         <div class="ig"><label>수량</label><input type="number" id="assets-sh" placeholder="10" min="0" style="width:90px"></div>
-        <div class="ig"><label>평단가</label><input type="number" id="assets-avg" placeholder="120" step="0.01" min="0" style="width:110px"></div>
+        <div class="ig"><label id="assets-avg-label">평단가 ($)</label><input type="number" id="assets-avg" placeholder="120" step="0.01" min="0" style="width:110px"></div>
         <button class="btn btn-p btn-icon" data-icon="plus" data-icon-size="14" onclick="addAsset()"><span class="ico"></span>추가</button>
       </div>
       <div id="assets-loading" class="ltxt" style="display:none">가격 업데이트 중...</div>
@@ -2356,6 +2419,8 @@ function setupSwipeNav(){
     if(target.closest('.cal-view-toggle'))return;
     if(target.closest('.picks-tabs'))return;
     if(target.closest('.tabs'))return;
+    if(target.closest('.assets-table-wrap'))return;  // 자산 테이블 가로 스크롤
+    if(target.closest('table'))return;                // 모든 테이블
     SWIPE_START_X=e.touches[0].clientX;
     SWIPE_START_Y=e.touches[0].clientY;
     SWIPE_START_TIME=Date.now();
@@ -4907,6 +4972,7 @@ function onAssetsTkInput(){
   const input=$('assets-tk');
   const dd=$('assets-search-dropdown');
   if(!input||!dd)return;
+  updateAssetCurrencyLabel(input.value);
   const q=input.value.trim();
   if(!q){dd.style.display='none';return;}
 
@@ -4946,8 +5012,21 @@ function onAssetsTkInput(){
 function selectAssetSearchItem(ticker,name){
   $('assets-tk').value=ticker;
   $('assets-search-dropdown').style.display='none';
-  // 수량 입력 칸으로 포커스 이동
+  updateAssetCurrencyLabel(ticker);
   $('assets-sh').focus();
+}
+
+// 통화 라벨 자동 변경
+function updateAssetCurrencyLabel(ticker){
+  const label=$('assets-avg-label');
+  if(!label)return;
+  const isKr=isKRTicker(ticker||$('assets-tk').value);
+  label.textContent='평단가 '+(isKr?'(₩)':'($)');
+  const input=$('assets-avg');
+  if(input){
+    input.step=isKr?'1':'0.01';
+    input.placeholder=isKr?'52300':'120';
+  }
 }
 
 async function addAsset(){
@@ -4955,6 +5034,8 @@ async function addAsset(){
   const sh=parseFloat($('assets-sh').value);
   const avg=parseFloat($('assets-avg').value);
   if(!tk||!sh||!avg){toast('모든 항목 입력');return;}
+  const isKr=isKRTicker(tk);
+  const currency=isKr?'KRW':'USD';
   // 기존 종목인지 확인 (수량 합치기)
   const existing=portfolio.findIndex(s=>s.tk===tk);
   if(existing>=0){
@@ -4962,39 +5043,70 @@ async function addAsset(){
       const old=portfolio[existing];
       const totalSh=old.sh+sh;
       const newAvg=(old.sh*old.avg+sh*avg)/totalSh;
-      portfolio[existing]={tk,sh:totalSh,avg:newAvg,price:old.price,sector:old.sector};
+      portfolio[existing]={tk,sh:totalSh,avg:newAvg,price:old.price,sector:old.sector,currency,name:old.name};
     }else return;
   }else{
-    portfolio.push({tk,sh,avg,price:null,sector:null});
+    portfolio.push({tk,sh,avg,price:null,sector:null,currency,name:null});
   }
   savePF();renderAssets();
-  // 가격 + 섹터 가져오기
   await fetchAssetExtras(tk);
   savePF();renderAssets();
   $('assets-tk').value='';$('assets-sh').value='';$('assets-avg').value='';
+  updateAssetCurrencyLabel('');  // 라벨 초기화
 }
 
 async function fetchAssetExtras(tk){
   const idx=portfolio.findIndex(s=>s.tk===tk);if(idx<0)return;
-  // 가격
+  const isKr=isKRTicker(tk);
+  
+  // 한국 종목: KRX 데이터 우선 사용
+  if(isKr){
+    const code=tk.replace(/\.(KS|KQ)$/i,'');
+    // 1) 가격 - KRX_STOCKS 에서
+    if(KRX_STOCKS[code]){
+      const k=KRX_STOCKS[code];
+      if(k.price)portfolio[idx].price=k.price;
+      if(k.name)portfolio[idx].name=k.name;
+    }
+    // 2) 이름 - ETF 매핑에서 가져오기
+    if(!portfolio[idx].name&&KRX_ETF_NAMES[code]){
+      portfolio[idx].name=KRX_ETF_NAMES[code];
+    }
+    // 3) Yahoo 가격도 fallback (KRX 데이터 없으면)
+    if(!portfolio[idx].price){
+      try{
+        const price=await fetchQuote(tk);
+        if(price)portfolio[idx].price=price;
+      }catch(e){}
+    }
+    // 4) 섹터 - ETF 분류 시도
+    let etfSec=getETFSector(tk);
+    if(etfSec)portfolio[idx].sector=etfSec;
+    else{
+      // 일반 한국 주식 → KRX 데이터 또는 기본
+      const name=portfolio[idx].name||'';
+      portfolio[idx].sector=name?`한국 주식`:'한국 종목';
+    }
+    return;
+  }
+  
+  // 미국 종목 (기존 로직)
   try{
     const price=await fetchQuote(tk);
     if(price)portfolio[idx].price=price;
   }catch(e){}
-  // 섹터 (Finnhub profile)
   try{
     const profile=await tryFetch(`/api/finnhub?symbol=${tk}&type=profile`);
     if(profile?.finnhubIndustry){
       portfolio[idx].sector=profile.finnhubIndustry;
+      if(profile?.name)portfolio[idx].name=profile.name;
     }else{
-      // Finnhub에 industry 없음 = ETF/펀드 가능성. ETF 섹터 매핑 적용
       let etfSec=getETFSector(tk);
-      // 매핑 못 찾았으면 이름으로 추정
       if(!etfSec&&profile?.name)etfSec=guessETFSectorByName(profile.name);
       if(etfSec)portfolio[idx].sector=etfSec;
+      if(profile?.name)portfolio[idx].name=profile.name;
     }
   }catch(e){
-    // 실패 시에도 ETF 매핑은 시도
     const etfSec=getETFSector(tk);
     if(etfSec)portfolio[idx].sector=etfSec;
   }
@@ -6364,34 +6476,72 @@ function renderAssets(){
     return;
   }
 
-  let totMkt=0,totCost=0;
+  // 통화별 합계 (USD/KRW 분리)
+  let totMktUSD=0,totMktKRW=0,totCostUSD=0,totCostKRW=0;
   tbody.innerHTML=portfolio.map((s,i)=>{
+    const isKr=s.currency==='KRW'||isKRTicker(s.tk);
     const mkt=s.price?s.price*s.sh:null;
     const cost=s.avg*s.sh;
-    const pnl=mkt?mkt-cost:null;
+    const pnl=mkt!=null?mkt-cost:null;
     const pct=pnl!=null?(pnl/cost)*100:null;
-    if(mkt)totMkt+=mkt;
-    totCost+=cost;
+    if(mkt){
+      if(isKr)totMktKRW+=mkt;
+      else totMktUSD+=mkt;
+    }
+    if(isKr)totCostKRW+=cost;
+    else totCostUSD+=cost;
+    
+    // 종목명 가져오기
+    const code=isKr?s.tk.replace(/\.(KS|KQ)$/i,''):'';
+    const displayName=s.name||(isKr?(KRX_STOCKS[code]?.name||KRX_ETF_NAMES[code]||s.tk):s.tk);
+    const showName=displayName!==s.tk&&displayName?`<span style="display:block;font-size:10px;color:var(--text2);font-weight:400;margin-top:2px;font-family:inherit">${displayName.length>20?displayName.slice(0,19)+'…':displayName}</span>`:'';
+    
     return `<tr>
-      <td><strong style="font-family:Inter,sans-serif;cursor:pointer;color:var(--accent)" onclick="$('ti').value='${s.tk}';navTo('analysis');stab('chart');go();">${s.tk}</strong></td>
+      <td><strong style="font-family:Inter,sans-serif;cursor:pointer;color:var(--accent)" onclick="$('ti').value='${s.tk}';navTo('analysis');stab('chart');go();">${s.tk}</strong>${showName}</td>
       <td style="font-size:11px;color:var(--text2);font-family:Inter,sans-serif">${s.sector||'—'}</td>
       <td>${s.sh}</td>
-      <td>${fu(s.avg)}</td>
-      <td>${s.price?fu(s.price):'—'}</td>
-      <td>${mkt?fu(mkt):'—'}</td>
+      <td>${fmtPrice(s.avg,s.tk)}</td>
+      <td>${s.price?fmtPrice(s.price,s.tk):'—'}</td>
+      <td>${mkt?fmtPrice(mkt,s.tk):'—'}</td>
       <td class="${pct>=0?'up':'down'}">${pct!=null?fp(pct):'—'}</td>
       <td><button class="del-btn" onclick="removeAsset(${i})">${ic('trash',13)}</button></td>
     </tr>`;
   }).join('');
 
-  // 요약
+  // 통화 변환 (자산 탭 토글)
+  const useKrw=ASSET_CURRENCY==='krw';
+  const totMkt=useKrw
+    ? (totMktKRW+totMktUSD*USD_KRW)
+    : (totMktUSD+totMktKRW/USD_KRW);
+  const totCost=useKrw
+    ? (totCostKRW+totCostUSD*USD_KRW)
+    : (totCostUSD+totCostKRW/USD_KRW);
   const totPnl=totMkt-totCost;
   const totPct=totCost?(totPnl/totCost)*100:0;
+  
+  const curSym=useKrw?'₩':'$';
+  const otherSym=useKrw?'$':'₩';
+  const otherLabel=useKrw?'USD':'KRW';
+  
+  const fmtCur=v=>curSym+Math.round(v).toLocaleString();
+  // 수익금: 부호 항상 표시
+  const fmtPnl=v=>{
+    if(!isFinite(v))return '—';
+    const abs=Math.abs(Math.round(v));
+    return (v>=0?'+':'-')+curSym+abs.toLocaleString();
+  };
+  
+  // 평가금액을 큰 카드 1개로 + 토글 버튼
   $('assets-grid').innerHTML=`
-    <div class="btc"><div class="btc-l">평가금액</div><div class="btc-v">${totMkt?'$'+Math.round(totMkt).toLocaleString():'—'}</div></div>
-    <div class="btc"><div class="btc-l">평가금액 (원화)</div><div class="btc-v" style="font-size:15px">${totMkt?'₩'+Math.round(totMkt*USD_KRW).toLocaleString():'—'}</div></div>
-    <div class="btc"><div class="btc-l">총 투자금</div><div class="btc-v" style="font-size:15px">$${Math.round(totCost).toLocaleString()}</div></div>
-    <div class="btc"><div class="btc-l">수익금</div><div class="btc-v ${totPnl>=0?'up':'down'}">${totMkt?(totPnl>=0?'+':'')+'$'+Math.abs(Math.round(totPnl)).toLocaleString():'—'}</div></div>
+    <div class="btc btc-main" style="grid-column:1/-1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:18px;background:linear-gradient(135deg,rgba(74,158,255,0.08),rgba(16,208,144,0.06));border:1px solid rgba(74,158,255,0.2);position:relative">
+      <div class="btc-l" style="font-size:11px;margin-bottom:6px">평가금액</div>
+      <div class="btc-v" style="font-size:26px;font-weight:800;font-family:'Inter',sans-serif;letter-spacing:-0.5px">${totMkt?fmtCur(totMkt):'—'}</div>
+      <button onclick="toggleAssetCurrency()" style="position:absolute;right:14px;top:50%;transform:translateY(-50%);background:rgba(74,158,255,0.15);border:1px solid rgba(74,158,255,0.4);color:var(--accent);padding:5px 10px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:4px" title="통화 전환">
+        ${otherSym} ${otherLabel}
+      </button>
+    </div>
+    <div class="btc"><div class="btc-l">총 투자금</div><div class="btc-v" style="font-size:15px">${fmtCur(totCost)}</div></div>
+    <div class="btc"><div class="btc-l">수익금</div><div class="btc-v ${totPnl>=0?'up':'down'}">${totMkt?fmtPnl(totPnl):'—'}</div></div>
     <div class="btc"><div class="btc-l">수익률</div><div class="btc-v ${totPct>=0?'up':'down'}">${totMkt?fp(totPct):'—'}</div></div>
     <div class="btc"><div class="btc-l">보유 종목 수</div><div class="btc-v">${portfolio.length}</div></div>`;
   $('assets-summary').style.display='block';
@@ -6969,29 +7119,108 @@ function autoCleanupAlerts(){
 }
 
 // 다크/라이트 모드 토글
-function toggleTheme(){
-  const cur=document.documentElement.getAttribute('data-theme')||'dark';
-  const next=cur==='dark'?'light':'dark';
-  document.documentElement.setAttribute('data-theme',next);
-  try{localStorage.setItem('theme',next);}catch(e){}
-  updateThemeIcon();
+// ─── 설정 시스템 (테마 + 색상) ───
+const SETTINGS_DEFAULTS={theme:'dark',colorMode:'global'};
+const SETTINGS={...SETTINGS_DEFAULTS};
+
+// 자산 합계 표시 통화 (자산 탭의 토글 버튼으로 즉시 전환)
+let ASSET_CURRENCY='usd';  // 'usd' | 'krw'
+function toggleAssetCurrency(){
+  ASSET_CURRENCY=ASSET_CURRENCY==='usd'?'krw':'usd';
+  try{localStorage.setItem('asset_currency',ASSET_CURRENCY);}catch(e){}
+  renderAssets();
 }
-function applyStoredTheme(){
-  let theme='dark';
-  try{theme=localStorage.getItem('theme')||'dark';}catch(e){}
-  document.documentElement.setAttribute('data-theme',theme);
-  updateThemeIcon();
+function loadAssetCurrency(){
+  try{const v=localStorage.getItem('asset_currency');if(v==='krw'||v==='usd')ASSET_CURRENCY=v;}catch(e){}
 }
-function updateThemeIcon(){
-  const cur=document.documentElement.getAttribute('data-theme')||'dark';
-  const icon=$('theme-icon');
-  if(icon){
-    icon.dataset.icon=cur==='dark'?'sun':'moon';
-    delete icon.dataset.injected;
-    icon.innerHTML='';
-    if(typeof injectIcons==='function')injectIcons(icon.parentElement);
+
+function loadSettings(){
+  try{
+    const s=JSON.parse(localStorage.getItem('pulsa_settings')||'{}');
+    Object.assign(SETTINGS,s);
+  }catch(e){}
+  // 기존 theme localStorage와 호환
+  try{
+    const oldTheme=localStorage.getItem('theme');
+    if(oldTheme&&!localStorage.getItem('pulsa_settings'))SETTINGS.theme=oldTheme;
+  }catch(e){}
+  applySettings();
+}
+
+function saveSettings(){
+  try{localStorage.setItem('pulsa_settings',JSON.stringify(SETTINGS));}catch(e){}
+}
+
+function setSetting(key,value){
+  SETTINGS[key]=value;
+  saveSettings();
+  applySettings();
+  // 변경 후 현재 화면 다시 그리기
+  if(key==='colorMode'){
+    if(typeof drawPrice==='function'&&D)drawPrice();
+    if(typeof renderAssets==='function')renderAssets();
+    if(typeof loadHome==='function'){
+      const homeOn=document.querySelector('#screen-home.on');
+      if(homeOn)loadHome();
+    }
+  }
+  updateSettingsButtons();
+}
+
+function applySettings(){
+  // 테마 적용
+  document.documentElement.setAttribute('data-theme',SETTINGS.theme);
+  // CSS 변수에 색상 변수 주입
+  applyColorMode();
+}
+
+function applyColorMode(){
+  // var(--up) / var(--down) 을 색상 모드에 따라 재정의
+  const root=document.documentElement;
+  if(SETTINGS.colorMode==='korea'){
+    root.style.setProperty('--up','#ff4d6d');       // 상승 빨강
+    root.style.setProperty('--up-soft','rgba(255,77,109,.15)');
+    root.style.setProperty('--down','#4a9eff');     // 하락 파랑
+    root.style.setProperty('--down-soft','rgba(74,158,255,.15)');
+  }else{
+    // 전 세계식 (기본): 상승 초록, 하락 빨강
+    root.style.setProperty('--up','#26d782');
+    root.style.setProperty('--up-soft','rgba(38,215,130,.15)');
+    root.style.setProperty('--down','#ff4d6d');
+    root.style.setProperty('--down-soft','rgba(255,77,109,.15)');
   }
 }
+
+// 등락 색상 가져오기 (JS에서 차트 등에서 사용)
+function getUpColor(){return SETTINGS.colorMode==='korea'?'#ff4d6d':'#26d782';}
+function getDownColor(){return SETTINGS.colorMode==='korea'?'#4a9eff':'#ff4d6d';}
+
+function updateSettingsButtons(){
+  document.querySelectorAll('.settings-opt').forEach(btn=>{
+    const key=btn.dataset.setting;
+    const value=btn.dataset.value;
+    if(SETTINGS[key]===value)btn.classList.add('on');
+    else btn.classList.remove('on');
+  });
+}
+
+function openSettings(){
+  const modal=$('settings-modal');
+  if(modal){
+    modal.classList.add('on');
+    updateSettingsButtons();
+  }
+}
+function closeSettings(){
+  const modal=$('settings-modal');
+  if(modal)modal.classList.remove('on');
+}
+
+// 호환용 (구 toggleTheme 호출 코드 있으면)
+function toggleTheme(){
+  setSetting('theme',SETTINGS.theme==='dark'?'light':'dark');
+}
+function applyStoredTheme(){loadSettings();loadAssetCurrency();}
 
 // ── 자동 알림 (5% 변동 + 실적) ───────────────────────
 function saveAutoAlerts(){
@@ -7631,7 +7860,7 @@ function newsImgError(img){
 
 function newsCardHTML(n,cls=''){
   const title=n.ko||n.title;
-  const enTitle=n.ko&&n.ko!==n.title?n.title:'';
+  const isPendingTrans=!n.ko&&n.title&&/[a-zA-Z]/.test(n.title);  // 영어 원문이고 번역 안 됐으면
   const site=n.site||'';
   const url=n.url||'#';
   const img=n.image||'';
@@ -7652,12 +7881,13 @@ function newsCardHTML(n,cls=''){
   };
   const cat=n.cat||'other';
   const catLabel=catLabels[cat]||'기타';
+  // 번역 진행중 표시 (영어 원문 + 번역 중 마크)
+  const transBadge=isPendingTrans?`<span style="display:inline-block;font-size:9px;color:var(--text3);background:rgba(150,150,170,0.15);padding:1px 5px;border-radius:3px;margin-left:4px;vertical-align:middle">번역 중</span>`:'';
   return `<a class="news-card ${cls}${isRead?' read':''}" href="${url}" target="_blank" rel="noopener" onclick="markNewsRead('${(url||'').replace(/'/g,'&#39;')}')">
     <div class="news-card-img">${img?`<img src="${img}" alt="" referrerpolicy="no-referrer" loading="lazy" onerror="newsImgError(this)">`:ic('newspaper',32)}</div>
     <div class="news-card-body">
       <div>
-        <div class="news-card-title">${title}</div>
-        ${enTitle?`<div class="news-card-en">${enTitle.length>80?enTitle.slice(0,80)+'…':enTitle}</div>`:''}
+        <div class="news-card-title">${title}${transBadge}</div>
       </div>
       <div class="news-card-meta">
         <span style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
