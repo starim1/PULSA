@@ -1713,7 +1713,7 @@ body.has-notch .topbar{
         <div class="ig" style="position:relative">
           <label>티커</label>
           <input type="text" id="assets-tk" placeholder="NVDA / 삼성전자" style="width:160px" autocomplete="off" oninput="onAssetsTkInput()" onfocus="onAssetsTkInput()" onblur="setTimeout(()=>{const d=document.getElementById('assets-search-dropdown');if(d)d.style.display='none';},200)">
-          <div id="assets-search-dropdown" class="search-dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;min-width:240px;z-index:100"></div>
+          <div id="assets-search-dropdown" class="search-dropdown" style="display:none;position:absolute;bottom:100%;left:0;right:0;min-width:240px;max-height:280px;overflow-y:auto;z-index:200;margin-bottom:4px;box-shadow:0 -8px 24px rgba(0,0,0,0.4)"></div>
         </div>
         <div class="ig"><label>수량</label><input type="number" id="assets-sh" placeholder="10" min="0" style="width:90px"></div>
         <div class="ig"><label id="assets-avg-label">평단가 ($)</label><input type="number" id="assets-avg" placeholder="120" step="0.01" min="0" style="width:110px"></div>
@@ -2922,6 +2922,195 @@ const US_TICKER_MAP = {
   // === 인덱스 ===
   'S&P500':'^GSPC','S&P 500':'^GSPC','SP500':'^GSPC','나스닥':'^IXIC','나스닥종합':'^IXIC',
   '다우':'^DJI','다우존스':'^DJI','다우산업':'^DJI','러셀2000':'^RUT','VIX':'^VIX','공포지수':'^VIX',
+  
+  // ════════════════════════════════════════
+  // 미국 광역 ETF (지수)
+  // ════════════════════════════════════════
+  'SPY':'SPY','VOO':'VOO','IVV':'IVV','SPLG':'SPLG',
+  'QQQ':'QQQ','QQQM':'QQQM','TQQQ':'TQQQ','SQQQ':'SQQQ',
+  'DIA':'DIA','VTI':'VTI','VT':'VT','VEA':'VEA','VWO':'VWO',
+  'IWM':'IWM','IWB':'IWB','IWP':'IWP','IWN':'IWN','IWO':'IWO',
+  'SCHB':'SCHB','SCHX':'SCHX','SCHA':'SCHA','SCHG':'SCHG','SCHV':'SCHV','SCHM':'SCHM',
+  'IEFA':'IEFA','IEMG':'IEMG','EFA':'EFA','EEM':'EEM','ACWI':'ACWI','MSCI':'ACWI',
+  // 레버리지/인버스
+  'SPXL':'SPXL','SPXS':'SPXS','UPRO':'UPRO','SH':'SH','SDS':'SDS','SSO':'SSO',
+  'QLD':'QLD','PSQ':'PSQ',
+  // 팩터/스타일
+  'MTUM':'MTUM','QUAL':'QUAL','VLUE':'VLUE','SIZE':'SIZE','USMV':'USMV',
+  'SPYV':'SPYV','SPYG':'SPYG','IVE':'IVE','IVW':'IVW','VUG':'VUG','VTV':'VTV',
+  
+  // ════════════════════════════════════════
+  // 미국 섹터 ETF
+  // ════════════════════════════════════════
+  // 기술
+  'XLK':'XLK','VGT':'VGT','IYW':'IYW','FTEC':'FTEC',
+  // 반도체
+  'SMH':'SMH','SOXX':'SOXX','SOXL':'SOXL','SOXS':'SOXS','USD':'USD','PSI':'PSI','XSD':'XSD',
+  '반도체ETF':'SMH','반도체레버리지':'SOXL',
+  // 금융
+  'XLF':'XLF','VFH':'VFH','KRE':'KRE','KBE':'KBE','IAI':'IAI','KIE':'KIE',
+  // 헬스케어
+  'XLV':'XLV','VHT':'VHT','IBB':'IBB','XBI':'XBI','ARKG':'ARKG','IXJ':'IXJ',
+  // 에너지
+  'XLE':'XLE','VDE':'VDE','XOP':'XOP','OIH':'OIH','TAN':'TAN','ICLN':'ICLN','URA':'URA',
+  // 산업/방산
+  'XLI':'XLI','VIS':'VIS','ITA':'ITA','PPA':'PPA','XAR':'XAR',
+  '방산ETF':'ITA','우주ETF':'UFO',
+  // 소비재
+  'XLP':'XLP','XLY':'XLY','VDC':'VDC','VCR':'VCR',
+  // 통신
+  'XLC':'XLC','VOX':'VOX',
+  // 유틸리티
+  'XLU':'XLU','VPU':'VPU',
+  // 부동산/REITs
+  'XLRE':'XLRE','VNQ':'VNQ','IYR':'IYR','SCHH':'SCHH','REET':'REET',
+  // 소재
+  'XLB':'XLB','VAW':'VAW','GLD':'GLD','SLV':'SLV','IAU':'IAU','GLDM':'GLDM',
+  '금ETF':'GLD','은ETF':'SLV',
+  
+  // ════════════════════════════════════════
+  // 테마/인기 ETF
+  // ════════════════════════════════════════
+  'ARKK':'ARKK','ARKQ':'ARKQ','ARKW':'ARKW','ARKF':'ARKF','ARKG':'ARKG','ARKX':'ARKX',
+  '아크인베스트':'ARKK','캐시우드':'ARKK','아크우주':'ARKX',
+  'BOTZ':'BOTZ','ROBO':'ROBO','IRBO':'IRBO','UBOT':'UBOT',
+  '로봇ETF':'BOTZ','AI ETF':'BOTZ','휴머노이드ETF':'BOTZ',
+  'JEPI':'JEPI','JEPQ':'JEPQ','SCHD':'SCHD','VYM':'VYM','DGRO':'DGRO','NOBL':'NOBL','HDV':'HDV',
+  '커버드콜':'JEPI','배당ETF':'SCHD','배당귀족':'NOBL',
+  'TLT':'TLT','SHY':'SHY','IEF':'IEF','BND':'BND','AGG':'AGG','LQD':'LQD','HYG':'HYG',
+  '미국채권ETF':'AGG','장기국채':'TLT',
+  'GBTC':'GBTC','IBIT':'IBIT','FBTC':'FBTC','BITO':'BITO','ETHE':'ETHE','ETHA':'ETHA',
+  '비트코인ETF':'IBIT','이더리움ETF':'ETHA',
+  
+  // ════════════════════════════════════════
+  // Magnificent 7 + 빅테크
+  // ════════════════════════════════════════
+  '애플':'AAPL','마이크로소프트':'MSFT','MS':'MSFT','구글':'GOOGL','알파벳':'GOOGL',
+  '아마존':'AMZN','메타':'META','페이스북':'META','테슬라':'TSLA','넷플릭스':'NFLX',
+  '엔비디아':'NVDA','NVDA':'NVDA',
+  // 반도체 종목
+  'AMD':'AMD','인텔':'INTC','퀄컴':'QCOM','마이크론':'MU','TSMC':'TSM','대만반도체':'TSM',
+  '브로드컴':'AVGO','텍사스인스트루먼트':'TXN','TI':'TXN','어플라이드머티리얼즈':'AMAT',
+  '램리서치':'LRCX','KLA':'KLAC','마벨':'MRVL','마이크로칩':'MCHP','온세미컨덕터':'ON',
+  'ASML':'ASML','암':'ARM','ARM홀딩스':'ARM','모놀리식파워':'MPWR','엔트지리스':'ENTG',
+  '아날로그디바이시즈':'ADI','애너로그':'ADI','스카이웍스':'SWKS','코르보':'QRVO',
+  // 소프트웨어/클라우드
+  '오라클':'ORCL','세일즈포스':'CRM','어도비':'ADBE','서비스나우':'NOW','워크데이':'WDAY',
+  '인튜이트':'INTU','스노우플레이크':'SNOW','데이터독':'DDOG','몽고DB':'MDB',
+  '아틀라시안':'TEAM','옥타':'OKTA','시놉시스':'SNPS','케이던스':'CDNS',
+  '쇼피파이':'SHOP','PayPal':'PYPL','페이팔':'PYPL','블록':'SQ','스퀘어':'SQ',
+  // 사이버보안
+  '크라우드스트라이크':'CRWD','팰로앨토네트웍스':'PANW','팔로알토':'PANW',
+  '포티넷':'FTNT','지스케일러':'ZS','클라우드플레어':'NET','센티넬원':'S',
+  '루브릭':'RBRK','테너블':'TENB','오라클':'ORCL',
+  
+  // ════════════════════════════════════════
+  // 금융
+  // ════════════════════════════════════════
+  '버크셔':'BRK.B','버크셔해서웨이':'BRK.B','워런버핏':'BRK.B','워렌버핏':'BRK.B',
+  'JP모건':'JPM','제이피모간':'JPM','뱅크오브아메리카':'BAC','시티그룹':'C','시티':'C',
+  '웰스파고':'WFC','골드만삭스':'GS','모건스탠리':'MS','블랙록':'BLK','BlackRock':'BLK',
+  '뱅가드':'V','비자':'V','마스터카드':'MA','아메리칸익스프레스':'AXP','아멕스':'AXP',
+  '챨스슈왑':'SCHW','블랙스톤':'BX','KKR':'KKR','아폴로':'APO','칼라일그룹':'CG',
+  'S&P글로벌':'SPGI','무디스':'MCO','S&P':'SPGI',
+  '프로그레시브':'PGR','올스테이트':'ALL','메트라이프':'MET','프루덴셜':'PRU',
+  '처브':'CB','AON':'AON','마쉬앤맥레넌':'MMC','AIG':'AIG',
+  'PNC':'PNC','트루이스트':'TFC','US뱅코프':'USB','캐피털원':'COF','피프스써드':'FITB',
+  
+  // ════════════════════════════════════════
+  // 헬스케어/바이오
+  // ════════════════════════════════════════
+  '존슨앤존슨':'JNJ','일라이릴리':'LLY','릴리':'LLY','화이자':'PFE','애브비':'ABBV',
+  '머크':'MRK','써모피셔':'TMO','애보트':'ABT','다나허':'DHR','암젠':'AMGN',
+  '길리어드':'GILD','리제네론':'REGN','버텍스':'VRTX','바이오젠':'BIIB',
+  '인튜이티브서지컬':'ISRG','보스턴사이언티픽':'BSX','메드트로닉':'MDT','스트라이커':'SYK',
+  '브리스톨마이어스':'BMY','BMS':'BMY','노바티스':'NVS','로슈':'RHHBY',
+  '모더나':'MRNA','바이오엔테크':'BNTX','노보노디스크':'NVO',
+  '유나이티드헬스':'UNH','CVS헬스':'CVS','시그나':'CI','휴마나':'HUM','엘리번스':'ELV',
+  '센텐':'CNC','HCA헬스케어':'HCA','데이비타':'DVA',
+  
+  // ════════════════════════════════════════
+  // 에너지
+  // ════════════════════════════════════════
+  '엑손모빌':'XOM','엑손':'XOM','쉐브론':'CVX','셰브론':'CVX','코노코필립스':'COP',
+  '슐럼버거':'SLB','EOG리소시즈':'EOG','옥시덴탈':'OXY','파이오니어':'PXD',
+  '발레로':'VLO','마라톤페트롤리엄':'MPC','필립스66':'PSX','헤스':'HES',
+  '엔터프라이즈프로덕츠':'EPD','킨더모건':'KMI',
+  
+  // ════════════════════════════════════════
+  // 산업/항공/방산
+  // ════════════════════════════════════════
+  '보잉':'BA','GE':'GE','GE에어로스페이스':'GE','GE버노바':'GEV',
+  '록히드마틴':'LMT','RTX':'RTX','레이시온':'RTX','노스롭그루먼':'NOC','제너럴다이내믹스':'GD',
+  'L3해리스':'LHX','헌팅턴인갈스':'HII','TransDigm':'TDG','크라토스':'KTOS','레이도스':'LDOS',
+  '에어버스':'EADSY','텍스트론':'TXT','커티스라이트':'CW',
+  '하니웰':'HON','3M':'MMM','에머슨일렉트릭':'EMR','일리노이툴':'ITW','이튼':'ETN',
+  '디어':'DE','존디어':'DE','캐터필러':'CAT','파커하니핀':'PH','커밍스':'CMI',
+  'UPS':'UPS','페덱스':'FDX','유나이티드항공':'UAL','델타항공':'DAL','아메리칸항공':'AAL',
+  '사우스웨스트':'LUV',
+  
+  // ════════════════════════════════════════
+  // 자동차/EV (확장)
+  // ════════════════════════════════════════
+  '포드':'F','GM':'GM','제너럴모터스':'GM','테슬라':'TSLA','리비안':'RIVN','루시드':'LCID',
+  '니오':'NIO','샤오펑':'XPEV','리오토':'LI','BYD':'BYDDY','폭스바겐':'VWAGY',
+  '도요타':'TM','혼다':'HMC','BMW':'BMWYY','벤츠':'MBGYY','메르세데스':'MBGYY',
+  '페라리':'RACE','포르쉐':'POAHY','스텔란티스':'STLA','크라이슬러':'STLA',
+  '아우토네이션':'AN','카맥스':'KMX','카바나':'CVNA',
+  
+  // ════════════════════════════════════════
+  // 소비재/유통
+  // ════════════════════════════════════════
+  '월마트':'WMT','홈디포':'HD','코스트코':'COST','타깃':'TGT','타겟':'TGT',
+  '로우스':'LOW','TJX':'TJX','TJ맥스':'TJX','달러트리':'DLTR','달러제너럴':'DG',
+  '아마존':'AMZN','이베이':'EBAY','베스트바이':'BBY','메이시스':'M','노드스트롬':'JWN',
+  '룰루레몬':'LULU','나이키':'NKE','아디다스':'ADDYY','언더아머':'UAA',
+  '맥도날드':'MCD','스타벅스':'SBUX','맥도널드':'MCD','치폴레':'CMG','얌브랜드':'YUM',
+  '코카콜라':'KO','펩시':'PEP','펩시코':'PEP','몬스터':'MNST','켈로그':'K',
+  '크래프트하인즈':'KHC','몬덜리즈':'MDLZ','허쉬':'HSY','캠벨':'CPB','제너럴밀스':'GIS',
+  'P&G':'PG','프록터앤갬블':'PG','콜게이트':'CL','킴벌리클락':'KMB','유닐레버':'UL',
+  '에스티로더':'EL','로레알':'LRLCY','로레얼':'LRLCY',
+  '에어비앤비':'ABNB','부킹닷컴':'BKNG','부킹홀딩스':'BKNG','메리어트':'MAR','힐튼':'HLT',
+  '윈리조트':'WYNN','MGM리조트':'MGM','시저스':'CZR',
+  
+  // ════════════════════════════════════════
+  // 미디어/엔터/통신 (확장)
+  // ════════════════════════════════════════
+  '디즈니':'DIS','월트디즈니':'DIS','컴캐스트':'CMCSA','워너브라더스':'WBD','워너브로스':'WBD',
+  '파라마운트':'PARA','폭스':'FOX','뉴욕타임즈':'NYT',
+  '스포티파이':'SPOT','로블록스':'RBLX','일렉트로닉아츠':'EA','EA스포츠':'EA',
+  '테이크투':'TTWO','액티비전':'ATVI','유니티':'U',
+  '핀터레스트':'PINS','스냅':'SNAP','스냅챗':'SNAP','레딧':'RDDT','웨이브':'TWLO',
+  
+  // ════════════════════════════════════════
+  // 산업/물류/리츠
+  // ════════════════════════════════════════
+  '리얼티인컴':'O','프로로지스':'PLD','아메리칸타워':'AMT','크라운캐슬':'CCI',
+  '이퀴닉스':'EQIX','디지털리얼티':'DLR','퍼블릭스토리지':'PSA','사이먼프로퍼티':'SPG',
+  'EQR':'EQR','아발론베이':'AVB','웰타워':'WELL','벤타스':'VTR','보네이도':'VNO',
+  
+  // ════════════════════════════════════════
+  // 한국 ADR
+  // ════════════════════════════════════════
+  '쿠팡':'CPNG','SE':'SE','씨리미티드':'SE',
+  // === 중국 ADR ===
+  '알리바바':'BABA','알리바바그룹':'BABA','징둥':'JD','JD닷컴':'JD',
+  '핀둬둬':'PDD','테무':'PDD','바이두':'BIDU','넷이즈':'NTES','텐센트':'TCEHY',
+  '텐센트뮤직':'TME','빌리빌리':'BILI','TAL교육':'TAL','베이크':'BEKE',
+  
+  // ════════════════════════════════════════
+  // 양자컴퓨팅 (확장)
+  // ════════════════════════════════════════
+  'IONQ':'IONQ','RGTI':'RGTI','QBTS':'QBTS','QUBT':'QUBT','ARQQ':'ARQQ',
+  '아킷퀀텀':'ARQQ','형스퀀텀':'QUBT','퀀텀스케이프':'QS',
+  
+  // ════════════════════════════════════════
+  // 신재생/원자력 (확장)
+  // ════════════════════════════════════════
+  '엔페이즈':'ENPH','퍼스트솔라':'FSLR','선런':'RUN','선노바':'NOVA','솔라엣지':'SEDG',
+  '비스트라':'VST','콘스텔레이션':'CEG','뉴스케일':'SMR','우라늄에너지':'UEC',
+  '카메코':'CCJ','센트러스에너지':'LEU','오클로':'OKLO','NUSCALE':'SMR',
+  '플러그파워':'PLUG','블룸에너지':'BE','퓨얼셀':'FCEL','발라드파워':'BLDP',
 };
 
 function resolveTicker(input){
@@ -5135,26 +5324,36 @@ async function fetchAssetExtras(tk){
     return;
   }
   
-  // 미국 종목 (기존 로직 + 영어 섹터 한글 변환)
+  // 미국 종목 (티커 직접 매핑 1순위 > Finnhub 영어 섹터 변환 2순위 > ETF 분류 3순위)
   try{
     const price=await fetchQuote(tk);
     if(price)portfolio[idx].price=price;
   }catch(e){}
+  
+  // 1순위: 직접 매핑 (양자컴퓨팅, 우주항공 등 세부 카테고리)
+  if(US_TICKER_SECTORS[tk]){
+    portfolio[idx].sector=US_TICKER_SECTORS[tk];
+  }
+  
   try{
     const profile=await tryFetch(`/api/finnhub?symbol=${tk}&type=profile`);
-    if(profile?.finnhubIndustry){
-      // 영어 섹터를 한글로 변환 (한국 주식과 같은 카테고리로 통일)
-      portfolio[idx].sector=translateSector(profile.finnhubIndustry);
-      if(profile?.name)portfolio[idx].name=profile.name;
-    }else{
-      let etfSec=getETFSector(tk);
-      if(!etfSec&&profile?.name)etfSec=guessETFSectorByName(profile.name);
-      if(etfSec)portfolio[idx].sector=etfSec;
-      if(profile?.name)portfolio[idx].name=profile.name;
+    // 이름은 항상 가져옴
+    if(profile?.name&&!portfolio[idx].name)portfolio[idx].name=profile.name;
+    // 섹터 - 직접 매핑 없을 때만 Finnhub 사용
+    if(!portfolio[idx].sector){
+      if(profile?.finnhubIndustry){
+        portfolio[idx].sector=translateSector(profile.finnhubIndustry);
+      }else{
+        let etfSec=getETFSector(tk);
+        if(!etfSec&&profile?.name)etfSec=guessETFSectorByName(profile.name);
+        if(etfSec)portfolio[idx].sector=etfSec;
+      }
     }
   }catch(e){
-    const etfSec=getETFSector(tk);
-    if(etfSec)portfolio[idx].sector=etfSec;
+    if(!portfolio[idx].sector){
+      const etfSec=getETFSector(tk);
+      if(etfSec)portfolio[idx].sector=etfSec;
+    }
   }
 }
 
@@ -5512,6 +5711,62 @@ function translateSector(sec){
   return EN_TO_KR_SECTOR[sec]||EN_TO_KR_SECTOR[sec.trim()]||sec;
 }
 
+// 미국 주요 종목 — 티커 직접 매핑 (Finnhub 분류가 너무 두루뭉술할 때 override)
+// 자산 분류의 편의를 위해 더 세부적인 카테고리로 분류
+const US_TICKER_SECTORS={
+  // 양자컴퓨팅 (Finnhub는 IT 서비스로 분류해서 override 필요)
+  'IONQ':'양자컴퓨팅','RGTI':'양자컴퓨팅','QBTS':'양자컴퓨팅','QUBT':'양자컴퓨팅',
+  'ARQQ':'양자컴퓨팅','HON':'양자컴퓨팅',  // HON는 산업·기계가 더 맞지만 양자도 함
+  // AI 전용
+  'PLTR':'AI','AI':'AI','SOUN':'AI','BBAI':'AI','SMCI':'AI',
+  // 반도체 (override - Finnhub와 별도)
+  'NVDA':'반도체','AMD':'반도체','TSM':'반도체','ASML':'반도체','AVGO':'반도체',
+  'INTC':'반도체','MU':'반도체','QCOM':'반도체','TXN':'반도체','MRVL':'반도체',
+  'ON':'반도체','MCHP':'반도체','AMAT':'반도체','LRCX':'반도체','KLAC':'반도체',
+  'ARM':'반도체','MPWR':'반도체','ENTG':'반도체','SWKS':'반도체','QRVO':'반도체',
+  'ADI':'반도체','LSCC':'반도체','WOLF':'반도체','CRUS':'반도체','UMC':'반도체',
+  // 반도체 ETF (개별 종목과 같은 "반도체"로 통합)
+  'SOXX':'반도체','SMH':'반도체','SOXL':'반도체','SOXS':'반도체','USD':'반도체',
+  'PSI':'반도체','XSD':'반도체',
+  // 우주항공·방산
+  'LMT':'우주항공·방산','RTX':'우주항공·방산','NOC':'우주항공·방산','GD':'우주항공·방산',
+  'BA':'우주항공·방산','HII':'우주항공·방산','LHX':'우주항공·방산','TXT':'우주항공·방산',
+  'KTOS':'우주항공·방산','LDOS':'우주항공·방산','TDG':'우주항공·방산',
+  'RKLB':'우주항공·방산','ASTS':'우주항공·방산','SPCE':'우주항공·방산','LUNR':'우주항공·방산',
+  'PL':'우주항공·방산','MAXR':'우주항공·방산','RDW':'우주항공·방산','BWXT':'우주항공·방산',
+  // 자동차/EV
+  'TSLA':'자동차','F':'자동차','GM':'자동차','RIVN':'자동차','LCID':'자동차',
+  'NIO':'자동차','XPEV':'자동차','LI':'자동차','BYDDF':'자동차','BYDDY':'자동차',
+  'STLA':'자동차','TM':'자동차','HMC':'자동차','VWAGY':'자동차','MBGYY':'자동차',
+  'RACE':'자동차','NKLA':'자동차','FSR':'자동차',
+  // 빅테크 (Mag 7)
+  'AAPL':'미국 빅테크','MSFT':'미국 빅테크','GOOGL':'미국 빅테크','GOOG':'미국 빅테크',
+  'AMZN':'미국 빅테크','META':'미국 빅테크','NFLX':'미국 빅테크',
+  // 소프트웨어/클라우드
+  'CRM':'소프트웨어','ORCL':'소프트웨어','ADBE':'소프트웨어','NOW':'소프트웨어',
+  'SNOW':'소프트웨어','DDOG':'소프트웨어','MDB':'소프트웨어','TEAM':'소프트웨어',
+  'OKTA':'소프트웨어','SHOP':'소프트웨어','SQ':'소프트웨어','PYPL':'소프트웨어',
+  'CRWD':'사이버보안','PANW':'사이버보안','FTNT':'사이버보안','ZS':'사이버보안',
+  'NET':'사이버보안','S':'사이버보안','RBRK':'사이버보안','OKLO':'원자력',
+  // 원자력/SMR
+  'SMR':'원자력','BWXT':'원자력','NUKZ':'원자력','URA':'원자력','URNM':'원자력',
+  'CCJ':'원자력','LEU':'원자력','UEC':'원자력','NXE':'원자력',
+  // 로봇
+  'ABB':'로봇','ISRG':'로봇','IRBT':'로봇','SYM':'로봇','BOTZ':'로봇',
+  // 핀테크/암호화폐
+  'COIN':'암호화폐','MSTR':'암호화폐','MARA':'암호화폐','RIOT':'암호화폐',
+  'HOOD':'금융','SOFI':'금융','AFRM':'금융','UPST':'금융',
+  // 게임
+  'EA':'게임','TTWO':'게임','RBLX':'게임','U':'게임',
+  // 미디어/엔터
+  'DIS':'미디어·엔터','SPOT':'미디어·엔터','WBD':'미디어·엔터','PARA':'미디어·엔터',
+  // 한국 ADR (한국 종목과 통일)
+  'CPNG':'유통·소비재','SE':'유통·소비재',
+  // 중국 ADR
+  'BABA':'중국','JD':'중국','PDD':'중국','BIDU':'중국','NTES':'중국',
+  'TCEHY':'중국','TME':'중국','BILI':'중국','TAL':'중국','BEKE':'중국',
+};
+
 // 주요 ETF의 기초자산 섹터 매핑
 // 구조: 카테고리 단위로 묶음 (광범위 지수 / 섹터 / 테마 / 채권 / 원자재 / 국제 / 한국)
 function getETFSector(tk){
@@ -5544,19 +5799,21 @@ function getETFSector(tk){
   };
   if(broadUS[t])return `ETF · ${broadUS[t]}`;
 
-  // ─── 미국 섹터 ETF ───
+  // ─── 미국 섹터 ETF (개별 종목과 같은 카테고리로 통일) ───
   const sectorETF={
-    'XLK':'기술','VGT':'기술','SMH':'반도체','SOXX':'반도체','SOXL':'반도체 (레버리지)',
-    'XLF':'금융','VFH':'금융','KRE':'은행','KBE':'은행','IAI':'증권사',
-    'XLV':'헬스케어','VHT':'헬스케어','IBB':'바이오테크','XBI':'바이오테크','ARKG':'유전공학',
-    'XLE':'에너지','VDE':'에너지','XOP':'에너지 (탐사)','OIH':'유전 서비스','URA':'우라늄',
-    'XLI':'산업','VIS':'산업','ITA':'방산','XAR':'방산',
-    'XLY':'경기소비재','VCR':'경기소비재','XRT':'소매','XHB':'주택건설',
-    'XLP':'필수소비재','VDC':'필수소비재',
+    'XLK':'IT/기술','VGT':'IT/기술','SMH':'반도체','SOXX':'반도체','SOXL':'반도체','SOXS':'반도체',
+    'USD':'반도체','PSI':'반도체','XSD':'반도체',
+    'XLF':'금융','VFH':'금융','KRE':'금융','KBE':'금융','IAI':'금융','KIE':'금융',
+    'XLV':'헬스케어','VHT':'헬스케어','IBB':'바이오·제약','XBI':'바이오·제약','ARKG':'바이오·제약',
+    'XLE':'에너지·화학','VDE':'에너지·화학','XOP':'에너지·화학','OIH':'에너지·화학','URA':'원자력','URNM':'원자력',
+    'TAN':'에너지·화학','ICLN':'에너지·화학',
+    'XLI':'산업·기계','VIS':'산업·기계','ITA':'우주항공·방산','XAR':'우주항공·방산','PPA':'우주항공·방산',
+    'XLY':'유통·소비재','VCR':'유통·소비재','XRT':'유통·소비재','XHB':'건설',
+    'XLP':'식음료','VDC':'식음료',
     'XLU':'유틸리티','VPU':'유틸리티',
-    'XLC':'통신서비스','VOX':'통신서비스',
-    'XLB':'소재','VAW':'소재','GDX':'금광주','GDXJ':'주니어 금광',
-    'XLRE':'리츠','VNQ':'리츠','SCHH':'리츠','REET':'글로벌 리츠','IYR':'리츠',
+    'XLC':'통신','VOX':'통신',
+    'XLB':'철강·금속','VAW':'철강·금속','GDX':'철강·금속','GDXJ':'철강·금속',
+    'XLRE':'리츠·부동산','VNQ':'리츠·부동산','SCHH':'리츠·부동산','REET':'리츠·부동산','IYR':'리츠·부동산',
   };
   if(sectorETF[t])return `ETF · ${sectorETF[t]}`;
 
@@ -5952,25 +6209,21 @@ function guessETFSectorByName(name){
   // 키워드 매칭으로 카테고리 추정 (통일된 섹터명 사용)
   // 같은 자산군은 같은 이름으로 (예: 모든 나스닥 관련 → "미국 나스닥")
   const checks=[
-    // 광범위 한국 지수
+    // 광범위 한국 지수 (레버리지/인버스라도 KOSPI200 키워드 있으면 여기로)
     [/KOSPI200|코스피200|KOSPI\s*200/i,'한국 KOSPI200'],
     [/KOSDAQ150|코스닥150|KOSDAQ\s*150/i,'한국 KOSDAQ150'],
     [/KOSPI|코스피/i,'한국 KOSPI'],
     [/KOSDAQ|코스닥/i,'한국 KOSDAQ'],
-    // 레버리지/인버스
-    [/레버리지.*인버스|인버스.*레버리지|인버스2X|2X.*인버스/i,'레버리지/인버스'],
-    [/인버스/i,'레버리지/인버스'],
-    [/레버리지|2X/i,'레버리지/인버스'],
-    // 미국 광역 지수 (모두 통합)
+    // 미국 광역 지수 (모두 통합) — 레버리지여도 기초 지수로
     [/S&P\s*500|S&P500|에스앤피500/i,'미국 S&P 500'],
-    [/나스닥|NASDAQ/i,'미국 나스닥'],  // 100, 성장주, 커버드콜 등 다 합침
+    [/나스닥|NASDAQ/i,'미국 나스닥'],
     [/다우|DOW/i,'미국 다우존스'],
     [/러셀|RUSSELL/i,'미국 러셀'],
-    // 미국 섹터/테마 ETF
+    // 미국 섹터/테마 ETF (레버리지여도 기초 자산으로 분류)
     [/필라델피아|반도체.*미국|미국.*반도체/i,'반도체'],
     [/빅테크|BIG\s*TECH|매그니피센트/i,'미국 빅테크'],
     [/AI.*데이터센터|데이터센터.*AI/i,'AI'],
-    [/AI.*반도체|반도체.*AI/i,'반도체'],  // AI반도체도 반도체로
+    [/AI.*반도체|반도체.*AI/i,'반도체'],
     [/AI.*전력|전력.*AI/i,'전력 인프라'],
     [/AI.*인프라|인프라.*AI/i,'AI'],
     [/AI.*클라우드|클라우드.*AI/i,'AI'],
