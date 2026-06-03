@@ -1712,11 +1712,11 @@ body.has-notch .topbar{
       <div class="add-row">
         <div class="ig" style="position:relative">
           <label>티커</label>
-          <input type="text" id="assets-tk" placeholder="NVDA / 삼성전자" style="width:160px" autocomplete="off" oninput="onAssetsTkInput()" onfocus="onAssetsTkFocus()" onblur="setTimeout(()=>{const d=document.getElementById('assets-search-dropdown');if(d)d.style.display='none';},200)">
+          <input type="text" id="assets-tk" placeholder="NVDA / 삼성전자" style="width:160px" autocomplete="off" oninput="onAssetsTkInput()" onfocus="onAssetsTkFocus()" onkeydown="if(event.key==='Enter'){event.preventDefault();$('assets-sh').focus();}" onblur="setTimeout(()=>{const d=document.getElementById('assets-search-dropdown');if(d)d.style.display='none';},200)">
           <div id="assets-search-dropdown" class="search-dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;min-width:240px;max-height:240px;overflow-y:auto;z-index:2000;margin-top:4px;background:var(--bg2);border:1px solid var(--border);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,0.5)"></div>
         </div>
-        <div class="ig"><label>수량</label><input type="number" id="assets-sh" placeholder="10" min="0" style="width:90px"></div>
-        <div class="ig"><label id="assets-avg-label">평단가 ($)</label><input type="number" id="assets-avg" placeholder="120" step="0.01" min="0" style="width:110px"></div>
+        <div class="ig"><label>수량</label><input type="number" id="assets-sh" placeholder="10" min="0" style="width:90px" onkeydown="if(event.key==='Enter'){event.preventDefault();$('assets-avg').focus();}"></div>
+        <div class="ig"><label id="assets-avg-label">평단가 ($)</label><input type="number" id="assets-avg" placeholder="120" step="0.01" min="0" style="width:110px" onkeydown="if(event.key==='Enter'){event.preventDefault();addAsset();}"></div>
         <button class="btn btn-p btn-icon" data-icon="plus" data-icon-size="14" onclick="addAsset()"><span class="ico"></span>추가</button>
       </div>
       <div id="assets-loading" class="ltxt" style="display:none">가격 업데이트 중...</div>
@@ -1890,6 +1890,7 @@ const ICONS = {
   moon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>',
   sun: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>',
   settings: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>',
+  edit: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>',
   'chevron-left': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>',
   'chevron-right': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>',
   grid: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>',
@@ -6236,7 +6237,7 @@ function guessETFSectorByName(name){
   // 같은 자산군은 같은 이름으로 (예: 모든 나스닥 관련 → "미국 나스닥")
   const checks=[
     // 광범위 한국 지수 (레버리지/인버스라도 KOSPI200 키워드 있으면 여기로)
-    [/KOSPI200|코스피200|KOSPI\s*200/i,'한국 KOSPI200'],
+    [/KOSPI200|코스피200|KOSPI\s*200|\b200\b.*(타깃|타겟|커버드콜|위클리|TR)|(타깃|타겟|커버드콜|위클리|TR).*\b200\b|KODEX\s*200|TIGER\s*200|ACE\s*200|RISE\s*200|PLUS\s*200|HANARO\s*200/i,'한국 KOSPI200'],
     [/KOSDAQ150|코스닥150|KOSDAQ\s*150/i,'한국 KOSDAQ150'],
     [/KOSPI|코스피/i,'한국 KOSPI'],
     [/KOSDAQ|코스닥/i,'한국 KOSDAQ'],
@@ -6342,6 +6343,62 @@ function guessETFSectorByName(name){
 function removeAsset(i){
   if(!confirm(`${portfolio[i].tk}를 삭제하시겠습니까?`))return;
   portfolio.splice(i,1);savePF();renderAssets();
+}
+
+// 보유 종목 편집 (수량, 평단가)
+function openEditAsset(idx){
+  const s=portfolio[idx];
+  if(!s)return;
+  const isKr=isKRTicker(s.tk);
+  const displayName=getDisplayName(s.tk,s.name);
+  const sym=isKr?'₩':'$';
+  const html=`
+    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:18px;max-width:380px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,0.5)">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+        <div>
+          <div style="font-size:16px;font-weight:700">${displayName}</div>
+          ${isKr?'':`<div style="font-size:11px;color:var(--text2);margin-top:2px;font-family:'JetBrains Mono',monospace">${s.tk}</div>`}
+        </div>
+        <button onclick="this.closest('.modal-overlay').classList.remove('on')" style="background:var(--bg3);border:1px solid var(--border);color:var(--text);width:28px;height:28px;border-radius:6px;cursor:pointer;font-size:16px">×</button>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div>
+          <label style="display:block;font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px">수량</label>
+          <input type="number" id="edit-sh" value="${s.sh}" min="0" step="any" style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:10px 12px;border-radius:8px;font-size:14px;font-family:'JetBrains Mono',monospace">
+        </div>
+        <div>
+          <label style="display:block;font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px">평단가 (${sym})</label>
+          <input type="number" id="edit-avg" value="${s.avg}" min="0" step="${isKr?'1':'0.01'}" style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:10px 12px;border-radius:8px;font-size:14px;font-family:'JetBrains Mono',monospace">
+        </div>
+        <div style="display:flex;gap:8px;margin-top:6px">
+          <button onclick="this.closest('.modal-overlay').classList.remove('on')" style="flex:1;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:10px;border-radius:8px;font-weight:600;cursor:pointer">취소</button>
+          <button onclick="saveEditAsset(${idx})" class="btn btn-p" style="flex:1;padding:10px;border-radius:8px;font-weight:600">저장</button>
+        </div>
+      </div>
+    </div>
+  `;
+  let modal=$('edit-asset-modal');
+  if(!modal){
+    modal=document.createElement('div');
+    modal.id='edit-asset-modal';
+    modal.className='modal-overlay';
+    modal.onclick=e=>{if(e.target===modal)modal.classList.remove('on');};
+    document.body.appendChild(modal);
+  }
+  modal.innerHTML=html;
+  modal.classList.add('on');
+  setTimeout(()=>$('edit-sh')?.focus(),100);
+}
+
+function saveEditAsset(idx){
+  const sh=parseFloat($('edit-sh').value);
+  const avg=parseFloat($('edit-avg').value);
+  if(!sh||sh<=0||!avg||avg<=0){toast('수량과 평단가를 정확히 입력');return;}
+  portfolio[idx].sh=sh;
+  portfolio[idx].avg=avg;
+  savePF();
+  renderAssets();
+  $('edit-asset-modal').classList.remove('on');
 }
 
 async function refreshAssets(){
@@ -7068,7 +7125,7 @@ function renderAssets(){
       <td>${s.price?fmtCellPrice(s.price,s.tk):'—'}</td>
       <td>${mkt?fmtCellPrice(mkt,s.tk):'—'}</td>
       <td class="${pct>=0?'up':'down'}">${pct!=null?fp(pct):'—'}</td>
-      <td><button class="del-btn" onclick="removeAsset(${i})">${ic('trash',13)}</button></td>
+      <td style="white-space:nowrap"><button class="del-btn" onclick="openEditAsset(${i})" title="수정" style="margin-right:4px">${ic('edit',13)}</button><button class="del-btn" onclick="removeAsset(${i})" title="삭제">${ic('trash',13)}</button></td>
     </tr>`;
   }).join('');
 
@@ -7213,10 +7270,14 @@ function renderAssetHistory(){
     const d=new Date(h.date);
     return `${d.getMonth()+1}/${d.getDate()}`;
   });
-  const mktData=filtered.map(h=>h.mkt);
-  const costData=filtered.map(h=>h.cost);
+  // 저장된 history는 USD 기준 — 표시 통화로 변환
+  const useKrw=ASSET_CURRENCY==='krw';
+  const conv=v=>useKrw?v*USD_KRW:v;
+  const sym=useKrw?'₩':'$';
+  const mktData=filtered.map(h=>conv(h.mkt));
+  const costData=filtered.map(h=>conv(h.cost));
 
-  // 시작 대비 수익률 (백분율)
+  // 시작 대비 수익률 (백분율) — 통화 무관
   const firstMkt=filtered[0].mkt;
   const lastMkt=filtered[filtered.length-1].mkt;
   const periodReturn=((lastMkt-firstMkt)/firstMkt*100).toFixed(2);
@@ -7243,14 +7304,14 @@ function renderAssetHistory(){
           callbacks:{
             label:(c)=>{
               const val=c.parsed.y;
-              return c.dataset.label+': $'+val.toLocaleString('en-US',{maximumFractionDigits:0});
+              return c.dataset.label+': '+sym+Math.round(val).toLocaleString('en-US');
             }
           }
         }
       },
       scales:{
         x:{grid:{display:false},ticks:{font:{size:10},color:txt2,maxTicksLimit:8}},
-        y:{grid:{color:'rgba(150,150,170,.08)'},ticks:{font:{size:10},color:txt2,callback:v=>'$'+(v>=1000?(v/1000).toFixed(1)+'K':v.toFixed(0))}}
+        y:{grid:{color:'rgba(150,150,170,.08)'},ticks:{font:{size:10},color:txt2,callback:v=>sym+(useKrw?(v>=1e8?(v/1e8).toFixed(1)+'억':v>=1e4?(v/1e4).toFixed(0)+'만':v.toFixed(0)):(v>=1000?(v/1000).toFixed(1)+'K':v.toFixed(0)))}}
       }
     }
   });
@@ -7377,12 +7438,13 @@ function drawAssetsPieChart(totMkt){
 
   // 통화 설정에 따라 값을 표시 통화로 변환
   const useKrw=ASSET_CURRENCY==='krw';
-  const data=portfolio.filter(s=>s.price).map(s=>{
+  const allData=portfolio.filter(s=>s.price).map(s=>{
     const isKr=isKRTicker(s.tk);
     const rawVal=s.price*s.sh;
     const valInTarget=useKrw
       ? (isKr?rawVal:rawVal*USD_KRW)
       : (isKr?rawVal/USD_KRW:rawVal);
+    const pnlPct=s.avg?((s.price-s.avg)/s.avg)*100:0;
     return {
       label:getDisplayName(s.tk,s.name),
       tk:s.tk,
@@ -7390,23 +7452,50 @@ function drawAssetsPieChart(totMkt){
       sh:s.sh,
       price:s.price,
       avg:s.avg,
+      pnlPct,
       isKr,
     };
   }).sort((a,b)=>b.value-a.value);
 
-  const colors=['#10d090','#4a9eff','#22e8a8','#ffb432','#ff6b7a','#bf72ff','#26d782','#ff4d6d','#7a8499','#0ea860'];
+  const totalInTarget=allData.reduce((sum,d)=>sum+d.value,0);
+
+  // 상위 10개 + 나머지 "기타" 묶음
+  const TOP_N=10;
+  let chartData=allData;
+  if(allData.length>TOP_N){
+    const top=allData.slice(0,TOP_N);
+    const rest=allData.slice(TOP_N);
+    const restSum=rest.reduce((s,d)=>s+d.value,0);
+    chartData=[...top,{
+      label:`기타 (${rest.length}개)`,
+      tk:'__OTHER__',
+      value:restSum,
+      isOther:true,
+      restItems:rest,
+    }];
+  }
+
+  // 전역 저장 (모두 보기 모달용)
+  window.__ASSETS_ALL_DATA__=allData;
+  window.__ASSETS_TOTAL__=totalInTarget;
+  window.__ASSETS_USEKRW__=useKrw;
+
+  const colors=['#10d090','#4a9eff','#22e8a8','#ffb432','#ff6b7a','#bf72ff','#26d782','#ff4d6d','#7a8499','#0ea860','#888c9a'];
   const txt2=getComputedStyle(document.documentElement).getPropertyValue('--text2');
-  const totalInTarget=data.reduce((sum,d)=>sum+d.value,0);
   const sym=useKrw?'₩':'$';
 
-  // 라벨 길이 제한 (범례 깨지지 않게)
-  const shortLabels=data.map(d=>d.label.length>14?d.label.slice(0,13)+'…':d.label);
+  // 범례 라벨 — 종목명 + 비중 % 함께
+  const labels=chartData.map(d=>{
+    const pct=(d.value/totalInTarget*100).toFixed(1);
+    const name=d.label.length>14?d.label.slice(0,13)+'…':d.label;
+    return `${name} (${pct}%)`;
+  });
 
   CH.assetsPie=new Chart(newC,{type:'doughnut',data:{
-    labels:shortLabels,
+    labels,
     datasets:[{
-      data:data.map(d=>d.value),
-      backgroundColor:data.map((_,i)=>colors[i%colors.length]),
+      data:chartData.map(d=>d.value),
+      backgroundColor:chartData.map((_,i)=>colors[i%colors.length]),
       borderWidth:0,
     }]
   },options:{
@@ -7414,18 +7503,97 @@ function drawAssetsPieChart(totMkt){
     onClick:(evt,elements)=>{
       if(!elements.length)return;
       const idx=elements[0].index;
-      const item=data[idx];
-      showStockHoldingDetail(item,totalInTarget,useKrw);
+      const item=chartData[idx];
+      if(item.isOther){
+        showAllHoldingsListModal(allData,totalInTarget,useKrw,'종목별 비중');
+      }else{
+        showStockHoldingDetail(item,totalInTarget,useKrw);
+      }
     },
     plugins:{
-      legend:{position:'right',labels:{font:{size:10,family:'Inter'},color:txt2,boxWidth:8,padding:6}},
+      legend:{
+        position:'right',
+        labels:{
+          font:{size:10,family:'Inter'},
+          color:txt2,
+          boxWidth:8,
+          padding:6,
+        },
+      },
       tooltip:{callbacks:{label:c=>{
         const v=c.parsed;
         const pct=(v/totalInTarget*100).toFixed(1);
-        return `${data[c.dataIndex].label}: ${sym}${Math.round(v).toLocaleString()} (${pct}%)`;
+        return `${chartData[c.dataIndex].label}: ${sym}${Math.round(v).toLocaleString()} (${pct}%)`;
       }}}
     }
   }});
+
+  // 차트 아래에 "모두 보기" 버튼 추가
+  const wrap=newC.parentNode;
+  let allBtn=wrap.querySelector('.show-all-btn');
+  if(!allBtn){
+    allBtn=document.createElement('button');
+    allBtn.className='show-all-btn';
+    allBtn.style.cssText='margin-top:8px;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:6px 14px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;width:100%';
+    allBtn.textContent=`📋 종목 전체 리스트 (${allData.length}개)`;
+    allBtn.onclick=()=>showAllHoldingsListModal(allData,totalInTarget,useKrw,'종목별 비중');
+    wrap.appendChild(allBtn);
+  }else{
+    allBtn.textContent=`📋 종목 전체 리스트 (${allData.length}개)`;
+    allBtn.onclick=()=>showAllHoldingsListModal(allData,totalInTarget,useKrw,'종목별 비중');
+  }
+}
+
+// 모든 종목/섹터 리스트 모달 (스크롤 가능)
+function showAllHoldingsListModal(items,total,useKrw,title){
+  const sym=useKrw?'₩':'$';
+  const rows=items.sort((a,b)=>b.value-a.value).map((item,i)=>{
+    const pct=(item.value/total*100).toFixed(2);
+    const isUp=item.pnlPct>=0;
+    const pctColor=item.pnlPct!=null?(isUp?'var(--up)':'var(--down)'):'var(--text2)';
+    const pnlStr=item.pnlPct!=null?`${isUp?'+':''}${item.pnlPct.toFixed(2)}%`:'';
+    // 섹터 모달이면 stocks 배열, 종목 모달이면 단일
+    const subInfo=item.stocks
+      ?`${item.stocks.length}개 종목`
+      :(item.sh?`${item.sh}주`:'');
+    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:var(--bg3);border-radius:8px;margin-bottom:6px;cursor:pointer" onclick="(${item.stocks?'showSectorHoldingsDetail':'showStockHoldingDetail'})(${item.stocks?`window.__SEC_MODAL_DATA__[${i}]`:`window.__ASSETS_ALL_DATA__[${i}]`},${total},${useKrw})">
+      <div style="display:flex;align-items:center;gap:10px;flex:1;min-width:0">
+        <div style="font-size:11px;color:var(--text2);width:20px;text-align:right">${i+1}</div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${item.label}</div>
+          <div style="font-size:10px;color:var(--text2);margin-top:2px">${subInfo}</div>
+        </div>
+      </div>
+      <div style="text-align:right;flex-shrink:0;margin-left:8px">
+        <div style="font-size:13px;font-weight:700">${pct}%</div>
+        <div style="font-size:11px;font-family:'JetBrains Mono',monospace;color:var(--text2);margin-top:2px">${sym}${Math.round(item.value).toLocaleString()}</div>
+        ${pnlStr?`<div style="font-size:10px;margin-top:1px;color:${pctColor}">${pnlStr}</div>`:''}
+      </div>
+    </div>`;
+  }).join('');
+  
+  const html=`
+    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:18px;max-width:480px;width:100%;max-height:85vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,0.5)">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-shrink:0">
+        <div>
+          <div style="font-size:16px;font-weight:700">${title}</div>
+          <div style="font-size:11px;color:var(--text2);margin-top:2px">전체 ${items.length}개 · ${sym}${Math.round(total).toLocaleString()}</div>
+        </div>
+        <button onclick="this.closest('.modal-overlay').classList.remove('on')" style="background:var(--bg3);border:1px solid var(--border);color:var(--text);width:28px;height:28px;border-radius:6px;cursor:pointer;font-size:16px;flex-shrink:0">×</button>
+      </div>
+      <div style="overflow-y:auto;flex:1">${rows}</div>
+    </div>
+  `;
+  let modal=$('list-modal');
+  if(!modal){
+    modal=document.createElement('div');
+    modal.id='list-modal';
+    modal.className='modal-overlay';
+    modal.onclick=e=>{if(e.target===modal)modal.classList.remove('on');};
+    document.body.appendChild(modal);
+  }
+  modal.innerHTML=html;
+  modal.classList.add('on');
 }
 
 // 종목 클릭 시 상세 모달 표시
@@ -7503,8 +7671,18 @@ function normalizeSector(s){
   sec=translateSector(sec);
   // ETF 접두사 + 운용사 + "한국 " 정리
   sec=sec.replace(/^ETF\s*·\s*/,'');
-  sec=sec.replace(/\s*\((KODEX|TIGER|ACE|RISE|KoAct|KOACT|PLUS|HANARO|KOSEF|ARIRANG|TIMEFOLIO|KINDEX|SOL|WON|1Q|KBSTAR|WOORI|MIDAS)\)\s*$/i,'');
+  sec=sec.replace(/\s*\((KODEX|TIGER|ACE|RISE|KoAct|KOACT|PLUS|HANARO|KOSEF|ARIRANG|TIMEFOLIO|KINDEX|SOL|WON|1Q|KBSTAR|WOORI|MIDAS|H\/TIGER|H\/ACE|H\/KODEX)\)\s*$/i,'');
   sec=sec.replace(/^한국\s*(?=[가-힣])/,'');
+  // KOSPI/KOSDAQ 앞의 "한국 " 도 제거 (KOSPI200, KOSDAQ150 등 영문은 자체로 한국 지수임을 의미)
+  sec=sec.replace(/^한국\s+(?=KOSPI|KOSDAQ)/i,'');
+  // 추가 정규화 (커버드콜/데일리/타깃/PR/위클리 등 ETF 변형은 기초 지수로 통합)
+  sec=sec.replace(/\s*(타깃|타겟|데일리|위클리|월배당|PR|H)\s*/g,'');
+  // 나스닥100 → 나스닥, S&P500 동일가중 → S&P 500 등
+  sec=sec.replace(/나스닥\s*100/g,'나스닥');
+  sec=sec.replace(/S&P\s*500\s*동일가중/gi,'S&P 500');
+  sec=sec.replace(/\s*동일가중/g,'');
+  sec=sec.replace(/\s*커버드콜/g,'');
+  sec=sec.trim();
   return sec;
 }
 
@@ -7548,17 +7726,58 @@ function drawSectorChart(totMkt){
   const newC=document.createElement('canvas');newC.id='assets-sector';
   parent.replaceChild(newC,oldC);
 
-  const colors=['#10d090','#4a9eff','#22e8a8','#ffb432','#ff6b7a','#bf72ff','#26d782','#ff4d6d','#7a8499','#0ea860'];
+  const colors=['#10d090','#4a9eff','#22e8a8','#ffb432','#ff6b7a','#bf72ff','#26d782','#ff4d6d','#7a8499','#0ea860','#888c9a'];
   const txt2=getComputedStyle(document.documentElement).getPropertyValue('--text2');
 
   const totalSec=sectors.reduce((sum,s)=>sum+s[1],0);
   const sym=useKrw?'₩':'$';
+
+  // 섹터 데이터 변환: 등락률(가중평균) 추가
+  const allSectorData=sectors.map(([name,val])=>{
+    const stocks=sectorStocks[name]||[];
+    // 가중평균 등락률
+    let weightedSum=0,weightTotal=0;
+    stocks.forEach(st=>{
+      const pnlPct=st.avg?((st.price-st.avg)/st.avg)*100:0;
+      weightedSum+=pnlPct*st.value;
+      weightTotal+=st.value;
+    });
+    const avgPnlPct=weightTotal?weightedSum/weightTotal:0;
+    return {label:name,value:val,stocks,pnlPct:avgPnlPct};
+  });
+
+  // 상위 10개 + 기타
+  const TOP_N=10;
+  let chartSectors=allSectorData;
+  if(allSectorData.length>TOP_N){
+    const top=allSectorData.slice(0,TOP_N);
+    const rest=allSectorData.slice(TOP_N);
+    const restSum=rest.reduce((s,d)=>s+d.value,0);
+    const restStocks=rest.flatMap(d=>d.stocks);
+    chartSectors=[...top,{
+      label:`기타 (${rest.length}개)`,
+      value:restSum,
+      stocks:restStocks,
+      isOther:true,
+      restItems:rest,
+    }];
+  }
+
+  // 전역 저장
+  window.__SEC_MODAL_DATA__=allSectorData;
+
+  // 범례 라벨 — 섹터명 + 비중 %
+  const labels=chartSectors.map(d=>{
+    const pct=(d.value/totalSec*100).toFixed(1);
+    const name=d.label.length>14?d.label.slice(0,13)+'…':d.label;
+    return `${name} (${pct}%)`;
+  });
   
   CH.assetsSector=new Chart(newC,{type:'doughnut',data:{
-    labels:sectors.map(s=>s[0]),
+    labels,
     datasets:[{
-      data:sectors.map(s=>s[1]),
-      backgroundColor:sectors.map((_,i)=>colors[i%colors.length]),
+      data:chartSectors.map(d=>d.value),
+      backgroundColor:chartSectors.map((_,i)=>colors[i%colors.length]),
       borderWidth:0,
     }]
   },options:{
@@ -7566,19 +7785,36 @@ function drawSectorChart(totMkt){
     onClick:(evt,elements)=>{
       if(!elements.length)return;
       const idx=elements[0].index;
-      const sectorName=sectors[idx][0];
-      const stocks=window.__SECTOR_STOCKS__?.[sectorName]||[];
-      showSectorHoldingsDetail(sectorName,stocks,totalSec,useKrw);
+      const item=chartSectors[idx];
+      if(item.isOther){
+        showAllHoldingsListModal(allSectorData,totalSec,useKrw,'섹터별 비중');
+      }else{
+        showSectorHoldingsDetail(item.label,item.stocks,totalSec,useKrw);
+      }
     },
     plugins:{
       legend:{position:'right',labels:{font:{size:10,family:'Inter'},color:txt2,boxWidth:8,padding:6}},
       tooltip:{callbacks:{label:c=>{
         const v=c.parsed;
         const pct=(v/totalSec*100).toFixed(1);
-        return `${c.label}: ${sym}${Math.round(v).toLocaleString()} (${pct}%)`;
+        const item=chartSectors[c.dataIndex];
+        const pnl=item.pnlPct!=null?` · 평균 ${item.pnlPct>=0?'+':''}${item.pnlPct.toFixed(2)}%`:'';
+        return `${item.label}: ${sym}${Math.round(v).toLocaleString()} (${pct}%)${pnl}`;
       }}}
     }
   }});
+
+  // 차트 아래 "모두 보기" 버튼
+  const wrap=newC.parentNode;
+  let allBtn=wrap.querySelector('.show-all-btn');
+  if(!allBtn){
+    allBtn=document.createElement('button');
+    allBtn.className='show-all-btn';
+    allBtn.style.cssText='margin-top:8px;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:6px 14px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;width:100%';
+    wrap.appendChild(allBtn);
+  }
+  allBtn.textContent=`📋 섹터 전체 리스트 (${allSectorData.length}개)`;
+  allBtn.onclick=()=>showAllHoldingsListModal(allSectorData,totalSec,useKrw,'섹터별 비중');
 }
 
 // 섹터 클릭 시 그 섹터에 속한 보유 종목 모달
@@ -7906,6 +8142,7 @@ function toggleAssetCurrency(){
   ASSET_CURRENCY=ASSET_CURRENCY==='usd'?'krw':'usd';
   try{localStorage.setItem('asset_currency',ASSET_CURRENCY);}catch(e){}
   renderAssets();
+  if(typeof renderAssetHistory==='function')renderAssetHistory();
 }
 function loadAssetCurrency(){
   try{const v=localStorage.getItem('asset_currency');if(v==='krw'||v==='usd')ASSET_CURRENCY=v;}catch(e){}
