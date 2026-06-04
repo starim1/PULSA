@@ -2632,7 +2632,30 @@ async function fetchStock(tk){
   const proxyUrl=`/api/stock?symbol=${tk}&range=${CURRENT_RANGE}&interval=${interval}`;
   try{
     const data=await tryFetch(proxyUrl);
-    if(data?.chart?.result?.[0])return parseYahoo(tk,data);
+    if(data?.chart?.result?.[0]){
+      const result=parseYahoo(tk,data);
+      // 등락률은 전일 종가 대비로 통일 (1d range로 별도 조회)
+      // CURRENT_RANGE가 1d가 아니면 1일 데이터 추가 호출
+      if(CURRENT_RANGE!=='1d'){
+        try{
+          const d1=await tryFetch(`/api/stock?symbol=${tk}&range=1d&interval=1m`);
+          const meta1=d1?.chart?.result?.[0]?.meta;
+          if(meta1?.regularMarketPrice&&meta1?.chartPreviousClose){
+            const cp=meta1.regularMarketPrice;
+            const pc=meta1.chartPreviousClose;
+            result.cp=cp;
+            result.pc=pc;
+            result.dc=cp-pc;
+            result.dcp=((cp-pc)/pc)*100;
+            if(result.meta){
+              result.meta.regularMarketPrice=cp;
+              result.meta.chartPreviousClose=pc;
+            }
+          }
+        }catch(e){}
+      }
+      return result;
+    }
   }catch(e){}
   try{
     const data=await tryFetch(`https://query1.finance.yahoo.com/v8/finance/chart/${tk}?interval=${interval}&range=${CURRENT_RANGE}`);
@@ -7827,14 +7850,20 @@ function showSectorHoldingsDetail(sectorName,stocks,total,useKrw){
     const origPrice=st.isKr?'₩'+Math.round(st.price).toLocaleString():'$'+st.price.toFixed(2);
     const pnl=(st.price-st.avg)*st.sh;
     const pnlPct=((st.price-st.avg)/st.avg)*100;
-    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:10px;background:var(--bg3);border-radius:8px;margin-bottom:6px">
+    const pnlSym=pnl>=0?'+':'';
+    const pnlAbs=Math.abs(Math.round(pnl));
+    const pnlStr=st.isKr?`${pnlSym}₩${pnlAbs.toLocaleString()}`:`${pnlSym}$${Math.abs(pnl).toFixed(2)}`;
+    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:12px;background:var(--bg3);border-radius:8px;margin-bottom:6px">
       <div style="flex:1;min-width:0">
         <div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${st.name}</div>
-        <div style="font-size:10px;color:var(--text2);margin-top:2px">${st.sh}주 · ${origPrice}</div>
+        <div style="font-size:10px;color:var(--text2);margin-top:3px">${st.sh}주 · 현재 ${origPrice}</div>
+        <div style="font-size:11px;margin-top:3px;color:${pnl>=0?'var(--up)':'var(--down)'};font-weight:600">
+          ${pnlSym}${pnlPct.toFixed(2)}% <span style="font-size:10px;font-weight:500;opacity:0.8">(${pnlStr})</span>
+        </div>
       </div>
       <div style="text-align:right;flex-shrink:0;margin-left:10px">
-        <div style="font-size:13px;font-weight:700">${sym}${Math.round(st.value).toLocaleString()}</div>
-        <div style="font-size:10px;color:${pnl>=0?'var(--up)':'var(--down)'}">${pnlPct>=0?'+':''}${pnlPct.toFixed(1)}% · ${pct}%</div>
+        <div style="font-size:14px;font-weight:700">${sym}${Math.round(st.value).toLocaleString()}</div>
+        <div style="font-size:11px;color:var(--accent);margin-top:3px;font-weight:600">${pct}%</div>
       </div>
     </div>`;
   }).join('');
@@ -9205,7 +9234,8 @@ ${p.label} 동안의 주요 뉴스 / 정책 / 실적 등 2~3개
 }
 async function fetchIdx(tk){
   try{
-    const data=await tryFetch(`/api/stock?symbol=${encodeURIComponent(tk)}&range=5d`);
+    // 1d range로 전일 종가 대비 등락률 계산 (모든 화면에서 일관성 유지)
+    const data=await tryFetch(`/api/stock?symbol=${encodeURIComponent(tk)}&range=1d&interval=1m`);
     const meta=data?.chart?.result?.[0]?.meta;if(!meta)return null;
     const price=meta.regularMarketPrice,pc=meta.chartPreviousClose;
     return{price,chgPct:pc?((price-pc)/pc)*100:0};
@@ -9252,7 +9282,7 @@ async function loadCalendar(){
   if($('cal-list'))$('cal-list').innerHTML='<div class="ltxt">로딩 중...</div>';
 
   // 캐시: 24시간 (하루 1회 자동 최신화)
-  const cacheKey='cal_cache_v3';  // v3: IPO 추가
+  const cacheKey='cal_cache_v4';  // v4: 실적 결과 자동 표시 (epsActual)
   try{
     const cached=localStorage.getItem(cacheKey);
     if(cached){
@@ -9336,12 +9366,32 @@ async function loadCalendar(){
           dateObj=new Date(yy,mm-1,dd);
           timeNote='시간 미정';
         }
-        const epsNote=e.epsEstimate?` · 예상 EPS $${Number(e.epsEstimate).toFixed(2)}`:'';
+        // 실적 발표 결과 자동 표시 (Finnhub epsActual 필드)
+        const hasActual=e.epsActual!=null&&e.epsActual!==undefined;
+        let titlePrefix='';
+        let metaParts=[];
+        if(hasActual){
+          // 발표 완료
+          const actual=Number(e.epsActual).toFixed(2);
+          const estimate=e.epsEstimate?Number(e.epsEstimate).toFixed(2):null;
+          let beatMiss='';
+          if(estimate){
+            const diff=((Number(e.epsActual)-Number(e.epsEstimate))/Math.abs(Number(e.epsEstimate)))*100;
+            if(diff>0)beatMiss=` · 어닝 비트 +${diff.toFixed(1)}%`;
+            else if(diff<0)beatMiss=` · 어닝 미스 ${diff.toFixed(1)}%`;
+            else beatMiss=' · 예상치 부합';
+          }
+          titlePrefix='✅ ';
+          metaParts.push(`${tag} · 발표 완료 · 실제 EPS $${actual}${estimate?` (예상 $${estimate})`:''}${beatMiss}`);
+        }else{
+          const epsNote=e.epsEstimate?` · 예상 EPS $${Number(e.epsEstimate).toFixed(2)}`:'';
+          metaParts.push(`${tag} · ${timeNote}${epsNote}`);
+        }
         events.push({
           date:dateObj,
-          title:`${e.symbol} 실적 발표`,
+          title:`${titlePrefix}${e.symbol} 실적 발표`,
           type:'earn',
-          meta:`${tag} · ${timeNote}${epsNote}`,
+          meta:metaParts.join(''),
           imp:isWatch||isPortfolio?3:2,
           url:`https://finance.yahoo.com/quote/${e.symbol}/`,
         });
