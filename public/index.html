@@ -9343,16 +9343,38 @@ ${p.label} 동안의 주요 뉴스 / 정책 / 실적 등 2~3개
 }
 async function fetchIdx(tk){
   try{
-    // 1d range로 전일 종가 대비 등락률 계산 (모든 화면에서 일관성 유지)
-    const data=await tryFetch(`/api/stock?symbol=${encodeURIComponent(tk)}&range=1d&interval=1m`);
-    const meta=data?.chart?.result?.[0]?.meta;if(!meta)return null;
+    // 1d range로 전일 종가 + 등락 + 시간외 가격 가져오기
+    // 단, 1d/1m 응답에 marketState나 시간외가 없으면 5d로 폴백
+    let data=await tryFetch(`/api/stock?symbol=${encodeURIComponent(tk)}&range=1d&interval=1m`);
+    let meta=data?.chart?.result?.[0]?.meta;
+    if(!meta)return null;
+    
+    // marketState나 시간외 필드가 누락된 경우 5d로 재시도
+    const needFallback=!meta.marketState||(!meta.postMarketPrice&&!meta.preMarketPrice);
+    if(needFallback){
+      try{
+        const data5=await tryFetch(`/api/stock?symbol=${encodeURIComponent(tk)}&range=5d&interval=5m`);
+        const meta5=data5?.chart?.result?.[0]?.meta;
+        if(meta5){
+          // 시간외 필드는 5d가 더 잘 가져옴
+          meta={...meta,
+            marketState:meta5.marketState||meta.marketState,
+            preMarketPrice:meta5.preMarketPrice||meta.preMarketPrice,
+            preMarketChange:meta5.preMarketChange||meta.preMarketChange,
+            preMarketChangePercent:meta5.preMarketChangePercent||meta.preMarketChangePercent,
+            postMarketPrice:meta5.postMarketPrice||meta.postMarketPrice,
+            postMarketChange:meta5.postMarketChange||meta.postMarketChange,
+            postMarketChangePercent:meta5.postMarketChangePercent||meta.postMarketChangePercent,
+          };
+        }
+      }catch(e){}
+    }
+    
     const price=meta.regularMarketPrice,pc=meta.chartPreviousClose;
     const ms=meta.marketState||'REGULAR';
     // 시간외 가격 (장 마감 후/시작 전)
     let livePrice=price,liveChg=price-pc,livePct=pc?((price-pc)/pc)*100:0,liveLabel='';
     if((ms==='POST'||ms==='POSTPOST'||ms==='CLOSED')&&meta.postMarketPrice){
-      // 데이마켓/시간외: 전일 종가 대비 등락은 (시간외 가격 - 정규장 종가) 합쳐서
-      // 일반 앱들은 보통 시간외 가격 + 전일 종가 대비 등락 함께 표시
       livePrice=meta.postMarketPrice;
       liveChg=livePrice-pc;
       livePct=pc?((livePrice-pc)/pc)*100:0;
